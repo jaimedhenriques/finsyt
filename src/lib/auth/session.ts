@@ -1,5 +1,5 @@
 import { auth, currentUser } from "@clerk/nextjs/server";
-import { prisma } from "@/lib/db/prisma";
+import { getPrismaClient } from "@/lib/db/prisma";
 import type { AuthContext, MembershipRole } from "@/lib/auth/types";
 
 const DEFAULT_ROLE: MembershipRole = "MEMBER";
@@ -18,6 +18,7 @@ function fallbackOrgSlug(userId: string) {
 }
 
 export async function requireAuthContext(): Promise<AuthContext> {
+  const prisma = getPrismaClient();
   const authResult = await auth();
 
   if (!authResult.userId) {

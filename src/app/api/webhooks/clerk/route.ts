@@ -1,9 +1,10 @@
 import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 import { Webhook } from "svix";
-import { prisma } from "@/lib/db/prisma";
+import { getPrismaClient } from "@/lib/db/prisma";
 
 export async function POST(request: Request) {
+  const prisma = getPrismaClient();
   const signingSecret = process.env.CLERK_WEBHOOK_SECRET;
   if (!signingSecret) {
     return NextResponse.json({ error: "Missing CLERK_WEBHOOK_SECRET" }, { status: 500 });

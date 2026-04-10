@@ -20,6 +20,27 @@ Then open http://localhost:3000.
 
 Copy `.env.example` to `.env` and fill provider keys.
 
+### Supabase Postgres (connected via Vercel)
+
+For the `supabase-violet-battery` database, ensure these are set in Vercel project env vars:
+
+- `DATABASE_URL` (pooled connection string from Supabase integration)
+- `DIRECT_URL` (direct connection string for migrations, if provided)
+- `SUPABASE_PROJECT_ID` (for reference/tracing; e.g. `xgdygzkddknvaliokxfk`)
+- `NEXT_PUBLIC_SUPABASE_URL`
+- `SUPABASE_SERVICE_ROLE_KEY`
+
+Local migration workflow:
+
+```bash
+npx prisma generate
+npx prisma migrate dev --name init
+```
+
+The API health endpoint now includes database connectivity:
+
+- `GET /api/v1/status` -> includes `database.status` as `healthy | unconfigured | unhealthy`
+
 ### Provider priority hard rule
 
 - FMP is the primary data source for market/fundamental retrieval.

@@ -2,7 +2,7 @@ import { headers } from "next/headers";
 import { NextResponse } from "next/server";
 import Stripe from "stripe";
 import { PlanCode, SubscriptionStatus } from "@prisma/client";
-import { prisma } from "@/lib/db/prisma";
+import { getPrismaClient } from "@/lib/db/prisma";
 
 const stripeSecret = process.env.STRIPE_SECRET_KEY;
 
@@ -40,6 +40,7 @@ function mapPlanCode(priceId?: string | null): PlanCode {
 }
 
 export async function POST(request: Request) {
+  const prisma = getPrismaClient();
   if (!stripe) {
     return NextResponse.json({ error: "Missing STRIPE_SECRET_KEY" }, { status: 500 });
   }

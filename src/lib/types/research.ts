@@ -4,6 +4,11 @@ export type ProviderHealth = {
   status: "healthy" | "unconfigured";
 };
 
+export type DatabaseHealth = {
+  provider: "supabase-postgres";
+  status: "healthy" | "unconfigured" | "unhealthy";
+};
+
 export type ResearchRequest = {
   question: string;
   ticker?: string;
