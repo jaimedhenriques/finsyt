@@ -1,7 +1,8 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useParams } from 'next/navigation';
+import { useQuery } from '@tanstack/react-query';
 import Link from 'next/link';
 import {
   Card,
@@ -29,6 +30,8 @@ import {
   BarChart3,
 } from 'lucide-react';
 import { cn, formatMarketCap, formatPercent, formatCurrency, formatDate } from '@/lib/utils';
+import { PriceChart } from '@/components/charts/price-chart';
+import { ErrorMessage } from '@/components/ui/error-boundary';
 
 interface CompanyData {
   symbol: string;
@@ -69,85 +72,66 @@ interface Filing {
   description?: string;
 }
 
-// Mock data for demo
-const MOCK_COMPANY: CompanyData = {
-  symbol: 'AAPL',
-  name: 'Apple Inc.',
-  description: 'Apple Inc. designs, manufactures, and markets smartphones, personal computers, tablets, wearables, and accessories worldwide. The company offers iPhone, a line of smartphones; Mac, a line of personal computers; iPad, a line of multi-purpose tablets; and wearables, home, and accessories comprising AirPods, Apple TV, Apple Watch, Beats products, and HomePod.',
-  sector: 'Technology',
-  industry: 'Consumer Electronics',
-  website: 'https://apple.com',
-  employees: 164000,
-  ceo: 'Tim Cook',
-  headquarters: 'Cupertino, California',
-  marketCap: 3020000000000,
-  peRatio: 29.5,
-  eps: 6.42,
-  dividendYield: 0.52,
-  beta: 1.28,
-  fiftyTwoWeekHigh: 199.62,
-  fiftyTwoWeekLow: 164.08,
-};
+// Fetch functions
+async function fetchProfile(symbol: string) {
+  const res = await fetch(`/api/market?action=profile&symbol=${symbol}`);
+  if (!res.ok) throw new Error('Failed to fetch profile');
+  return res.json();
+}
 
-const MOCK_QUOTE: QuoteData = {
-  price: 189.45,
-  change: 2.34,
-  changePercent: 1.25,
-  volume: 52000000,
-  high: 190.23,
-  low: 187.12,
-  open: 187.50,
-  previousClose: 187.11,
-};
+async function fetchQuote(symbol: string) {
+  const res = await fetch(`/api/market?action=quote&symbol=${symbol}`);
+  if (!res.ok) throw new Error('Failed to fetch quote');
+  return res.json();
+}
 
-const MOCK_FILINGS: Filing[] = [
-  {
-    accessionNumber: '0000320193-24-000081',
-    formType: '10-K',
-    filedAt: new Date('2024-11-01'),
-    documentUrl: 'https://sec.gov',
-    description: 'Annual Report',
-  },
-  {
-    accessionNumber: '0000320193-24-000072',
-    formType: '10-Q',
-    filedAt: new Date('2024-08-02'),
-    documentUrl: 'https://sec.gov',
-    description: 'Quarterly Report Q3 2024',
-  },
-  {
-    accessionNumber: '0000320193-24-000065',
-    formType: '8-K',
-    filedAt: new Date('2024-07-25'),
-    documentUrl: 'https://sec.gov',
-    description: 'Results of Operations and Financial Condition',
-  },
-];
+async function fetchHistorical(symbol: string, timeframe: string) {
+  const res = await fetch(`/api/market?action=historical&symbol=${symbol}&timeframe=${timeframe}`);
+  if (!res.ok) throw new Error('Failed to fetch historical data');
+  return res.json();
+}
+
+async function fetchFilings(symbol: string) {
+  const res = await fetch(`/api/filings?ticker=${symbol}&limit=5`);
+  if (!res.ok) throw new Error('Failed to fetch filings');
+  return res.json();
+}
 
 export default function CompanyPage() {
   const params = useParams();
-  const symbol = params.symbol as string;
+  const symbol = (params.symbol as string).toUpperCase();
+  const [chartTimeframe, setChartTimeframe] = useState<'1W' | '1M' | '3M' | '1Y'>('1M');
 
-  const [company, setCompany] = useState<CompanyData | null>(null);
-  const [quote, setQuote] = useState<QuoteData | null>(null);
-  const [filings, setFilings] = useState<Filing[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  // Fetch company profile
+  const { data: company, isLoading: profileLoading, error: profileError } = useQuery({
+    queryKey: ['company', 'profile', symbol],
+    queryFn: () => fetchProfile(symbol),
+    staleTime: 300000, // 5 minutes
+  });
 
-  useEffect(() => {
-    // In production, fetch from API
-    const fetchData = async () => {
-      setIsLoading(true);
-      await new Promise((r) => setTimeout(r, 500));
+  // Fetch quote
+  const { data: quote, isLoading: quoteLoading } = useQuery({
+    queryKey: ['company', 'quote', symbol],
+    queryFn: () => fetchQuote(symbol),
+    staleTime: 30000, // 30 seconds
+    refetchInterval: 60000, // Refetch every minute
+  });
 
-      // Mock data - replace with actual API calls
-      setCompany({ ...MOCK_COMPANY, symbol: symbol.toUpperCase() });
-      setQuote(MOCK_QUOTE);
-      setFilings(MOCK_FILINGS);
-      setIsLoading(false);
-    };
+  // Fetch historical prices for chart
+  const { data: historicalData, isLoading: chartLoading } = useQuery({
+    queryKey: ['company', 'historical', symbol, chartTimeframe],
+    queryFn: () => fetchHistorical(symbol, chartTimeframe),
+    staleTime: 60000,
+  });
 
-    fetchData();
-  }, [symbol]);
+  // Fetch SEC filings
+  const { data: filings } = useQuery({
+    queryKey: ['company', 'filings', symbol],
+    queryFn: () => fetchFilings(symbol),
+    staleTime: 300000,
+  });
+
+  const isLoading = profileLoading || quoteLoading;
 
   if (isLoading) {
     return (
@@ -165,19 +149,35 @@ export default function CompanyPage() {
     );
   }
 
-  if (!company || !quote) {
+  if (profileError) {
+    return (
+      <div className="flex-1 flex items-center justify-center p-8">
+        <ErrorMessage
+          title="Company Not Found"
+          message={`We couldn't find data for ${symbol}. Please check the symbol and try again.`}
+        />
+      </div>
+    );
+  }
+
+  if (!company) {
     return (
       <div className="flex-1 flex items-center justify-center">
         <div className="text-center">
           <Building className="w-12 h-12 mx-auto mb-4 text-muted-foreground opacity-50" />
           <h2 className="text-xl font-semibold mb-2">Company Not Found</h2>
           <p className="text-muted-foreground">
-            We couldn't find data for {symbol.toUpperCase()}
+            We couldn't find data for {symbol}
           </p>
         </div>
       </div>
     );
   }
+
+  // Use quote data or fallback values
+  const currentPrice = quote?.price ?? 0;
+  const priceChange = quote?.change ?? 0;
+  const priceChangePercent = quote?.changePercent ?? 0;
 
   return (
     <div className="flex-1 overflow-auto">
@@ -204,19 +204,19 @@ export default function CompanyPage() {
 
           <div className="flex flex-col items-end gap-2">
             <div className="text-right">
-              <p className="text-4xl font-bold">${quote.price.toFixed(2)}</p>
+              <p className="text-4xl font-bold">${currentPrice.toFixed(2)}</p>
               <div
                 className={cn(
                   'flex items-center justify-end gap-2 text-lg font-medium',
-                  quote.change >= 0 ? 'text-bull' : 'text-bear'
+                  priceChange >= 0 ? 'text-bull' : 'text-bear'
                 )}
               >
-                {quote.change >= 0 ? (
+                {priceChange >= 0 ? (
                   <TrendingUp className="w-5 h-5" />
                 ) : (
                   <TrendingDown className="w-5 h-5" />
                 )}
-                ${Math.abs(quote.change).toFixed(2)} ({formatPercent(quote.changePercent)})
+                ${Math.abs(priceChange).toFixed(2)} ({formatPercent(priceChangePercent)})
               </div>
             </div>
             <div className="flex gap-2">
@@ -244,6 +244,42 @@ export default function CompanyPage() {
           </TabsList>
 
           <TabsContent value="overview" className="mt-6">
+            {/* Price Chart */}
+            <Card className="mb-6">
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle>Price History</CardTitle>
+                <div className="flex gap-1">
+                  {(['1W', '1M', '3M', '1Y'] as const).map((tf) => (
+                    <Button
+                      key={tf}
+                      variant={chartTimeframe === tf ? 'default' : 'ghost'}
+                      size="sm"
+                      onClick={() => setChartTimeframe(tf)}
+                    >
+                      {tf}
+                    </Button>
+                  ))}
+                </div>
+              </CardHeader>
+              <CardContent>
+                {chartLoading ? (
+                  <Skeleton className="h-[300px] w-full" />
+                ) : historicalData?.length > 0 ? (
+                  <PriceChart
+                    data={historicalData.map((d: { date: string; close: number }) => ({
+                      date: d.date,
+                      price: d.close,
+                    }))}
+                    height={300}
+                  />
+                ) : (
+                  <div className="h-[300px] flex items-center justify-center text-muted-foreground">
+                    No chart data available
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+
             <div className="grid lg:grid-cols-3 gap-6">
               {/* About */}
               <Card className="lg:col-span-2">
@@ -371,7 +407,7 @@ export default function CompanyPage() {
               </CardHeader>
               <CardContent>
                 <div className="space-y-4">
-                  {filings.map((filing) => (
+                  {(filings || []).map((filing: Filing) => (
                     <div
                       key={filing.accessionNumber}
                       className="flex items-center justify-between p-4 rounded-lg border hover:bg-muted/50 transition"
