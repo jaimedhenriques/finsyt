@@ -6,12 +6,24 @@ import { streamChat, generateChatTitle, ChatMessage } from '@/lib/ai/chat';
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
+// Check if database is configured
+async function isDatabaseConfigured(): Promise<boolean> {
+  if (!process.env.DATABASE_URL) return false;
+  try {
+    await db.$queryRaw`SELECT 1`;
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
-    const session = await auth();
-
-    if (!session?.user?.id) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    let session = null;
+    try {
+      session = await auth();
+    } catch {
+      // Auth not configured - allow anonymous usage
     }
 
     const body = await request.json();
@@ -27,50 +39,54 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Create or get chat
-    let chat;
-    if (chatId) {
-      chat = await db.chat.findUnique({
-        where: { id: chatId, userId: session.user.id },
-      });
-      if (!chat) {
-        return NextResponse.json({ error: 'Chat not found' }, { status: 404 });
+    // Only use database if configured
+    const useDatabase = await isDatabaseConfigured();
+    let chat: { id: string } | null = null;
+
+    if (useDatabase && session?.user?.id) {
+      // Create or get chat
+      if (chatId) {
+        chat = await db.chat.findUnique({
+          where: { id: chatId, userId: session.user.id },
+        });
+      } else {
+        // Generate title from first user message
+        const firstUserMessage = messages.find((m) => m.role === 'user');
+        const title = firstUserMessage
+          ? await generateChatTitle(firstUserMessage.content)
+          : 'New Chat';
+
+        chat = await db.chat.create({
+          data: {
+            userId: session.user.id,
+            title,
+          },
+        });
       }
-    } else {
-      // Generate title from first user message
-      const firstUserMessage = messages.find((m) => m.role === 'user');
-      const title = firstUserMessage
-        ? await generateChatTitle(firstUserMessage.content)
-        : 'New Chat';
 
-      chat = await db.chat.create({
-        data: {
-          userId: session.user.id,
-          title,
-        },
-      });
+      // Save user message
+      if (chat) {
+        const lastUserMessage = messages[messages.length - 1];
+        if (lastUserMessage.role === 'user') {
+          await db.message.create({
+            data: {
+              chatId: chat.id,
+              role: 'USER',
+              content: lastUserMessage.content,
+            },
+          });
+        }
+
+        // Record usage
+        await db.usageRecord.create({
+          data: {
+            userId: session.user.id,
+            type: 'CHAT_MESSAGE',
+            quantity: 1,
+          },
+        });
+      }
     }
-
-    // Save user message
-    const lastUserMessage = messages[messages.length - 1];
-    if (lastUserMessage.role === 'user') {
-      await db.message.create({
-        data: {
-          chatId: chat.id,
-          role: 'USER',
-          content: lastUserMessage.content,
-        },
-      });
-    }
-
-    // Record usage
-    await db.usageRecord.create({
-      data: {
-        userId: session.user.id,
-        type: 'CHAT_MESSAGE',
-        quantity: 1,
-      },
-    });
 
     // Create streaming response
     const encoder = new TextEncoder();
@@ -113,32 +129,34 @@ export async function POST(request: NextRequest) {
                 )
               );
             } else if (chunk.type === 'done') {
-              // Save assistant message
-              const message = await db.message.create({
-                data: {
-                  chatId: chat.id,
-                  role: 'ASSISTANT',
-                  content: fullContent,
-                  metadata: { citations },
-                },
-              });
-
-              // Save citations
-              if (citations.length > 0) {
-                await db.citation.createMany({
-                  data: citations.map((c) => ({
-                    messageId: message.id,
-                    type: c.type as 'SEC_FILING' | 'NEWS_ARTICLE' | 'FINANCIAL_DATA' | 'RESEARCH_REPORT' | 'WEBSITE' | 'OTHER',
-                    title: c.title,
-                    url: c.url,
-                    content: c.content,
-                  })),
+              // Save assistant message if using database
+              if (useDatabase && chat) {
+                const message = await db.message.create({
+                  data: {
+                    chatId: chat.id,
+                    role: 'ASSISTANT',
+                    content: fullContent,
+                    metadata: { citations },
+                  },
                 });
+
+                // Save citations
+                if (citations.length > 0) {
+                  await db.citation.createMany({
+                    data: citations.map((c) => ({
+                      messageId: message.id,
+                      type: c.type as 'SEC_FILING' | 'NEWS_ARTICLE' | 'FINANCIAL_DATA' | 'RESEARCH_REPORT' | 'WEBSITE' | 'OTHER',
+                      title: c.title,
+                      url: c.url,
+                      content: c.content,
+                    })),
+                  });
+                }
               }
 
               controller.enqueue(
                 encoder.encode(
-                  `data: ${JSON.stringify({ type: 'done', chatId: chat.id })}\n\n`
+                  `data: ${JSON.stringify({ type: 'done', chatId: chat?.id || null })}\n\n`
                 )
               );
             }
