@@ -1,4 +1,4 @@
-import type { DataProvider, ProviderQuote } from "@/lib/providers/base";
+import type { DataProvider, MarketQuote } from "@/lib/providers/base";
 import { providerRegistry } from "@/lib/providers/registry";
 
 export type RoutedProviderOrder = {
@@ -20,7 +20,7 @@ export function getProviderRoutingOrder(): RoutedProviderOrder {
 }
 
 export async function getBestEffortQuote(symbol: string): Promise<{
-  quote: ProviderQuote | null;
+  quote: MarketQuote | null;
   attemptedProviders: string[];
 }> {
   const orderedProviders = [...providerRegistry].sort((a, b) => {

@@ -1,7 +1,6 @@
 import { auth, currentUser } from "@clerk/nextjs/server";
-import type { MembershipRole } from "@prisma/client";
 import { prisma } from "@/lib/db/prisma";
-import type { AuthContext } from "@/lib/auth/types";
+import type { AuthContext, MembershipRole } from "@/lib/auth/types";
 
 const DEFAULT_ROLE: MembershipRole = "MEMBER";
 

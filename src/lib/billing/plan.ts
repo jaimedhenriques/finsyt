@@ -1,4 +1,4 @@
-import type { PlanCode } from "@prisma/client";
+export type PlanCode = "FREE" | "PRO" | "TEAM" | "ENTERPRISE";
 
 export type PlanLimits = {
   seats: number;

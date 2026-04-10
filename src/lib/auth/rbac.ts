@@ -1,4 +1,4 @@
-import type { MembershipRole } from "@prisma/client";
+import type { MembershipRole } from "@/lib/auth/types";
 
 const roleOrder: Record<MembershipRole, number> = {
   OWNER: 4,

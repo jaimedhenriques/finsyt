@@ -1,17 +1,18 @@
 import { env } from "@/lib/config/env";
-import type { DataProvider, DataProviderStatus, ProviderQuote } from "@/lib/providers/base";
+import type { DataProvider, DataProviderStatus, MarketQuote } from "@/lib/providers/base";
 
 export class FinnhubProvider implements DataProvider {
   id = "finnhub";
   displayName = "Finnhub";
   configured = Boolean(env.FINNHUB_API_KEY);
+  priority = 40;
 
   async health(): Promise<DataProviderStatus> {
     if (!this.configured) return "unconfigured";
     return "healthy";
   }
 
-  async getQuote(symbol: string): Promise<ProviderQuote | null> {
+  async getQuote(symbol: string): Promise<MarketQuote | null> {
     if (!this.configured || !env.FINNHUB_API_KEY) return null;
 
     const params = new URLSearchParams({

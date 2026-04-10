@@ -20,10 +20,13 @@
   "homepage": "https://github.com/jaimedhenriques/finsyt#readme",
   "dependencies": {
     "@clerk/nextjs": "^7.0.12",
+    "@prisma/adapter-pg": "^7.7.0",
     "@prisma/client": "^7.7.0",
     "next": "^16.2.3",
+    "pg": "^8.20.0",
     "react": "^19.2.5",
     "react-dom": "^19.2.5",
+    "stripe": "^22.0.1",
     "svix": "^1.90.0",
     "zod": "^4.3.6"
   },

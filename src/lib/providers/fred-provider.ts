@@ -1,5 +1,5 @@
 import { env } from "@/lib/config/env";
-import type { DataProvider, DataProviderStatus } from "@/lib/providers/base";
+import type { DataProvider, DataProviderStatus, MarketQuote } from "@/lib/providers/base";
 
 export class FredProvider implements DataProvider {
   id = "fred";
@@ -11,7 +11,7 @@ export class FredProvider implements DataProvider {
     return "healthy";
   }
 
-  async getQuote() {
+  async getQuote(): Promise<MarketQuote | null> {
     return null;
   }
 }

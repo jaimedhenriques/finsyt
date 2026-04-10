@@ -9,7 +9,7 @@ const stripeSecret = process.env.STRIPE_SECRET_KEY;
 const stripe =
   stripeSecret &&
   new Stripe(stripeSecret, {
-    apiVersion: "2025-03-31.basil",
+    apiVersion: "2026-03-25.dahlia",
   });
 
 function mapStripeStatus(status: Stripe.Subscription.Status): SubscriptionStatus {
@@ -70,6 +70,10 @@ export async function POST(request: Request) {
 
     if (organizationId) {
       const priceId = subscription.items.data[0]?.price.id ?? null;
+      const periodStartUnix = subscription.items.data[0]?.current_period_start ?? null;
+      const periodEndUnix = subscription.items.data[0]?.current_period_end ?? null;
+      const currentPeriodStart = periodStartUnix ? new Date(periodStartUnix * 1000) : null;
+      const currentPeriodEnd = periodEndUnix ? new Date(periodEndUnix * 1000) : null;
 
       await prisma.subscription.upsert({
         where: {
@@ -79,8 +83,8 @@ export async function POST(request: Request) {
           status: mapStripeStatus(subscription.status),
           stripePriceId: priceId,
           planCode: mapPlanCode(priceId),
-          currentPeriodStart: new Date(subscription.current_period_start * 1000),
-          currentPeriodEnd: new Date(subscription.current_period_end * 1000),
+          currentPeriodStart,
+          currentPeriodEnd,
           cancelAtPeriodEnd: subscription.cancel_at_period_end,
         },
         create: {
@@ -90,8 +94,8 @@ export async function POST(request: Request) {
           stripeCustomerId: String(subscription.customer),
           stripeSubscriptionId: subscription.id,
           stripePriceId: priceId,
-          currentPeriodStart: new Date(subscription.current_period_start * 1000),
-          currentPeriodEnd: new Date(subscription.current_period_end * 1000),
+          currentPeriodStart,
+          currentPeriodEnd,
           cancelAtPeriodEnd: subscription.cancel_at_period_end,
         },
       });

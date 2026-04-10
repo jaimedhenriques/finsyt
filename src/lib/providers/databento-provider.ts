@@ -1,5 +1,5 @@
 import { env } from "@/lib/config/env";
-import type { DataProvider, DataProviderStatus, ProviderQuote } from "@/lib/providers/base";
+import type { DataProvider, DataProviderStatus, MarketQuote } from "@/lib/providers/base";
 
 export class DatabentoProvider implements DataProvider {
   id = "databento";
@@ -11,7 +11,7 @@ export class DatabentoProvider implements DataProvider {
     return "healthy";
   }
 
-  async getQuote(symbol: string): Promise<ProviderQuote | null> {
+  async getQuote(symbol: string): Promise<MarketQuote | null> {
     if (!this.configured || !env.DATABENTO_API_KEY) return null;
 
     const response = await fetch("https://hist.databento.com/v0/timeseries.get_range", {

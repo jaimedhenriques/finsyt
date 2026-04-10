@@ -1,5 +1,5 @@
 import { env } from "@/lib/config/env";
-import type { DataProvider, DataProviderStatus, ProviderQuote } from "@/lib/providers/base";
+import type { DataProvider, DataProviderStatus, MarketQuote } from "@/lib/providers/base";
 
 export class AlphaVantageProvider implements DataProvider {
   id = "alphavantage";
@@ -11,7 +11,7 @@ export class AlphaVantageProvider implements DataProvider {
     return "healthy";
   }
 
-  async getQuote(symbol: string): Promise<ProviderQuote | null> {
+  async getQuote(symbol: string): Promise<MarketQuote | null> {
     if (!this.configured || !env.ALPHA_VANTAGE_API_KEY) return null;
 
     const params = new URLSearchParams({
