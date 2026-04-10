@@ -11,6 +11,9 @@ import {
   Home,
   Bot,
   User,
+  Newspaper,
+  Filter,
+  PieChart,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -56,6 +59,9 @@ export default async function AppLayout({
           <NavItem href="/dashboard" icon={<Home />} label="Dashboard" />
           <NavItem href="/research" icon={<MessageSquare />} label="Research Chat" />
           <NavItem href="/market" icon={<TrendingUp />} label="Market Monitor" />
+          <NavItem href="/news" icon={<Newspaper />} label="News" />
+          <NavItem href="/screening" icon={<Filter />} label="Screening" />
+          <NavItem href="/portfolio" icon={<PieChart />} label="Portfolio" />
           <NavItem href="/filings" icon={<FileText />} label="SEC Filings" />
           <NavItem href="/companies" icon={<Briefcase />} label="Companies" />
           <NavItem href="/agents" icon={<Bot />} label="AI Agents" />

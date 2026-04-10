@@ -5,6 +5,7 @@ import {
   FinancialStatement,
   NewsArticle,
   ProviderConfig,
+  HistoricalPrice,
 } from './types';
 
 interface FMPQuote {
@@ -135,6 +136,30 @@ interface FMPNews {
   site: string;
   text: string;
   url: string;
+}
+
+interface FMPHistoricalPrice {
+  date: string;
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  adjClose: number;
+  volume: number;
+  unadjustedVolume: number;
+  change: number;
+  changePercent: number;
+  vwap: number;
+  label: string;
+  changeOverTime: number;
+}
+
+interface FMPSearchResult {
+  symbol: string;
+  name: string;
+  currency: string;
+  stockExchange: string;
+  exchangeShortName: string;
 }
 
 export class FMPProvider extends BaseProvider {
@@ -320,6 +345,58 @@ export class FMPProvider extends BaseProvider {
       revenue: e.revenue ?? undefined,
       revenueEstimated: e.revenueEstimated ?? undefined,
     }));
+  }
+
+  async getHistoricalPrices(
+    symbol: string,
+    options?: { from?: Date; to?: Date }
+  ): Promise<HistoricalPrice[]> {
+    const params: Record<string, string> = {};
+    if (options?.from) params.from = this.formatDate(options.from);
+    if (options?.to) params.to = this.formatDate(options.to);
+
+    const url = this.getUrl(`/historical-price-full/${symbol}`, params);
+    const data = await this.fetchWithRetry<{
+      symbol: string;
+      historical: FMPHistoricalPrice[];
+    }>(url);
+
+    if (!data.historical) {
+      throw this.createError('NOT_FOUND', `Historical data not found: ${symbol}`, false);
+    }
+
+    return data.historical.map((h) => ({
+      date: new Date(h.date),
+      open: h.open,
+      high: h.high,
+      low: h.low,
+      close: h.close,
+      adjustedClose: h.adjClose,
+      volume: h.volume,
+    })).sort((a, b) => a.date.getTime() - b.date.getTime());
+  }
+
+  async searchSymbol(
+    query: string
+  ): Promise<Array<{ symbol: string; name: string; type: string; region: string }>> {
+    const url = this.getUrl('/search', { query, limit: '10' });
+    const data = await this.fetchWithRetry<FMPSearchResult[]>(url);
+
+    return data.map((result) => ({
+      symbol: result.symbol,
+      name: result.name,
+      type: 'stock',
+      region: result.exchangeShortName,
+    }));
+  }
+
+  async healthCheck(): Promise<boolean> {
+    try {
+      await this.getQuote('AAPL');
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   private parseQuote(quote: FMPQuote): StockQuote {

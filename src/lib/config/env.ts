@@ -15,11 +15,14 @@ const envSchema = z.object({
   // AI Providers
   ANTHROPIC_API_KEY: z.string().optional(),
   OPENAI_API_KEY: z.string().optional(),
+  GROQ_API_KEY: z.string().optional(),
+  PERPLEXITY_API_KEY: z.string().optional(),
 
   // Financial Data Providers
   FMP_API_KEY: z.string().optional(),
   FINNHUB_API_KEY: z.string().optional(),
   ALPHA_VANTAGE_API_KEY: z.string().optional(),
+  DATABENTO_API_KEY: z.string().optional(),
   POLYGON_API_KEY: z.string().optional(),
   TIINGO_API_KEY: z.string().optional(),
   IEX_API_KEY: z.string().optional(),
@@ -45,7 +48,9 @@ function validateEnv(): Env {
 export const env = validateEnv();
 
 // Helper to check if a provider is configured
-export function isProviderConfigured(provider: 'fmp' | 'finnhub' | 'anthropic' | 'openai'): boolean {
+export function isProviderConfigured(
+  provider: 'fmp' | 'finnhub' | 'anthropic' | 'openai' | 'groq' | 'perplexity' | 'databento' | 'alpha_vantage'
+): boolean {
   switch (provider) {
     case 'fmp':
       return !!env.FMP_API_KEY;
@@ -55,6 +60,14 @@ export function isProviderConfigured(provider: 'fmp' | 'finnhub' | 'anthropic' |
       return !!env.ANTHROPIC_API_KEY;
     case 'openai':
       return !!env.OPENAI_API_KEY;
+    case 'groq':
+      return !!env.GROQ_API_KEY;
+    case 'perplexity':
+      return !!env.PERPLEXITY_API_KEY;
+    case 'databento':
+      return !!env.DATABENTO_API_KEY;
+    case 'alpha_vantage':
+      return !!env.ALPHA_VANTAGE_API_KEY;
     default:
       return false;
   }
@@ -67,7 +80,10 @@ export function requireApiKey(provider: string): string {
     finnhub: env.FINNHUB_API_KEY,
     anthropic: env.ANTHROPIC_API_KEY,
     openai: env.OPENAI_API_KEY,
+    groq: env.GROQ_API_KEY,
+    perplexity: env.PERPLEXITY_API_KEY,
     alpha_vantage: env.ALPHA_VANTAGE_API_KEY,
+    databento: env.DATABENTO_API_KEY,
     polygon: env.POLYGON_API_KEY,
     tiingo: env.TIINGO_API_KEY,
     iex: env.IEX_API_KEY,
