@@ -9,6 +9,7 @@ import {
   jsonb,
   real,
   index,
+  primaryKey,
 } from 'drizzle-orm/pg-core';
 import { relations } from 'drizzle-orm';
 
@@ -18,10 +19,13 @@ export const users = pgTable('users', {
   email: varchar('email', { length: 255 }).notNull().unique(),
   name: varchar('name', { length: 255 }),
   image: text('image'),
+  password: text('password'),
   emailVerified: timestamp('email_verified', { mode: 'date' }),
   createdAt: timestamp('created_at', { mode: 'date' }).defaultNow().notNull(),
   updatedAt: timestamp('updated_at', { mode: 'date' }).defaultNow().notNull(),
-  plan: varchar('plan', { length: 50 }).default('free').notNull(),
+  plan: varchar('plan', { length: 50 }).default('free_trial').notNull(),
+  trialStartDate: timestamp('trial_start_date', { mode: 'date' }),
+  trialEndDate: timestamp('trial_end_date', { mode: 'date' }),
   credits: integer('credits').default(100).notNull(),
 });
 
@@ -48,6 +52,15 @@ export const sessions = pgTable('sessions', {
   userId: uuid('user_id').notNull().references(() => users.id, { onDelete: 'cascade' }),
   expires: timestamp('expires', { mode: 'date' }).notNull(),
 });
+
+// Verification tokens table (for email verification)
+export const verificationTokens = pgTable('verification_tokens', {
+  identifier: varchar('identifier', { length: 255 }).notNull(),
+  token: varchar('token', { length: 255 }).notNull(),
+  expires: timestamp('expires', { mode: 'date' }).notNull(),
+}, (table) => ({
+  compositePk: primaryKey({ columns: [table.identifier, table.token] }),
+}));
 
 // Research queries table
 export const queries = pgTable('queries', {
