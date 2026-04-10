@@ -49,3 +49,4 @@ drizzle/meta/
 # Logs
 logs
 *.log
+package-lock.json
