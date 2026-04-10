@@ -1,20 +1,66 @@
 import { NextRequest, NextResponse } from 'next/server'
-const AV = process.env.ALPHA_VANTAGE_KEY
+const FINNHUB = process.env.FINNHUB_API_KEY
+const AV      = process.env.ALPHA_VANTAGE_API_KEY || process.env.ALPHA_VANTAGE_KEY
+
 export async function GET(req: NextRequest) {
-  const symbol = req.nextUrl.searchParams.get('symbol')||''
-  const topics = req.nextUrl.searchParams.get('topics')||'financial_markets'
-  const limit = parseInt(req.nextUrl.searchParams.get('limit')||'20')
+  const symbol  = req.nextUrl.searchParams.get('symbol') || ''
+  const topics  = req.nextUrl.searchParams.get('topics') || 'general'
+  const limit   = parseInt(req.nextUrl.searchParams.get('limit') || '20')
+  const from    = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10)
+  const to      = new Date().toISOString().slice(0, 10)
+
   try {
-    const params = symbol ? `tickers=${symbol.toUpperCase()}&limit=${limit}` : `topics=${topics}&limit=${limit}`
-    const res = await fetch(`https://www.alphavantage.co/query?function=NEWS_SENTIMENT&${params}&apikey=${AV}`)
-    const data = await res.json()
-    const articles = (data.feed||[]).slice(0,limit).map((item: any) => ({
-      title: item.title, url: item.url, publishedAt: item.time_published,
-      summary: item.summary, source: item.source,
-      sentiment: item.overall_sentiment_label, sentimentScore: parseFloat(item.overall_sentiment_score||'0'),
-      tickers: (item.ticker_sentiment||[]).slice(0,5).map((t: any) => t.ticker),
-      banner: item.banner_image,
-    }))
+    let articles: any[] = []
+
+    if (symbol) {
+      // Company-specific news from Finnhub
+      const res = await fetch(`https://finnhub.io/api/v1/company-news?symbol=${symbol.toUpperCase()}&from=${from}&to=${to}&token=${FINNHUB}`)
+      const data = await res.json()
+      articles = (Array.isArray(data) ? data : []).slice(0, limit).map((n: any) => ({
+        title:       n.headline,
+        url:         n.url,
+        publishedAt: new Date(n.datetime * 1000).toISOString(),
+        summary:     n.summary,
+        source:      n.source,
+        banner:      n.image || null,
+        sentiment:   null,
+        tickers:     [symbol.toUpperCase()],
+      }))
+    } else {
+      // Market-wide news from Finnhub by category
+      const categoryMap: Record<string, string> = {
+        general: 'general', financial_markets: 'general', earnings: 'general',
+        mergers_and_acquisitions: 'merger', technology: 'technology',
+        economy_macro: 'economy', forex: 'forex', crypto: 'crypto',
+      }
+      const cat = categoryMap[topics] || 'general'
+      const res = await fetch(`https://finnhub.io/api/v1/news?category=${cat}&minId=0&token=${FINNHUB}`)
+      const data = await res.json()
+      articles = (Array.isArray(data) ? data : []).slice(0, limit).map((n: any) => ({
+        title:       n.headline,
+        url:         n.url,
+        publishedAt: new Date(n.datetime * 1000).toISOString(),
+        summary:     n.summary,
+        source:      n.source,
+        banner:      n.image || null,
+        sentiment:   null,
+        tickers:     n.related ? n.related.split(',').slice(0, 3) : [],
+      }))
+    }
+
+    // Enrich with AV sentiment if available and small batch
+    if (symbol && articles.length > 0 && AV) {
+      try {
+        const avRes = await fetch(`https://www.alphavantage.co/query?function=NEWS_SENTIMENT&tickers=${symbol.toUpperCase()}&limit=10&apikey=${AV}`)
+        const avData = await avRes.json()
+        const avMap: Record<string, string> = {}
+        ;(avData.feed || []).forEach((a: any) => { avMap[a.url] = a.overall_sentiment_label })
+        articles = articles.map(a => ({ ...a, sentiment: avMap[a.url] || a.sentiment }))
+      } catch {}
+    }
+
     return NextResponse.json({ articles })
-  } catch { return NextResponse.json({ articles: [] }) }
+  } catch {
+    return NextResponse.json({ articles: [] })
+  }
 }
