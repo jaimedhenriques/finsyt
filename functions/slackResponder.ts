@@ -20,28 +20,15 @@ Deno.serve(async (req) => {
     const user = event.user;
     const text = event.text;
 
-    // Get slackbot token
-    const tokenRes = await base44.integrations.getToken('slackbot');
-    const slackToken = tokenRes.access_token;
-
-    // Send reply
-    const res = await fetch('https://slack.com/api/chat.postMessage', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${slackToken}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        channel: channel,
-        text: `<@${user}> got your message: "${text}" 👋 I'm Base44 Agent — fully connected now!`,
-        username: 'Base44 Agent',
-        icon_emoji: ':robot_face:',
-      }),
+    // Send reply using the SDK's connector integration
+    const result = await base44.integrations.slack('POST', 'chat.postMessage', {
+      channel: channel,
+      text: `<@${user}> got your message: "${text}" 👋 I'm Base44 Agent — fully connected now!`,
+      username: 'Base44 Agent',
+      icon_emoji: ':robot_face:',
     });
 
-    const result = await res.json();
     console.log('Slack post result:', JSON.stringify(result));
-
     return Response.json({ ok: true });
   } catch (error) {
     console.error('Error:', error.message);
