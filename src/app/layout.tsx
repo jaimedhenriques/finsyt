@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import './globals.css';
 import { Providers } from '@/components/providers';
+import { AssistLoopWidget } from '@/components/support/assistloop-widget';
 
 export const metadata: Metadata = {
   title: 'Finsyt - AI-Powered Financial Research',
@@ -39,6 +40,7 @@ export default function RootLayout({
     <html lang="en" suppressHydrationWarning>
       <body className="font-sans antialiased">
         <Providers>{children}</Providers>
+        <AssistLoopWidget />
       </body>
     </html>
   );
