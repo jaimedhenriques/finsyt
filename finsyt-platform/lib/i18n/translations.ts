@@ -22,6 +22,8 @@ export const T: Record<Locale, Record<string, string>> = {
     markets: 'Markets',
     deals: 'Deals & M&A',
     macro: 'Macro',
+    widgets: 'Widget Builder',
+    developer: 'Developer API',
     settings: 'Settings',
     research: 'Research',
     data: 'Data',
