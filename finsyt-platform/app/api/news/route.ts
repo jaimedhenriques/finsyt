@@ -1,66 +1,73 @@
 import { NextRequest, NextResponse } from 'next/server'
+
+const EODHD   = process.env.EODHD_API_KEY || process.env.eodhd_api
 const FINNHUB = process.env.FINNHUB_API_KEY
-const AV      = process.env.ALPHA_VANTAGE_API_KEY || process.env.ALPHA_VANTAGE_KEY
 
 export async function GET(req: NextRequest) {
-  const symbol  = req.nextUrl.searchParams.get('symbol') || ''
-  const topics  = req.nextUrl.searchParams.get('topics') || 'general'
-  const limit   = parseInt(req.nextUrl.searchParams.get('limit') || '20')
-  const from    = new Date(Date.now() - 7 * 86400000).toISOString().slice(0, 10)
-  const to      = new Date().toISOString().slice(0, 10)
+  const symbol = req.nextUrl.searchParams.get('symbol')?.toUpperCase()
+  const limit  = parseInt(req.nextUrl.searchParams.get('limit') || '30')
+  const from   = req.nextUrl.searchParams.get('from') || ''
+  const to     = req.nextUrl.searchParams.get('to') || ''
 
-  try {
-    let articles: any[] = []
+  // Primary: EODHD — includes sentiment score per article
+  if (EODHD) {
+    try {
+      const eodSymbol = symbol ? (symbol.includes('.') ? symbol : `${symbol}.US`) : ''
+      const params = new URLSearchParams({
+        api_token: EODHD,
+        limit: String(Math.min(limit, 50)),
+        fmt: 'json',
+      })
+      if (eodSymbol) params.set('s', eodSymbol)
+      if (from) params.set('from', from)
+      if (to) params.set('to', to)
 
-    if (symbol) {
-      // Company-specific news from Finnhub
-      const res = await fetch(`https://finnhub.io/api/v1/company-news?symbol=${symbol.toUpperCase()}&from=${from}&to=${to}&token=${FINNHUB}`)
+      const res = await fetch(`https://eodhd.com/api/news?${params}`, { next: { revalidate: 300 } })
       const data = await res.json()
-      articles = (Array.isArray(data) ? data : []).slice(0, limit).map((n: any) => ({
-        title:       n.headline,
-        url:         n.url,
-        publishedAt: new Date(n.datetime * 1000).toISOString(),
-        summary:     n.summary,
-        source:      n.source,
-        banner:      n.image || null,
-        sentiment:   null,
-        tickers:     [symbol.toUpperCase()],
-      }))
-    } else {
-      // Market-wide news from Finnhub by category
-      const categoryMap: Record<string, string> = {
-        general: 'general', financial_markets: 'general', earnings: 'general',
-        mergers_and_acquisitions: 'merger', technology: 'technology',
-        economy_macro: 'economy', forex: 'forex', crypto: 'crypto',
+
+      if (Array.isArray(data) && data.length > 0) {
+        return NextResponse.json(data.map((item: any) => ({
+          id:        item.id || item.url,
+          title:     item.title,
+          summary:   item.content?.slice(0, 300) || item.summary || '',
+          url:       item.link || item.url,
+          source:    item.source || 'EODHD',
+          publishedAt: item.date,
+          sentiment: item.sentiment || null, // { polarity, neg, neu, pos }
+          tickers:   item.symbols || [],
+          tags:      item.tags || [],
+          image:     item.image || null,
+          dataSource: 'eodhd',
+        })))
       }
-      const cat = categoryMap[topics] || 'general'
-      const res = await fetch(`https://finnhub.io/api/v1/news?category=${cat}&minId=0&token=${FINNHUB}`)
-      const data = await res.json()
-      articles = (Array.isArray(data) ? data : []).slice(0, limit).map((n: any) => ({
-        title:       n.headline,
-        url:         n.url,
-        publishedAt: new Date(n.datetime * 1000).toISOString(),
-        summary:     n.summary,
-        source:      n.source,
-        banner:      n.image || null,
-        sentiment:   null,
-        tickers:     n.related ? n.related.split(',').slice(0, 3) : [],
-      }))
+    } catch (e) {
+      console.error('EODHD news failed:', e)
     }
-
-    // Enrich with AV sentiment if available and small batch
-    if (symbol && articles.length > 0 && AV) {
-      try {
-        const avRes = await fetch(`https://www.alphavantage.co/query?function=NEWS_SENTIMENT&tickers=${symbol.toUpperCase()}&limit=10&apikey=${AV}`)
-        const avData = await avRes.json()
-        const avMap: Record<string, string> = {}
-        ;(avData.feed || []).forEach((a: any) => { avMap[a.url] = a.overall_sentiment_label })
-        articles = articles.map(a => ({ ...a, sentiment: avMap[a.url] || a.sentiment }))
-      } catch {}
-    }
-
-    return NextResponse.json({ articles })
-  } catch {
-    return NextResponse.json({ articles: [] })
   }
+
+  // Fallback: Finnhub
+  if (FINNHUB && symbol) {
+    try {
+      const toDate   = to   || new Date().toISOString().split('T')[0]
+      const fromDate = from || new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0]
+      const res = await fetch(
+        `https://finnhub.io/api/v1/company-news?symbol=${symbol}&from=${fromDate}&to=${toDate}&token=${FINNHUB}`
+      )
+      const data = await res.json()
+      return NextResponse.json((data || []).slice(0, limit).map((item: any) => ({
+        id:          item.id,
+        title:       item.headline,
+        summary:     item.summary,
+        url:         item.url,
+        source:      item.source,
+        publishedAt: new Date(item.datetime * 1000).toISOString(),
+        sentiment:   null,
+        tickers:     [symbol],
+        image:       item.image,
+        dataSource:  'finnhub',
+      })))
+    } catch { return NextResponse.json([], { status: 200 }) }
+  }
+
+  return NextResponse.json([])
 }
