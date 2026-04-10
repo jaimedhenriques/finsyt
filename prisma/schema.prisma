@@ -1,0 +1,325 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// ============================================================================
+// AUTH MODELS
+// ============================================================================
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  role          UserRole  @default(USER)
+  tier          UserTier  @default(FREE)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts      Account[]
+  sessions      Session[]
+  chats         Chat[]
+  watchlists    Watchlist[]
+  agents        Agent[]
+  usageRecords  UsageRecord[]
+  apiKeys       ApiKey[]
+}
+
+model Account {
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@id([provider, providerAccountId])
+}
+
+model Session {
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
+
+model VerificationToken {
+  identifier String
+  token      String
+  expires    DateTime
+
+  @@id([identifier, token])
+}
+
+// ============================================================================
+// CORE MODELS
+// ============================================================================
+
+model Chat {
+  id        String   @id @default(cuid())
+  userId    String
+  title     String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  messages Message[]
+
+  @@index([userId])
+}
+
+model Message {
+  id        String      @id @default(cuid())
+  chatId    String
+  role      MessageRole
+  content   String
+  metadata  Json?       // For tool calls, citations, etc.
+  createdAt DateTime    @default(now())
+
+  chat      Chat       @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  citations Citation[]
+
+  @@index([chatId])
+}
+
+model Citation {
+  id        String       @id @default(cuid())
+  messageId String
+  type      CitationType
+  title     String
+  url       String?
+  content   String?      // Relevant excerpt
+  metadata  Json?        // Additional source metadata
+  createdAt DateTime     @default(now())
+
+  message Message @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@index([messageId])
+}
+
+// ============================================================================
+// WATCHLIST & MARKET DATA
+// ============================================================================
+
+model Watchlist {
+  id        String   @id @default(cuid())
+  userId    String
+  name      String
+  isDefault Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  user   User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+  items  WatchlistItem[]
+
+  @@index([userId])
+}
+
+model WatchlistItem {
+  id          String   @id @default(cuid())
+  watchlistId String
+  symbol      String
+  name        String?
+  addedAt     DateTime @default(now())
+  notes       String?
+
+  watchlist Watchlist @relation(fields: [watchlistId], references: [id], onDelete: Cascade)
+
+  @@unique([watchlistId, symbol])
+  @@index([watchlistId])
+}
+
+model Company {
+  id          String   @id @default(cuid())
+  symbol      String   @unique
+  name        String
+  exchange    String?
+  sector      String?
+  industry    String?
+  description String?
+  website     String?
+  logo        String?
+  cik         String?  // SEC CIK number
+  metadata    Json?
+  updatedAt   DateTime @updatedAt
+
+  filings Filing[]
+
+  @@index([symbol])
+  @@index([cik])
+}
+
+model Filing {
+  id            String      @id @default(cuid())
+  companyId     String?
+  cik           String
+  accessionNo   String      @unique
+  formType      String
+  filedAt       DateTime
+  reportDate    DateTime?
+  documentUrl   String
+  description   String?
+  metadata      Json?
+  processedAt   DateTime?
+  summary       String?     // AI-generated summary
+  keyPoints     Json?       // Extracted key points
+
+  company Company? @relation(fields: [companyId], references: [id])
+
+  @@index([cik])
+  @@index([formType])
+  @@index([filedAt])
+}
+
+// ============================================================================
+// AI AGENTS
+// ============================================================================
+
+model Agent {
+  id          String      @id @default(cuid())
+  userId      String
+  name        String
+  description String?
+  type        AgentType
+  config      Json        // Agent-specific configuration
+  status      AgentStatus @default(IDLE)
+  schedule    String?     // Cron expression for scheduled agents
+  lastRunAt   DateTime?
+  createdAt   DateTime    @default(now())
+  updatedAt   DateTime    @updatedAt
+
+  user User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  runs AgentRun[]
+
+  @@index([userId])
+}
+
+model AgentRun {
+  id          String         @id @default(cuid())
+  agentId     String
+  status      AgentRunStatus
+  input       Json?
+  output      Json?
+  error       String?
+  tokensUsed  Int?
+  startedAt   DateTime       @default(now())
+  completedAt DateTime?
+
+  agent Agent @relation(fields: [agentId], references: [id], onDelete: Cascade)
+
+  @@index([agentId])
+}
+
+// ============================================================================
+// USAGE & BILLING
+// ============================================================================
+
+model UsageRecord {
+  id        String    @id @default(cuid())
+  userId    String
+  type      UsageType
+  quantity  Int
+  metadata  Json?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([createdAt])
+}
+
+model ApiKey {
+  id          String    @id @default(cuid())
+  userId      String
+  name        String
+  keyHash     String    @unique
+  keyPrefix   String    // First 8 chars for display
+  lastUsedAt  DateTime?
+  expiresAt   DateTime?
+  createdAt   DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([keyHash])
+}
+
+// ============================================================================
+// ENUMS
+// ============================================================================
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum UserTier {
+  FREE
+  PRO
+  ENTERPRISE
+}
+
+enum MessageRole {
+  USER
+  ASSISTANT
+  SYSTEM
+  TOOL
+}
+
+enum CitationType {
+  SEC_FILING
+  NEWS_ARTICLE
+  FINANCIAL_DATA
+  RESEARCH_REPORT
+  WEBSITE
+  OTHER
+}
+
+enum AgentType {
+  EARNINGS_MONITOR
+  NEWS_DIGEST
+  FILING_ALERT
+  PRICE_ALERT
+  CUSTOM_RESEARCH
+}
+
+enum AgentStatus {
+  IDLE
+  RUNNING
+  PAUSED
+  ERROR
+}
+
+enum AgentRunStatus {
+  PENDING
+  RUNNING
+  COMPLETED
+  FAILED
+}
+
+enum UsageType {
+  CHAT_MESSAGE
+  API_CALL
+  AGENT_RUN
+  FILING_FETCH
+  MARKET_DATA
+}
