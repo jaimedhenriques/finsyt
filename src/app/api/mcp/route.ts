@@ -15,7 +15,7 @@ interface MCPRequest {
 
 interface MCPResponse {
   jsonrpc: '2.0';
-  id: string | number;
+  id: string | number | null;
   result?: unknown;
   error?: {
     code: number;

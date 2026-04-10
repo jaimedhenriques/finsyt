@@ -90,10 +90,8 @@ export const toolSchemas = {
 };
 
 // Tool execution functions
-export const toolExecutors: Record<
-  string,
-  (params: Record<string, unknown>) => Promise<ToolResult>
-> = {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const toolExecutors: Record<string, (params: any) => Promise<ToolResult>> = {
   async getStockQuote({ symbol }: { symbol: string }): Promise<ToolResult> {
     try {
       const quote = await financialData.getQuote(symbol);
