@@ -1,0 +1,40 @@
+{
+  "catalogs": [
+    {
+      "name": "Awesome Claude Skills",
+      "repo": "https://github.com/ComposioHQ/awesome-claude-skills",
+      "purpose": "Community index of Claude-focused skills and workflows",
+      "required": true
+    },
+    {
+      "name": "Anthropic Skills",
+      "repo": "https://github.com/anthropics/skills",
+      "purpose": "Official Anthropic skill examples and formats",
+      "required": true
+    },
+    {
+      "name": "Superpowers",
+      "repo": "https://github.com/obra/superpowers",
+      "purpose": "Extensions and accelerators for coding workflows",
+      "required": true
+    },
+    {
+      "name": "Marketing Skills",
+      "repo": "https://github.com/coreyhaines31/marketingskills",
+      "purpose": "Go-to-market and messaging playbooks",
+      "required": true
+    },
+    {
+      "name": "Everything Claude Code",
+      "repo": "https://github.com/affaan-m/everything-claude-code",
+      "purpose": "Broad reference set for Claude Code usage",
+      "required": true
+    },
+    {
+      "name": "Agent Skills",
+      "repo": "https://github.com/addyosmani/agent-skills",
+      "purpose": "Production-grade engineering skills for coding agents",
+      "required": true
+    }
+  ]
+}
