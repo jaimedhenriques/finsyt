@@ -10,4 +10,8 @@ export class FredProvider implements DataProvider {
     if (!this.configured) return "unconfigured";
     return "healthy";
   }
+
+  async getQuote() {
+    return null;
+  }
 }

@@ -15,9 +15,19 @@ export type Citation = {
   url?: string;
 };
 
+export type ResearchMarketContext = {
+  symbol: string;
+  price?: number;
+  currency?: string;
+  asOf?: string;
+  sourceProvider?: string;
+  attemptedProviders: string[];
+};
+
 export type ResearchResponse = {
   summary: string;
   confidence: "low" | "medium" | "high";
   citations: Citation[];
   nextActions: string[];
+  marketContext?: ResearchMarketContext;
 };

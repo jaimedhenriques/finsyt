@@ -8,6 +8,12 @@ Build an AI-native financial intelligence platform that competes with Rogo, Alph
 - live structured market + filings + macro data
 - workflow automation via API, MCP, and Excel
 
+## Hard Rules
+1. FMP is first-priority provider for all market/fundamental data requests.
+2. Other providers are fallback paths for resiliency and coverage.
+3. Databento is used for real-time + historical market data lanes.
+4. Alpha Vantage remains configured as a tertiary fallback for quote continuity.
+
 ## Backend Priorities (Execution Order)
 1. Data layer: Postgres schema (users, orgs, conversations, messages, citations, watchlists, jobs)
 2. Auth layer: session/JWT + RBAC + org tenancy
@@ -21,6 +27,11 @@ Build an AI-native financial intelligence platform that competes with Rogo, Alph
 - API routes:
   - `GET /api/v1/status`
   - `POST /api/v1/research`
+- Product IA routes:
+  - `/news`
+  - `/screening`
+  - `/portfolio-analytics`
+  - `/ai-agents`
 - Typed provider registry and health checks
 - Zod validation + env schema scaffold
 

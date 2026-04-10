@@ -1,4 +1,5 @@
 import { providerRegistry } from "@/lib/providers/registry";
+import { getProviderRoutingOrder } from "@/lib/services/provider-router";
 import type { ProviderHealth } from "@/lib/types/research";
 
 export async function getProviderHealth(): Promise<ProviderHealth[]> {
@@ -11,4 +12,8 @@ export async function getProviderHealth(): Promise<ProviderHealth[]> {
   );
 
   return entries;
+}
+
+export function getProviderPriorityOrder() {
+  return getProviderRoutingOrder();
 }
