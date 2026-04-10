@@ -1,95 +1,67 @@
 import { NextRequest, NextResponse } from 'next/server'
-const FRED    = process.env.FRED_API_KEY
-const FINNHUB = process.env.FINNHUB_API_KEY
 
-// Key FRED series
-const FRED_SERIES: Record<string, { id: string; label: string; unit: string; description: string }> = {
-  fed_rate:    { id: 'FEDFUNDS',     label: 'Fed Funds Rate',       unit: '%',  description: 'Federal funds effective rate' },
-  cpi:         { id: 'CPIAUCSL',     label: 'CPI (All Items)',      unit: 'idx',description: 'Consumer Price Index, All Urban Consumers' },
-  core_cpi:    { id: 'CPILFESL',     label: 'Core CPI',             unit: 'idx',description: 'CPI excluding food and energy' },
-  pce:         { id: 'PCE',          label: 'PCE',                  unit: 'B$', description: 'Personal Consumption Expenditures' },
-  core_pce:    { id: 'PCEPILFE',     label: 'Core PCE Deflator',    unit: 'idx',description: 'PCE Price Index ex food/energy' },
-  gdp:         { id: 'GDP',          label: 'GDP',                  unit: 'B$', description: 'Gross Domestic Product' },
-  gdp_growth:  { id: 'A191RL1Q225SBEA', label: 'Real GDP Growth',  unit: '%',  description: 'Real GDP percent change, quarterly' },
-  unemployment:{ id: 'UNRATE',       label: 'Unemployment Rate',    unit: '%',  description: 'Civilian unemployment rate' },
-  payrolls:    { id: 'PAYEMS',       label: 'Nonfarm Payrolls',     unit: 'K',  description: 'Total nonfarm payrolls' },
-  yield_10y:   { id: 'GS10',         label: '10Y Treasury Yield',   unit: '%',  description: '10-year constant maturity rate' },
-  yield_2y:    { id: 'GS2',          label: '2Y Treasury Yield',    unit: '%',  description: '2-year constant maturity rate' },
-  yield_30y:   { id: 'GS30',         label: '30Y Treasury Yield',   unit: '%',  description: '30-year constant maturity rate' },
-  spread_10_2: { id: 'T10Y2Y',       label: '10Y-2Y Spread',        unit: 'bps',description: '10-year minus 2-year yield spread' },
-  m2:          { id: 'M2SL',         label: 'M2 Money Supply',      unit: 'B$', description: 'M2 money stock' },
-  housing:     { id: 'HOUST',        label: 'Housing Starts',       unit: 'K',  description: 'Total housing starts' },
-  retail_sales:{ id: 'RSXFS',        label: 'Retail Sales ex-auto', unit: 'M$', description: 'Retail & food services, ex auto' },
-  vix:         { id: 'VIXCLS',       label: 'VIX',                  unit: 'pts',description: 'CBOE Volatility Index' },
-  dxy:         { id: 'DTWEXBGS',     label: 'USD Index (DXY proxy)',unit: 'idx',description: 'Trade-weighted USD index broad' },
-}
+const EODHD = process.env.EODHD_API_KEY || process.env.eodhd_api
 
-async function fetchFredSeries(seriesId: string, limit = 12): Promise<{ date: string; value: number }[]> {
-  const res = await fetch(
-    `https://api.stlouisfed.org/fred/series/observations?series_id=${seriesId}&api_key=${FRED}&file_type=json&sort_order=desc&limit=${limit}`
-  )
-  const data = await res.json()
-  return (data.observations || [])
-    .filter((o: any) => o.value !== '.')
-    .map((o: any) => ({ date: o.date, value: parseFloat(o.value) }))
-    .reverse()
+// Key macro indicators available from EODHD
+const INDICATORS = {
+  gdp:           'GDP_USD',
+  gdp_growth:    'GDP_GROWTH_RATE',
+  inflation:     'INFLATION_CPI_YOY',
+  cpi:           'CPI_INDEX',
+  unemployment:  'UNEMPLOYMENT_RATE',
+  interest_rate: 'REAL_INTEREST_RATE',
+  trade_balance: 'TRADE_BALANCE',
+  current_account: 'CURRENT_ACCOUNT_TO_GDP',
+  debt_to_gdp:   'GOVERNMENT_DEBT_TO_GDP',
+  budget_deficit:'GOVERNMENT_BUDGET_VALUE',
+  manufacturing: 'MANUFACTURING_PMI',
+  services_pmi:  'SERVICES_PMI',
+  consumer_confidence: 'CONSUMER_CONFIDENCE',
+  retail_sales:  'RETAIL_SALES_YOY',
+  housing_starts:'HOUSING_STARTS',
+  industrial:    'INDUSTRIAL_PRODUCTION',
 }
 
 export async function GET(req: NextRequest) {
-  const series  = req.nextUrl.searchParams.get('series') || 'dashboard'
-  const limit   = parseInt(req.nextUrl.searchParams.get('limit') || '12')
+  const country   = req.nextUrl.searchParams.get('country') || 'US'
+  const indicator = req.nextUrl.searchParams.get('indicator') || 'gdp'
+  const all       = req.nextUrl.searchParams.get('all') === 'true'
 
-  if (series === 'dashboard') {
-    // Return latest value for key indicators
-    const keys = ['fed_rate','cpi','core_pce','gdp_growth','unemployment','yield_10y','yield_2y','spread_10_2','vix']
-    try {
-      const results = await Promise.allSettled(
-        keys.map(async k => {
-          const def = FRED_SERIES[k]
-          const obs = await fetchFredSeries(def.id, 2)
-          const latest  = obs[obs.length - 1]
-          const previous = obs[obs.length - 2]
-          const change = previous ? latest.value - previous.value : 0
-          return { key: k, ...def, latest, previous, change }
-        })
-      )
-      const data = results
-        .filter(r => r.status === 'fulfilled')
-        .map(r => (r as PromiseFulfilledResult<any>).value)
-      return NextResponse.json({ indicators: data })
-    } catch (e) {
-      return NextResponse.json({ error: String(e) }, { status: 500 })
-    }
+  if (!EODHD) return NextResponse.json({ error: 'EODHD_API_KEY not configured' }, { status: 500 })
+
+  if (all) {
+    // Fetch top 6 macro indicators for dashboard overview
+    const keys = ['gdp_growth', 'inflation', 'unemployment', 'interest_rate', 'manufacturing', 'consumer_confidence']
+    const results = await Promise.allSettled(
+      keys.map(async (key) => {
+        const ind = INDICATORS[key as keyof typeof INDICATORS]
+        const res = await fetch(
+          `https://eodhd.com/api/macro-indicator/${country}?api_token=${EODHD}&indicator=${ind}&fmt=json`,
+          { next: { revalidate: 3600 } }
+        )
+        const data = await res.json()
+        const latest = Array.isArray(data) ? data[data.length - 1] : null
+        return { key, indicator: ind, latest, history: Array.isArray(data) ? data.slice(-24) : [] }
+      })
+    )
+    return NextResponse.json({
+      country,
+      indicators: results.map((r, i) =>
+        r.status === 'fulfilled' ? r.value : { key: keys[i], error: true }
+      ),
+      source: 'eodhd',
+    })
   }
 
-  if (series === 'yield_curve') {
-    try {
-      const maturities = [
-        { label: '3M', id: 'TB3MS' }, { label: '6M', id: 'TB6MS' },
-        { label: '1Y', id: 'GS1' },   { label: '2Y', id: 'GS2' },
-        { label: '3Y', id: 'GS3' },   { label: '5Y', id: 'GS5' },
-        { label: '7Y', id: 'GS7' },   { label: '10Y', id: 'GS10' },
-        { label: '20Y', id: 'GS20' }, { label: '30Y', id: 'GS30' },
-      ]
-      const results = await Promise.all(
-        maturities.map(async m => {
-          const obs = await fetchFredSeries(m.id, 1)
-          return { maturity: m.label, yield: obs[0]?.value || null }
-        })
-      )
-      return NextResponse.json({ curve: results })
-    } catch (e) {
-      return NextResponse.json({ error: String(e) }, { status: 500 })
-    }
-  }
-
-  // Single series history
-  const def = FRED_SERIES[series]
-  if (!def) return NextResponse.json({ error: 'Unknown series' }, { status: 400 })
+  const ind = INDICATORS[indicator as keyof typeof INDICATORS] || indicator
   try {
-    const observations = await fetchFredSeries(def.id, limit)
-    return NextResponse.json({ series: def, observations })
-  } catch (e) {
-    return NextResponse.json({ error: String(e) }, { status: 500 })
+    const res = await fetch(
+      `https://eodhd.com/api/macro-indicator/${country}?api_token=${EODHD}&indicator=${ind}&fmt=json`,
+      { next: { revalidate: 3600 } }
+    )
+    const data = await res.json()
+    return NextResponse.json({ country, indicator: ind, data, source: 'eodhd' })
+  } catch (e: any) {
+    return NextResponse.json({ error: e.message }, { status: 500 })
   }
 }
