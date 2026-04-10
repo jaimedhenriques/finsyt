@@ -1,0 +1,265 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider  = "postgresql"
+}
+
+enum MembershipRole {
+  OWNER
+  ADMIN
+  MEMBER
+  VIEWER
+}
+
+enum MessageRole {
+  SYSTEM
+  USER
+  ASSISTANT
+  TOOL
+}
+
+enum SourceType {
+  SEC
+  MARKET
+  ECONOMIC
+  NEWS
+  AI
+  INTERNAL
+}
+
+enum JobType {
+  RESEARCH_ENRICHMENT
+  WATCHLIST_REFRESH
+  DAILY_BRIEF
+}
+
+enum JobStatus {
+  QUEUED
+  RUNNING
+  SUCCEEDED
+  FAILED
+}
+
+enum SubscriptionStatus {
+  TRIALING
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  INCOMPLETE
+  UNPAID
+}
+
+enum PlanCode {
+  FREE
+  PRO
+  TEAM
+  ENTERPRISE
+}
+
+model User {
+  id               String               @id @default(cuid())
+  externalAuthId   String               @unique
+  email            String               @unique
+  firstName        String?
+  lastName         String?
+  avatarUrl        String?
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+
+  memberships      OrganizationMember[]
+  conversations    Conversation[]       @relation("ConversationCreatedBy")
+  messages         Message[]            @relation("MessageCreatedBy")
+  watchlists       Watchlist[]          @relation("WatchlistCreatedBy")
+  jobs             Job[]                @relation("JobCreatedBy")
+}
+
+model Organization {
+  id                        String                @id @default(cuid())
+  externalOrgId             String?               @unique
+  name                      String
+  slug                      String                @unique
+  createdAt                 DateTime              @default(now())
+  updatedAt                 DateTime              @updatedAt
+
+  members                   OrganizationMember[]
+  conversations             Conversation[]
+  watchlists                Watchlist[]
+  jobs                      Job[]
+  apiKeys                   ApiKey[]
+  providerCredentials       ProviderCredential[]
+  subscriptions             Subscription[]
+  usageEvents               UsageEvent[]
+}
+
+model OrganizationMember {
+  id             String          @id @default(cuid())
+  organizationId String
+  userId         String
+  role           MembershipRole  @default(MEMBER)
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  organization   Organization    @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user           User            @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, userId])
+  @@index([userId])
+}
+
+model Conversation {
+  id             String       @id @default(cuid())
+  organizationId String
+  createdById    String
+  title          String
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy      User         @relation("ConversationCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  messages       Message[]
+
+  @@index([organizationId, updatedAt])
+}
+
+model Message {
+  id               String        @id @default(cuid())
+  conversationId   String
+  createdById      String?
+  role             MessageRole
+  content          String
+  model            String?
+  tokenCount       Int?
+  createdAt        DateTime      @default(now())
+
+  conversation     Conversation  @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  createdBy        User?         @relation("MessageCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+  citations        Citation[]
+
+  @@index([conversationId, createdAt])
+}
+
+model Citation {
+  id               String       @id @default(cuid())
+  messageId        String
+  sourceType       SourceType
+  provider         String
+  label            String
+  url              String?
+  confidenceScore  Decimal?     @db.Decimal(5, 2)
+  createdAt        DateTime     @default(now())
+
+  message          Message      @relation(fields: [messageId], references: [id], onDelete: Cascade)
+
+  @@index([messageId])
+}
+
+model Watchlist {
+  id               String       @id @default(cuid())
+  organizationId   String
+  createdById      String
+  name             String
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy        User         @relation("WatchlistCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
+  items            WatchlistItem[]
+
+  @@index([organizationId])
+}
+
+model WatchlistItem {
+  id               String       @id @default(cuid())
+  watchlistId      String
+  symbol           String
+  notes            String?
+  createdAt        DateTime     @default(now())
+
+  watchlist        Watchlist    @relation(fields: [watchlistId], references: [id], onDelete: Cascade)
+
+  @@unique([watchlistId, symbol])
+  @@index([symbol])
+}
+
+model Job {
+  id               String       @id @default(cuid())
+  organizationId   String
+  createdById      String?
+  type             JobType
+  status           JobStatus    @default(QUEUED)
+  payload          Json
+  result           Json?
+  errorMessage     String?
+  runAt            DateTime?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  createdBy        User?        @relation("JobCreatedBy", fields: [createdById], references: [id], onDelete: SetNull)
+
+  @@index([organizationId, status, runAt])
+}
+
+model ApiKey {
+  id               String       @id @default(cuid())
+  organizationId   String
+  name             String
+  keyPrefix        String
+  keyHash          String
+  isActive         Boolean      @default(true)
+  createdAt        DateTime     @default(now())
+  lastUsedAt       DateTime?
+
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, isActive])
+}
+
+model ProviderCredential {
+  id               String       @id @default(cuid())
+  organizationId   String
+  provider         String
+  encryptedKey     String
+  keyHint          String?
+  createdAt        DateTime     @default(now())
+  updatedAt        DateTime     @updatedAt
+
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@unique([organizationId, provider])
+}
+
+model Subscription {
+  id                       String               @id @default(cuid())
+  organizationId           String
+  status                   SubscriptionStatus
+  planCode                 PlanCode
+  stripeCustomerId         String?              @unique
+  stripeSubscriptionId     String?              @unique
+  stripePriceId            String?
+  currentPeriodStart       DateTime?
+  currentPeriodEnd         DateTime?
+  cancelAtPeriodEnd        Boolean              @default(false)
+  trialEndsAt              DateTime?
+  createdAt                DateTime             @default(now())
+  updatedAt                DateTime             @updatedAt
+
+  organization             Organization         @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+}
+
+model UsageEvent {
+  id                       String       @id @default(cuid())
+  organizationId           String
+  metric                   String
+  quantity                 Int          @default(1)
+  metadata                 Json?
+  occurredAt               DateTime     @default(now())
+
+  organization             Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId, metric, occurredAt])
+}

@@ -1,0 +1,46 @@
+{
+  "name": "finsyt",
+  "version": "1.0.0",
+  "description": "",
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "lint": "eslint . --ext .js,.jsx,.ts,.tsx",
+    "typecheck": "tsc --noEmit"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jaimedhenriques/finsyt.git"
+  },
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/jaimedhenriques/finsyt/issues"
+  },
+  "homepage": "https://github.com/jaimedhenriques/finsyt#readme",
+  "dependencies": {
+    "@clerk/nextjs": "^7.0.12",
+    "@prisma/adapter-pg": "^7.7.0",
+    "@prisma/client": "^7.7.0",
+    "next": "^16.2.3",
+    "pg": "^8.20.0",
+    "react": "^19.2.5",
+    "react-dom": "^19.2.5",
+    "stripe": "^22.0.1",
+    "svix": "^1.90.0",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@tailwindcss/postcss": "^4.2.2",
+    "@types/node": "^25.5.2",
+    "@types/react": "^19.2.14",
+    "@types/react-dom": "^19.2.3",
+    "eslint": "^9.39.4",
+    "eslint-config-next": "^16.2.3",
+    "postcss": "^8.5.9",
+    "prisma": "^7.7.0",
+    "tailwindcss": "^4.2.2",
+    "typescript": "^6.0.2"
+  },
+  "private": true
+}
