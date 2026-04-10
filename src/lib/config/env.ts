@@ -2,6 +2,7 @@ import { z } from "zod";
 
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
+  NEXT_PUBLIC_ASSISTLOOP_AGENT_ID: z.string().optional(),
   DATABASE_URL: z.string().optional(),
   DIRECT_URL: z.string().optional(),
   FMP_API_KEY: z.string().optional(),
@@ -26,6 +27,7 @@ const envSchema = z.object({
 
 export const env = envSchema.parse({
   NODE_ENV: process.env.NODE_ENV,
+  NEXT_PUBLIC_ASSISTLOOP_AGENT_ID: process.env.NEXT_PUBLIC_ASSISTLOOP_AGENT_ID,
   DATABASE_URL: process.env.DATABASE_URL,
   DIRECT_URL: process.env.DIRECT_URL,
   FMP_API_KEY: process.env.FMP_API_KEY,

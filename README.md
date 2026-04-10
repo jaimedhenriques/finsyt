@@ -20,6 +20,11 @@ Then open http://localhost:3000.
 
 Copy `.env.example` to `.env` and fill provider keys.
 
+Client support widget (AssistLoop):
+
+- Set `NEXT_PUBLIC_ASSISTLOOP_AGENT_ID` in Vercel (already configured in production).
+- The widget autoloads globally when this env var is present.
+
 ### Provider priority hard rule
 
 - FMP is the primary data source for market/fundamental retrieval.
