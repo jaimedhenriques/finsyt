@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import {
   Card,
@@ -22,8 +22,12 @@ import {
   RefreshCw,
   Clock,
   Plus,
+  AlertTriangle,
 } from 'lucide-react';
 import { cn, formatCurrency, formatPercent, formatVolume } from '@/lib/utils';
+import { SparklineChart } from '@/components/charts/price-chart';
+import { LoadingSpinner } from '@/components/ui/loading';
+import { ErrorMessage } from '@/components/ui/error-boundary';
 
 interface Quote {
   symbol: string;
@@ -35,38 +39,65 @@ interface Quote {
   marketCap?: number;
 }
 
-// Mock data - in production this would fetch from /api/market
-const MOCK_INDICES = [
-  { symbol: 'SPY', name: 'S&P 500', price: 512.45, change: 3.21, changePercent: 0.63 },
-  { symbol: 'QQQ', name: 'NASDAQ 100', price: 438.92, change: -1.45, changePercent: -0.33 },
-  { symbol: 'DIA', name: 'Dow Jones', price: 398.67, change: 2.15, changePercent: 0.54 },
-  { symbol: 'IWM', name: 'Russell 2000', price: 207.33, change: -0.89, changePercent: -0.43 },
-];
+// Fetch function for market data
+async function fetchMarketData(action: string) {
+  const res = await fetch(`/api/market?action=${action}`);
+  if (!res.ok) {
+    throw new Error(`Failed to fetch ${action}`);
+  }
+  return res.json();
+}
 
-const MOCK_GAINERS = [
-  { symbol: 'NVDA', name: 'NVIDIA Corp', price: 875.32, change: 45.67, changePercent: 5.51, volume: 48000000 },
-  { symbol: 'META', name: 'Meta Platforms', price: 502.45, change: 18.23, changePercent: 3.76, volume: 22000000 },
-  { symbol: 'AMD', name: 'AMD Inc', price: 178.90, change: 5.67, changePercent: 3.27, volume: 35000000 },
-];
-
-const MOCK_LOSERS = [
-  { symbol: 'TSLA', name: 'Tesla Inc', price: 178.45, change: -8.90, changePercent: -4.75, volume: 95000000 },
-  { symbol: 'NFLX', name: 'Netflix Inc', price: 612.30, change: -15.20, changePercent: -2.42, volume: 8000000 },
-];
+// Default indices to show
+const DEFAULT_INDICES = ['SPY', 'QQQ', 'DIA', 'IWM'];
 
 export default function MarketPage() {
   const [searchQuery, setSearchQuery] = useState('');
-  const [lastUpdate, setLastUpdate] = useState(new Date());
 
-  // In production, these would be real API calls
-  const indices = MOCK_INDICES;
-  const gainers = MOCK_GAINERS;
-  const losers = MOCK_LOSERS;
+  // Fetch market indices
+  const { data: indices, isLoading: indicesLoading, error: indicesError, refetch: refetchIndices } = useQuery({
+    queryKey: ['market', 'quotes', DEFAULT_INDICES],
+    queryFn: () => fetchMarketData(`quotes&symbols=${DEFAULT_INDICES.join(',')}`),
+    staleTime: 30000, // 30 seconds
+    refetchInterval: 60000, // Refetch every minute
+  });
+
+  // Fetch gainers
+  const { data: gainers, isLoading: gainersLoading, refetch: refetchGainers } = useQuery({
+    queryKey: ['market', 'gainers'],
+    queryFn: () => fetchMarketData('gainers'),
+    staleTime: 60000,
+  });
+
+  // Fetch losers
+  const { data: losers, isLoading: losersLoading, refetch: refetchLosers } = useQuery({
+    queryKey: ['market', 'losers'],
+    queryFn: () => fetchMarketData('losers'),
+    staleTime: 60000,
+  });
+
+  // Fetch most active
+  const { data: actives, isLoading: activesLoading, refetch: refetchActives } = useQuery({
+    queryKey: ['market', 'actives'],
+    queryFn: () => fetchMarketData('actives'),
+    staleTime: 60000,
+  });
+
+  // Fetch sectors
+  const { data: sectors, isLoading: sectorsLoading } = useQuery({
+    queryKey: ['market', 'sectors'],
+    queryFn: () => fetchMarketData('sectors'),
+    staleTime: 60000,
+  });
 
   const refresh = () => {
-    setLastUpdate(new Date());
-    // Would trigger refetch
+    refetchIndices();
+    refetchGainers();
+    refetchLosers();
+    refetchActives();
   };
+
+  const lastUpdate = new Date();
 
   return (
     <div className="flex-1 overflow-auto">
@@ -94,29 +125,49 @@ export default function MarketPage() {
 
         {/* Market Indices */}
         <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
-          {indices.map((index) => (
-            <Card key={index.symbol}>
+          {indicesLoading ? (
+            Array.from({ length: 4 }).map((_, i) => (
+              <Card key={i}>
+                <CardContent className="pt-6">
+                  <Skeleton className="h-4 w-20 mb-2" />
+                  <Skeleton className="h-8 w-24" />
+                </CardContent>
+              </Card>
+            ))
+          ) : indicesError ? (
+            <Card className="col-span-4">
               <CardContent className="pt-6">
-                <div className="flex justify-between items-start">
-                  <div>
-                    <p className="text-sm text-muted-foreground">{index.name}</p>
-                    <p className="text-2xl font-bold">{formatCurrency(index.price)}</p>
-                  </div>
-                  <Badge
-                    variant={index.change >= 0 ? 'success' : 'danger'}
-                    className="flex items-center gap-1"
-                  >
-                    {index.change >= 0 ? (
-                      <TrendingUp className="w-3 h-3" />
-                    ) : (
-                      <TrendingDown className="w-3 h-3" />
-                    )}
-                    {formatPercent(index.changePercent)}
-                  </Badge>
-                </div>
+                <ErrorMessage
+                  message="Failed to load market indices"
+                  onRetry={() => refetchIndices()}
+                />
               </CardContent>
             </Card>
-          ))}
+          ) : (
+            (indices || []).map((index: Quote) => (
+              <Card key={index.symbol}>
+                <CardContent className="pt-6">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <p className="text-sm text-muted-foreground">{index.name || index.symbol}</p>
+                      <p className="text-2xl font-bold">{formatCurrency(index.price)}</p>
+                    </div>
+                    <Badge
+                      variant={index.changePercent >= 0 ? 'success' : 'danger'}
+                      className="flex items-center gap-1"
+                    >
+                      {index.changePercent >= 0 ? (
+                        <TrendingUp className="w-3 h-3" />
+                      ) : (
+                        <TrendingDown className="w-3 h-3" />
+                      )}
+                      {formatPercent(index.changePercent)}
+                    </Badge>
+                  </div>
+                </CardContent>
+              </Card>
+            ))
+          )}
         </div>
 
         {/* Search */}
@@ -156,7 +207,11 @@ export default function MarketPage() {
                 <CardDescription>Stocks with the highest percentage gains today</CardDescription>
               </CardHeader>
               <CardContent>
-                <StockTable stocks={gainers} />
+                {gainersLoading ? (
+                  <LoadingTable />
+                ) : (
+                  <StockTable stocks={gainers || []} />
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -168,7 +223,11 @@ export default function MarketPage() {
                 <CardDescription>Stocks with the largest percentage losses today</CardDescription>
               </CardHeader>
               <CardContent>
-                <StockTable stocks={losers} />
+                {losersLoading ? (
+                  <LoadingTable />
+                ) : (
+                  <StockTable stocks={losers || []} />
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -180,7 +239,11 @@ export default function MarketPage() {
                 <CardDescription>Stocks with the highest trading volume today</CardDescription>
               </CardHeader>
               <CardContent>
-                <StockTable stocks={[...gainers, ...losers].sort((a, b) => (b.volume || 0) - (a.volume || 0))} />
+                {activesLoading ? (
+                  <LoadingTable />
+                ) : (
+                  <StockTable stocks={actives || []} />
+                )}
               </CardContent>
             </Card>
           </TabsContent>
@@ -193,33 +256,32 @@ export default function MarketPage() {
             <CardDescription>Today's performance by sector</CardDescription>
           </CardHeader>
           <CardContent>
-            <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
-              {[
-                { name: 'Technology', change: 1.24 },
-                { name: 'Healthcare', change: 0.87 },
-                { name: 'Financials', change: -0.32 },
-                { name: 'Energy', change: -1.15 },
-                { name: 'Consumer Discretionary', change: 0.56 },
-                { name: 'Industrials', change: 0.21 },
-                { name: 'Materials', change: -0.45 },
-                { name: 'Real Estate', change: -0.78 },
-              ].map((sector) => (
-                <div
-                  key={sector.name}
-                  className="flex items-center justify-between p-3 rounded-lg border"
-                >
-                  <span className="text-sm font-medium">{sector.name}</span>
-                  <span
-                    className={cn(
-                      'text-sm font-medium',
-                      sector.change >= 0 ? 'text-bull' : 'text-bear'
-                    )}
+            {sectorsLoading ? (
+              <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {Array.from({ length: 8 }).map((_, i) => (
+                  <Skeleton key={i} className="h-12" />
+                ))}
+              </div>
+            ) : (
+              <div className="grid sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                {(sectors || []).map((sector: { sector: string; changesPercentage: number }) => (
+                  <div
+                    key={sector.sector}
+                    className="flex items-center justify-between p-3 rounded-lg border"
                   >
-                    {formatPercent(sector.change)}
-                  </span>
-                </div>
-              ))}
-            </div>
+                    <span className="text-sm font-medium">{sector.sector}</span>
+                    <span
+                      className={cn(
+                        'text-sm font-medium',
+                        sector.changesPercentage >= 0 ? 'text-bull' : 'text-bear'
+                      )}
+                    >
+                      {formatPercent(sector.changesPercentage)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
           </CardContent>
         </Card>
       </div>
@@ -227,7 +289,27 @@ export default function MarketPage() {
   );
 }
 
+function LoadingTable() {
+  return (
+    <div className="space-y-2">
+      {Array.from({ length: 5 }).map((_, i) => (
+        <Skeleton key={i} className="h-12 w-full" />
+      ))}
+    </div>
+  );
+}
+
 function StockTable({ stocks }: { stocks: Quote[] }) {
+  if (!stocks || stocks.length === 0) {
+    return (
+      <div className="text-center py-8 text-muted-foreground">
+        <AlertTriangle className="w-8 h-8 mx-auto mb-2 opacity-50" />
+        <p>No data available</p>
+        <p className="text-sm">Configure API keys to see live market data</p>
+      </div>
+    );
+  }
+
   return (
     <div className="overflow-x-auto">
       <table className="data-table">
@@ -254,7 +336,7 @@ function StockTable({ stocks }: { stocks: Quote[] }) {
                 )}
               >
                 {stock.change >= 0 ? '+' : ''}
-                {stock.change.toFixed(2)}
+                {stock.change?.toFixed(2) || '0.00'}
               </td>
               <td className="text-right">
                 <Badge

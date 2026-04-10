@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { yahooFinance } from '@/lib/providers/yahoo-finance';
 import { fmp } from '@/lib/providers/fmp';
+import { cache, CacheTTL, cacheKey } from '@/lib/cache/redis';
 
 export const runtime = 'nodejs';
 
@@ -19,7 +20,11 @@ export async function GET(request: NextRequest) {
             { status: 400 }
           );
         }
-        const quote = await yahooFinance.getQuote(symbol);
+        const quote = await cache.getOrFetch(
+          cacheKey('quote', symbol),
+          () => yahooFinance.getQuote(symbol),
+          { ttl: CacheTTL.QUOTE }
+        );
         return NextResponse.json(quote);
       }
 
@@ -30,27 +35,47 @@ export async function GET(request: NextRequest) {
             { status: 400 }
           );
         }
-        const quotes = await yahooFinance.getQuotes(symbols);
+        const quotes = await cache.getOrFetch(
+          cacheKey('quotes', symbols.sort().join(',')),
+          () => yahooFinance.getQuotes(symbols),
+          { ttl: CacheTTL.QUOTE }
+        );
         return NextResponse.json(quotes);
       }
 
       case 'gainers': {
-        const gainers = await fmp.getMarketMovers('gainers');
+        const gainers = await cache.getOrFetch(
+          cacheKey('movers', 'gainers'),
+          () => fmp.getMarketMovers('gainers'),
+          { ttl: CacheTTL.MOVERS }
+        );
         return NextResponse.json(gainers);
       }
 
       case 'losers': {
-        const losers = await fmp.getMarketMovers('losers');
+        const losers = await cache.getOrFetch(
+          cacheKey('movers', 'losers'),
+          () => fmp.getMarketMovers('losers'),
+          { ttl: CacheTTL.MOVERS }
+        );
         return NextResponse.json(losers);
       }
 
       case 'actives': {
-        const actives = await fmp.getMarketMovers('actives');
+        const actives = await cache.getOrFetch(
+          cacheKey('movers', 'actives'),
+          () => fmp.getMarketMovers('actives'),
+          { ttl: CacheTTL.MOVERS }
+        );
         return NextResponse.json(actives);
       }
 
       case 'sectors': {
-        const sectors = await fmp.getSectorPerformance();
+        const sectors = await cache.getOrFetch(
+          cacheKey('sectors'),
+          () => fmp.getSectorPerformance(),
+          { ttl: CacheTTL.SECTORS }
+        );
         return NextResponse.json(sectors);
       }
 
@@ -62,7 +87,12 @@ export async function GET(request: NextRequest) {
             { status: 400 }
           );
         }
-        const results = await yahooFinance.searchSymbols(query);
+        // Search results cached briefly
+        const results = await cache.getOrFetch(
+          cacheKey('search', query.toLowerCase()),
+          () => yahooFinance.searchSymbols(query),
+          { ttl: 300 }
+        );
         return NextResponse.json(results);
       }
 
@@ -73,7 +103,11 @@ export async function GET(request: NextRequest) {
             { status: 400 }
           );
         }
-        const profile = await fmp.getCompanyProfile(symbol);
+        const profile = await cache.getOrFetch(
+          cacheKey('profile', symbol),
+          () => fmp.getCompanyProfile(symbol),
+          { ttl: CacheTTL.PROFILE }
+        );
         return NextResponse.json(profile);
       }
 
@@ -85,13 +119,21 @@ export async function GET(request: NextRequest) {
           );
         }
         const timeframe = (searchParams.get('timeframe') || '1Y') as '1D' | '1W' | '1M' | '3M' | '6M' | '1Y' | '5Y' | 'MAX';
-        const prices = await yahooFinance.getHistoricalPrices(symbol, timeframe);
+        const prices = await cache.getOrFetch(
+          cacheKey('historical', symbol, timeframe),
+          () => yahooFinance.getHistoricalPrices(symbol, timeframe),
+          { ttl: CacheTTL.HISTORICAL }
+        );
         return NextResponse.json(prices);
       }
 
       case 'news': {
         const newsSymbols = symbols.length > 0 ? symbols : ['AAPL', 'MSFT', 'GOOGL'];
-        const news = await fmp.getStockNews(newsSymbols, 20);
+        const news = await cache.getOrFetch(
+          cacheKey('news', newsSymbols.sort().join(',')),
+          () => fmp.getStockNews(newsSymbols, 20),
+          { ttl: CacheTTL.NEWS }
+        );
         return NextResponse.json(news);
       }
 
