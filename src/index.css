@@ -1,0 +1,45 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap');
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  * { box-sizing: border-box; }
+  body { @apply bg-navy-950 text-gray-100 font-sans antialiased; }
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { @apply bg-transparent; }
+  ::-webkit-scrollbar-thumb { @apply bg-border rounded; }
+}
+
+@layer components {
+  .btn-primary {
+    @apply bg-gradient-brand text-white font-semibold px-6 py-3 rounded-xl transition-all duration-200 hover:opacity-90 hover:-translate-y-0.5 hover:shadow-lg hover:shadow-blue-600/20 active:translate-y-0;
+  }
+  .btn-outline {
+    @apply bg-transparent text-gray-300 border border-border font-medium px-6 py-3 rounded-xl transition-all duration-200 hover:border-blue-500/50 hover:text-white;
+  }
+  .btn-ghost {
+    @apply bg-transparent text-muted font-medium px-4 py-2 rounded-lg transition-all duration-200 hover:bg-navy-800 hover:text-gray-100;
+  }
+  .card {
+    @apply bg-navy-800 border border-border rounded-2xl p-6 transition-all duration-200;
+  }
+  .card-hover {
+    @apply card hover:border-blue-600/30 hover:shadow-lg hover:shadow-blue-600/5;
+  }
+  .gradient-text {
+    @apply bg-gradient-to-r from-blue-500 to-teal-500 bg-clip-text text-transparent;
+  }
+  .badge {
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-bold;
+  }
+  .input {
+    @apply bg-navy-800 border border-border text-gray-100 px-4 py-3 rounded-xl text-sm outline-none transition-colors focus:border-blue-500 placeholder:text-muted;
+  }
+  .sidebar-link {
+    @apply flex items-center gap-3 px-4 py-2.5 rounded-xl text-sm font-medium text-muted transition-all duration-150 cursor-pointer hover:bg-navy-800 hover:text-gray-100;
+  }
+  .sidebar-link.active {
+    @apply bg-gradient-brand-soft text-blue-400 border border-blue-600/20;
+  }
+}
