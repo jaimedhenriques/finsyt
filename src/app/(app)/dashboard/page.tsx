@@ -19,29 +19,54 @@ import {
 } from 'lucide-react';
 import { formatDate } from '@/lib/utils';
 
+// Helper to safely fetch data with fallback
+async function safeDbFetch<T>(fetcher: () => Promise<T>, fallback: T): Promise<T> {
+  try {
+    return await fetcher();
+  } catch (error) {
+    console.error('Database fetch error:', error);
+    return fallback;
+  }
+}
+
 export default async function DashboardPage() {
-  const session = await auth();
+  let session = null;
+  try {
+    session = await auth();
+  } catch {
+    // Auth not configured
+  }
+
   const userId = session?.user?.id;
 
-  // Fetch user's recent activity
+  // Fetch user's recent activity with fallbacks
   const [recentChats, watchlists, usageThisMonth] = await Promise.all([
-    db.chat.findMany({
-      where: { userId },
-      orderBy: { updatedAt: 'desc' },
-      take: 5,
-    }),
-    db.watchlist.findMany({
-      where: { userId },
-      include: { _count: { select: { items: true } } },
-    }),
-    db.usageRecord.count({
-      where: {
-        userId,
-        createdAt: {
-          gte: new Date(new Date().setDate(1)), // First of month
+    safeDbFetch(
+      () => db.chat.findMany({
+        where: { userId },
+        orderBy: { updatedAt: 'desc' },
+        take: 5,
+      }),
+      []
+    ),
+    safeDbFetch(
+      () => db.watchlist.findMany({
+        where: { userId },
+        include: { _count: { select: { items: true } } },
+      }),
+      []
+    ),
+    safeDbFetch(
+      () => db.usageRecord.count({
+        where: {
+          userId,
+          createdAt: {
+            gte: new Date(new Date().setDate(1)),
+          },
         },
-      },
-    }),
+      }),
+      0
+    ),
   ]);
 
   const firstName = session?.user?.name?.split(' ')[0] || 'there';
