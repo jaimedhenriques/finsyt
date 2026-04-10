@@ -4,6 +4,12 @@ export type ProviderHealth = {
   status: "healthy" | "unconfigured";
 };
 
+export type DatabaseHealth = {
+  configured: boolean;
+  status: "healthy" | "unconfigured" | "degraded";
+  source: string | null;
+};
+
 export type ResearchRequest = {
   question: string;
   ticker?: string;

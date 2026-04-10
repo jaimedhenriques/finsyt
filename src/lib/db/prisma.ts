@@ -1,15 +1,18 @@
 import { PrismaClient } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
+import { resolveDatabaseUrls } from "@/lib/db/connection";
 
 const globalForPrisma = globalThis as unknown as {
   prisma?: PrismaClient;
 };
 
+const { pooledUrl } = resolveDatabaseUrls();
+
 export const prisma =
   globalForPrisma.prisma ??
   new PrismaClient({
     adapter: new PrismaPg({
-      connectionString: process.env.DATABASE_URL ?? "",
+      connectionString: pooledUrl ?? "",
     }),
     log: process.env.NODE_ENV === "development" ? ["query", "error", "warn"] : ["error"],
   });

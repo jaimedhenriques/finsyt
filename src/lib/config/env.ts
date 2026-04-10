@@ -1,9 +1,15 @@
 import { z } from "zod";
+import { resolveDatabaseUrls } from "@/lib/db/connection";
+
+const databaseUrls = resolveDatabaseUrls();
 
 const envSchema = z.object({
   NODE_ENV: z.enum(["development", "test", "production"]).default("development"),
   DATABASE_URL: z.string().optional(),
   DIRECT_URL: z.string().optional(),
+  POSTGRES_PRISMA_URL: z.string().optional(),
+  POSTGRES_URL: z.string().optional(),
+  POSTGRES_URL_NON_POOLING: z.string().optional(),
   FMP_API_KEY: z.string().optional(),
   FINNHUB_API_KEY: z.string().optional(),
   FRED_API_KEY: z.string().optional(),
@@ -26,8 +32,11 @@ const envSchema = z.object({
 
 export const env = envSchema.parse({
   NODE_ENV: process.env.NODE_ENV,
-  DATABASE_URL: process.env.DATABASE_URL,
-  DIRECT_URL: process.env.DIRECT_URL,
+  DATABASE_URL: databaseUrls.pooledUrl,
+  DIRECT_URL: databaseUrls.directUrl,
+  POSTGRES_PRISMA_URL: process.env.POSTGRES_PRISMA_URL,
+  POSTGRES_URL: process.env.POSTGRES_URL,
+  POSTGRES_URL_NON_POOLING: process.env.POSTGRES_URL_NON_POOLING,
   FMP_API_KEY: process.env.FMP_API_KEY,
   FINNHUB_API_KEY: process.env.FINNHUB_API_KEY,
   FRED_API_KEY: process.env.FRED_API_KEY,
