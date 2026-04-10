@@ -166,6 +166,151 @@ function AnalystBar({ buy,hold,sell }: {buy:number;hold:number;sell:number}) {
 }
 
 // ── Main page ─────────────────────────────────────────────────────────────────
+
+// ── FilingsTab — live sec-api.io powered filings with source links ────────────
+function FilingsTab({ symbol }: { symbol: string }) {
+  const [filings, setFilings] = useState<any[]>([])
+  const [kpis, setKpis] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [filter, setFilter] = useState('all')
+  const [error, setError] = useState('')
+
+  useEffect(() => {
+    if (!symbol) return
+    setLoading(true)
+    setError('')
+    Promise.all([
+      fetch(`/api/sec/filings?symbol=${symbol}&type=10-K,10-Q,8-K,DEF+14A,4&limit=20`).then(r => r.ok ? r.json() : { filings: [] }),
+      fetch(`/api/sec/kpis?symbol=${symbol}&quarters=4`).then(r => r.ok ? r.json() : { data: [] }),
+    ]).then(([filingsData, kpisData]) => {
+      setFilings(filingsData.filings || [])
+      setKpis(kpisData.data || [])
+    }).catch(() => setError('Could not load filings — check SEC API key')).finally(() => setLoading(false))
+  }, [symbol])
+
+  const formColor = (form: string) => {
+    if (form === '10-K')    return { bg:'#EEF3FF', text:'#1B4FFF' }
+    if (form === '10-Q')    return { bg:'#F0F7FF', text:'#0077CC' }
+    if (form === '8-K')     return { bg:'#F0FFF4', text:'#059669' }
+    if (form === 'DEF 14A') return { bg:'#FFF7ED', text:'#D97706' }
+    if (form === '4')       return { bg:'#FFF1F2', text:'#E11D48' }
+    return { bg:'#F5F7FB', text:'#7D8FA9' }
+  }
+
+  const filtered = filter === 'all' ? filings : filings.filter(f => f.formType === filter)
+
+  if (loading) return (
+    <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+      {[1,2,3,4,5].map(i => (
+        <div key={i} style={{ background:'#fff', border:'1px solid #E8EDF4', borderRadius:10, padding:'14px 16px', height:66, animation:'pulse 1.5s infinite' }} />
+      ))}
+    </div>
+  )
+
+  if (error) return (
+    <div style={{ background:'#FFF1F2', border:'1px solid #FECDD3', borderRadius:10, padding:16, color:'#E11D48', fontSize:13 }}>{error}</div>
+  )
+
+  return (
+    <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
+      {/* KPI Source Summary */}
+      {kpis.length > 0 && (
+        <div style={{ background:'linear-gradient(135deg,#EEF3FF,#F0FFF4)', border:'1px solid #D1E4FF', borderRadius:12, padding:'12px 16px' }}>
+          <div style={{ fontSize:12, fontWeight:800, color:'#0A1628', marginBottom:8, display:'flex', alignItems:'center', gap:6 }}>
+            <span style={{ background:'#1B4FFF', color:'#fff', borderRadius:4, padding:'2px 7px', fontSize:10 }}>AUDIT</span>
+            Non-GAAP KPIs extracted from 8-K press releases
+          </div>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fit, minmax(160px,1fr))', gap:8 }}>
+            {kpis.slice(0,1).map((q: any, i: number) =>
+              Object.entries(q.kpis || {}).filter(([,v]) => v).slice(0,6).map(([key, val]: any) => (
+                <div key={key+i} style={{ background:'#fff', borderRadius:8, padding:'8px 10px', border:'1px solid #E8EDF4' }}>
+                  <div style={{ fontSize:10, color:'#7D8FA9', fontWeight:600, textTransform:'uppercase', letterSpacing:0.3 }}>{key.replace(/_/g,' ')}</div>
+                  <div style={{ fontSize:13, fontWeight:800, color:'#0A1628', marginTop:2 }}>{val}</div>
+                  <a href={q.source?.edgarUrl} target="_blank" rel="noopener noreferrer"
+                    style={{ fontSize:9, color:'#1B4FFF', textDecoration:'none', display:'flex', alignItems:'center', gap:3, marginTop:3 }}>
+                    <svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                    8-K · {q.filedAt?.split('T')[0]}
+                  </a>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* Filter bar */}
+      <div style={{ display:'flex', gap:6, flexWrap:'wrap' }}>
+        {['all','10-K','10-Q','8-K','DEF 14A','4'].map(f => (
+          <button key={f} onClick={() => setFilter(f)}
+            style={{ fontSize:11, fontWeight:700, padding:'5px 12px', borderRadius:6, border:'1.5px solid', cursor:'pointer', fontFamily:'inherit', transition:'all 0.15s',
+              borderColor: filter===f ? '#1B4FFF' : '#E8EDF4',
+              background:  filter===f ? '#1B4FFF' : '#fff',
+              color:       filter===f ? '#fff' : '#7D8FA9',
+            }}>
+            {f === 'all' ? 'All Filings' : f}
+          </button>
+        ))}
+        <span style={{ marginLeft:'auto', fontSize:11, color:'#B0BCD0', alignSelf:'center' }}>{filtered.length} filings</span>
+      </div>
+
+      {/* Filings list */}
+      {filtered.length === 0 && (
+        <div style={{ textAlign:'center', padding:32, color:'#B0BCD0', fontSize:13 }}>No filings found for this filter.</div>
+      )}
+      {filtered.map((f: any, i: number) => {
+        const colors = formColor(f.formType)
+        const date = f.filedAt ? f.filedAt.split('T')[0] : '—'
+        const period = f.periodOfReport ? f.periodOfReport.split('T')[0] : ''
+        return (
+          <div key={i} style={{ background:'#fff', border:'1px solid #E8EDF4', borderRadius:10, padding:'12px 16px', display:'flex', alignItems:'center', gap:12 }}>
+            <div style={{ width:44, height:44, borderRadius:8, background:colors.bg, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
+              <span style={{ fontSize:9, fontWeight:900, color:colors.text, textAlign:'center', lineHeight:1.2 }}>{f.formType}</span>
+            </div>
+            <div style={{ flex:1, minWidth:0 }}>
+              <div style={{ fontSize:13, fontWeight:700, color:'#0A1628' }}>{f.description}</div>
+              <div style={{ fontSize:11, color:'#B0BCD0', marginTop:2, display:'flex', gap:12 }}>
+                <span>Filed: {date}</span>
+                {period && <span>Period: {period}</span>}
+                {f.companyName && <span style={{ color:'#7D8FA9' }}>{f.companyName}</span>}
+              </div>
+              {/* Sub-documents (exhibits) */}
+              {f.documents && f.documents.length > 0 && (
+                <div style={{ display:'flex', gap:6, marginTop:5, flexWrap:'wrap' }}>
+                  {f.documents.slice(0,3).map((doc: any, j: number) => doc.url && (
+                    <a key={j} href={doc.url} target="_blank" rel="noopener noreferrer"
+                      style={{ fontSize:9, color:'#7D8FA9', background:'#F5F7FB', borderRadius:4, padding:'2px 7px', textDecoration:'none', border:'1px solid #E8EDF4', whiteSpace:'nowrap' }}>
+                      {doc.description || doc.type || 'Exhibit'}
+                    </a>
+                  ))}
+                </div>
+              )}
+            </div>
+            <div style={{ display:'flex', gap:6, flexShrink:0 }}>
+              {f.htmlUrl && (
+                <a href={f.htmlUrl} target="_blank" rel="noopener noreferrer"
+                  style={{ fontSize:11, fontWeight:700, color:'#1B4FFF', background:'#EEF3FF', border:'none', borderRadius:6, padding:'6px 12px', cursor:'pointer', fontFamily:'inherit', display:'flex', alignItems:'center', gap:4, textDecoration:'none' }}>
+                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                  View
+                </a>
+              )}
+              {f.edgarUrl && (
+                <a href={f.edgarUrl} target="_blank" rel="noopener noreferrer"
+                  style={{ fontSize:11, fontWeight:700, color:'#059669', background:'#F0FFF4', border:'none', borderRadius:6, padding:'6px 12px', cursor:'pointer', fontFamily:'inherit', display:'flex', alignItems:'center', gap:4, textDecoration:'none' }}>
+                  EDGAR ↗
+                </a>
+              )}
+            </div>
+          </div>
+        )
+      })}
+
+      <div style={{ fontSize:11, color:'#B0BCD0', textAlign:'center', paddingTop:4 }}>
+        Source: SEC EDGAR via sec-api.io · All filings link directly to original source documents
+      </div>
+    </div>
+  )
+}
+
 export default function CompanyPage() {
   const params = useParams()
   const rawSym = (params.symbol as string || 'NVDA').toUpperCase()
@@ -637,30 +782,7 @@ export default function CompanyPage() {
 
         {/* ── FILINGS TAB ── */}
         {tab === 'filings' && (
-          <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-            {[
-              {form:'10-K',  date:'Feb 21, 2026', desc:'Annual Report — FY2026', size:'12.4 MB'},
-              {form:'10-Q',  date:'Nov 22, 2025', desc:'Quarterly Report — Q3 FY2026', size:'4.2 MB'},
-              {form:'8-K',   date:'Feb 26, 2026', desc:'Earnings Release & MD&A', size:'0.8 MB'},
-              {form:'DEF 14A',date:'Apr 3, 2026',  desc:'Proxy Statement — Annual Meeting', size:'3.1 MB'},
-              {form:'10-Q',  date:'Aug 29, 2025', desc:'Quarterly Report — Q2 FY2026', size:'4.0 MB'},
-              {form:'4',     date:'Mar 15, 2026', desc:'Form 4 — Insider Transaction (Huang)', size:'0.1 MB'},
-            ].map((f,i)=>(
-              <div key={i} style={{ background:'#fff', border:'1px solid #E8EDF4', borderRadius:10, padding:'12px 16px', display:'flex', alignItems:'center', gap:12 }}>
-                <div style={{ width:40, height:40, borderRadius:8, background:f.form.startsWith('10')?'#EEF3FF':'#F0FFF4', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0 }}>
-                  <span style={{ fontSize:10, fontWeight:800, color:f.form.startsWith('10')?'#1B4FFF':'#059669' }}>{f.form}</span>
-                </div>
-                <div style={{ flex:1 }}>
-                  <div style={{ fontSize:13, fontWeight:700, color:'#0A1628' }}>{f.desc}</div>
-                  <div style={{ fontSize:11, color:'#B0BCD0', marginTop:1 }}>{f.date} · {f.size}</div>
-                </div>
-                <button style={{ fontSize:11, fontWeight:700, color:'#1B4FFF', background:'#EEF3FF', border:'none', borderRadius:6, padding:'5px 12px', cursor:'pointer', fontFamily:'inherit', display:'flex', alignItems:'center', gap:5 }}>
-                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-                  SEC.gov
-                </button>
-              </div>
-            ))}
-          </div>
+          <FilingsTab symbol={symbol as string} />
         )}
 
         {/* ── COMPARISONS TAB ── */}
