@@ -1,15 +1,28 @@
 import { NextRequest, NextResponse } from 'next/server'
-const AV = process.env.ALPHA_VANTAGE_KEY
+const FINNHUB = process.env.FINNHUB_API_KEY
+const FMP     = process.env.FMP_API_KEY
+
 export async function GET(req: NextRequest) {
   const q = req.nextUrl.searchParams.get('q')
   if (!q) return NextResponse.json({ results: [] })
   try {
-    const res = await fetch(`https://www.alphavantage.co/query?function=SYMBOL_SEARCH&keywords=${encodeURIComponent(q)}&apikey=${AV}`)
+    // Finnhub symbol lookup
+    const res = await fetch(`https://finnhub.io/api/v1/search?q=${encodeURIComponent(q)}&token=${FINNHUB}`)
     const data = await res.json()
-    const results = (data.bestMatches||[]).slice(0,8).map((m: any) => ({
-      symbol: m['1. symbol'], name: m['2. name'], type: m['3. type'],
-      region: m['4. region'], currency: m['8. currency'],
+    const results = (data.result || []).slice(0, 10).map((r: any) => ({
+      symbol:      r.symbol,
+      name:        r.description,
+      type:        r.type,
+      region:      'US',
+      displaySymbol: r.displaySymbol,
     }))
     return NextResponse.json({ results })
-  } catch { return NextResponse.json({ results: [] }) }
+  } catch {
+    // FMP fallback
+    try {
+      const res = await fetch(`https://financialmodelingprep.com/api/v3/search?query=${encodeURIComponent(q)}&limit=10&apikey=${FMP}`)
+      const data = await res.json()
+      return NextResponse.json({ results: (data || []).map((r: any) => ({ symbol: r.symbol, name: r.name, type: 'Common Stock', region: r.exchangeShortName })) })
+    } catch { return NextResponse.json({ results: [] }) }
+  }
 }

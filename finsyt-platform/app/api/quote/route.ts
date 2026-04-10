@@ -1,36 +1,78 @@
 import { NextRequest, NextResponse } from 'next/server'
-const AV = process.env.ALPHA_VANTAGE_KEY
+const FINNHUB = process.env.FINNHUB_API_KEY
+const FMP     = process.env.FMP_API_KEY
+const AV      = process.env.ALPHA_VANTAGE_API_KEY || process.env.ALPHA_VANTAGE_KEY
+
 export async function GET(req: NextRequest) {
   const symbol = req.nextUrl.searchParams.get('symbol')?.toUpperCase()
   if (!symbol) return NextResponse.json({ error: 'symbol required' }, { status: 400 })
+
   try {
-    const [qr, or] = await Promise.all([
-      fetch(`https://www.alphavantage.co/query?function=GLOBAL_QUOTE&symbol=${symbol}&apikey=${AV}`),
-      fetch(`https://www.alphavantage.co/query?function=OVERVIEW&symbol=${symbol}&apikey=${AV}`),
+    // Finnhub: real-time quote + company profile (fast, accurate)
+    const [qRes, pRes, metricsRes] = await Promise.all([
+      fetch(`https://finnhub.io/api/v1/quote?symbol=${symbol}&token=${FINNHUB}`),
+      fetch(`https://finnhub.io/api/v1/stock/profile2?symbol=${symbol}&token=${FINNHUB}`),
+      fetch(`https://finnhub.io/api/v1/stock/metric?symbol=${symbol}&metric=all&token=${FINNHUB}`),
     ])
-    const [q, o] = await Promise.all([qr.json(), or.json()])
-    const gq = q['Global Quote'] || {}
-    if (!gq['01. symbol']) return NextResponse.json({ error: 'Not found' }, { status: 404 })
-    const price = parseFloat(gq['05. price'] || '0')
-    const prev = parseFloat(gq['08. previous close'] || '0')
-    const change = price - prev
+    const [q, profile, metricsData] = await Promise.all([qRes.json(), pRes.json(), metricsRes.json()])
+    const m = metricsData.metric || {}
+
+    if (!q.c || q.c === 0) throw new Error('Finnhub no data')
+
+    const change = q.c - q.pc
     return NextResponse.json({
-      symbol: gq['01. symbol'], price, change: parseFloat(change.toFixed(2)),
-      changePct: parseFloat(prev ? ((change/prev)*100).toFixed(2) : '0'),
-      open: parseFloat(gq['02. open']||'0'), high: parseFloat(gq['03. high']||'0'),
-      low: parseFloat(gq['04. low']||'0'), volume: parseInt(gq['06. volume']||'0'),
-      prevClose: prev, latestDay: gq['07. latest trading day'],
-      name: o['Name']||symbol, sector: o['Sector']||'', industry: o['Industry']||'',
-      marketCap: parseFloat(o['MarketCapitalization']||'0'), pe: parseFloat(o['PERatio']||'0'),
-      eps: parseFloat(o['EPS']||'0'), week52High: parseFloat(o['52WeekHigh']||'0'),
-      week52Low: parseFloat(o['52WeekLow']||'0'), description: o['Description']||'',
-      exchange: o['Exchange']||'', currency: o['Currency']||'USD',
-      dividendYield: parseFloat(o['DividendYield']||'0'), beta: parseFloat(o['Beta']||'0'),
-      priceToBook: parseFloat(o['PriceToBookRatio']||'0'), evToEbitda: parseFloat(o['EVToEBITDA']||'0'),
-      profitMargin: parseFloat(o['ProfitMargin']||'0'), operatingMargin: parseFloat(o['OperatingMarginTTM']||'0'),
-      returnOnEquity: parseFloat(o['ReturnOnEquityTTM']||'0'), analystTarget: parseFloat(o['AnalystTargetPrice']||'0'),
-      forwardPE: parseFloat(o['ForwardPE']||'0'), pegRatio: parseFloat(o['PEGRatio']||'0'),
-      sharesOutstanding: parseFloat(o['SharesOutstanding']||'0'), revenuePerShare: parseFloat(o['RevenuePerShareTTM']||'0'),
+      symbol,
+      price:       q.c,
+      change:      parseFloat(change.toFixed(2)),
+      changePct:   parseFloat(((change / q.pc) * 100).toFixed(2)),
+      open:        q.o,
+      high:        q.h,
+      low:         q.l,
+      prevClose:   q.pc,
+      volume:      0,
+      name:        profile.name || symbol,
+      sector:      profile.finnhubIndustry || '',
+      industry:    profile.finnhubIndustry || '',
+      marketCap:   profile.marketCapitalization ? profile.marketCapitalization * 1e6 : 0,
+      exchange:    profile.exchange || '',
+      currency:    profile.currency || 'USD',
+      logo:        profile.logo || '',
+      weburl:      profile.weburl || '',
+      ipo:         profile.ipo || '',
+      pe:          m['peNormalizedAnnual'] || m['peBasicExclExtraTTM'] || 0,
+      eps:         m['epsNormalizedAnnual'] || 0,
+      beta:        m['beta'] || 0,
+      week52High:  m['52WeekHigh'] || q.h,
+      week52Low:   m['52WeekLow'] || q.l,
+      dividendYield: m['dividendYieldIndicatedAnnual'] || 0,
+      returnOnEquity: m['roeTTM'] || 0,
+      grossMargin: m['grossMarginTTM'] || 0,
+      netMargin:   m['netProfitMarginTTM'] || 0,
+      revenueGrowth: m['revenueGrowthTTMYoy'] || 0,
+      analystTarget: 0,
+      source: 'finnhub',
     })
-  } catch { return NextResponse.json({ error: 'Failed' }, { status: 500 }) }
+  } catch {
+    // FMP fallback
+    try {
+      const [qRes, pRes] = await Promise.all([
+        fetch(`https://financialmodelingprep.com/api/v3/quote/${symbol}?apikey=${FMP}`),
+        fetch(`https://financialmodelingprep.com/api/v3/profile/${symbol}?apikey=${FMP}`),
+      ])
+      const [quotes, profiles] = await Promise.all([qRes.json(), pRes.json()])
+      const q = quotes[0]; const p = profiles[0]
+      if (!q) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+      return NextResponse.json({
+        symbol: q.symbol, price: q.price, change: q.change, changePct: q.changesPercentage,
+        open: q.open, high: q.dayHigh, low: q.dayLow, prevClose: q.previousClose,
+        volume: q.volume, marketCap: q.marketCap,
+        name: q.name, exchange: q.exchange, currency: 'USD',
+        pe: q.pe, eps: q.eps, week52High: q.yearHigh, week52Low: q.yearLow,
+        beta: p?.beta || 0, sector: p?.sector || '', industry: p?.industry || '',
+        logo: p?.image || '', weburl: p?.website || '',
+        dividendYield: p?.lastDiv || 0, grossMargin: p?.grossProfitMargin || 0,
+        source: 'fmp',
+      })
+    } catch { return NextResponse.json({ error: 'Failed' }, { status: 500 }) }
+  }
 }
