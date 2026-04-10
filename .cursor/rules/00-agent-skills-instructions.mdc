@@ -1,0 +1,33 @@
+---
+description: Enforce addyosmani/agent-skills workflow
+alwaysApply: true
+---
+
+# Agent Skills Policy
+
+Use the workflows from `addyosmani/agent-skills` for every task in this repository.
+
+## Required behavior
+
+1. Before implementation:
+   - Apply spec/planning discipline from:
+     - `.cursor/rules/agent-skills/using-agent-skills.md`
+     - `.cursor/rules/agent-skills/incremental-implementation.md`
+2. During implementation:
+   - Follow TDD and API/interface design guidance from:
+     - `.cursor/rules/agent-skills/test-driven-development.md`
+     - `.cursor/rules/agent-skills/api-and-interface-design.md`
+3. Before completion:
+   - Execute verification + review gates from:
+     - `.cursor/rules/agent-skills/debugging-and-error-recovery.md`
+     - `.cursor/rules/agent-skills/code-review-and-quality.md`
+     - `.cursor/rules/agent-skills/security-and-hardening.md`
+
+## Operational note
+
+If `.cursor/rules/agent-skills/` files are missing or stale, run:
+
+```bash
+./scripts/install-agent-skills.sh
+./scripts/sync-cursor-skills.sh
+```
