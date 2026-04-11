@@ -56,6 +56,7 @@ export const DEFAULT_NAV: NavItem[] = [
   { id:'overview',   href:'/app',           labelKey:'overview',    iconKey:'overview',    visible:true,  pinned:true },
   { id:'watchlist',  href:'/app/watchlist', labelKey:'watchlist',   iconKey:'watchlist',   visible:true },
   { id:'alerts',     href:'/app/alerts',    labelKey:'alerts',      iconKey:'alerts',      badge:'3', visible:true },
+  { id:'workspaces', href:'/app/workspaces', labelKey:'workspaces', iconKey:'workspaces', visible:true },
   { id:'research',   href:'/app/research',  labelKey:'ai_research', iconKey:'ai_research', visible:true },
   { id:'screener',   href:'/app/screener',  labelKey:'screener',    iconKey:'screener',    visible:true },
   { id:'news',       href:'/app/news',      labelKey:'news_signals',iconKey:'news_signals',visible:true },
