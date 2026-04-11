@@ -234,7 +234,7 @@ export default function Dashboard() {
             {news.map((n,i)=>(
               <div key={i} style={{ padding:'12px 16px', borderBottom: i<news.length-1?'1px solid #F1F5F9':'' }}>
                 <div style={{ fontSize:13, fontWeight:600, color:'#0A1628', lineHeight:1.4, marginBottom:4 }}>
-                  <SentimentDot s={typeof n.sentiment==='string'?n.sentiment:n.sentiment?.polarity||'neutral'} />
+                  <SentimentDot s={String(n.sentiment ?? "neutral")} />
                   {n.headline}
                 </div>
                 <div style={{ fontSize:11, color:'#9CA3AF', display:'flex', gap:8 }}>
