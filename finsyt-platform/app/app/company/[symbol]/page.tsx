@@ -311,6 +311,173 @@ function FilingsTab({ symbol }: { symbol: string }) {
   )
 }
 
+// ── Live Financials Tab Component ─────────────────────────────────────────────
+function FinancialsTab({ symbol, period, setPeriod }: { symbol: string; period: 'quarterly'|'annual'; setPeriod: (p:'quarterly'|'annual')=>void }) {
+  const [activeStmt, setActiveStmt] = useState<'income'|'balance'|'cashflow'>('income')
+  const [data, setData] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState('')
+
+  const STMTS = [
+    { id: 'income',   label: 'Income Statement',   endpoint: 'income-statement' },
+    { id: 'balance',  label: 'Balance Sheet',       endpoint: 'balance-sheet-statement' },
+    { id: 'cashflow', label: 'Cash Flow',           endpoint: 'cash-flow-statement' },
+  ] as const
+
+  useEffect(() => {
+    setLoading(true)
+    setError('')
+    const stmt = STMTS.find(s => s.id === activeStmt)!
+    const fmpPeriod = period === 'quarterly' ? 'quarter' : 'annual'
+    fetch(`https://financialmodelingprep.com/stable/${stmt.endpoint}?symbol=${symbol}&period=${fmpPeriod}&limit=8&apikey=${process.env.NEXT_PUBLIC_FMP_API_KEY || ''}`)
+      .then(r => r.json())
+      .then((rows: any[]) => {
+        if (!Array.isArray(rows) || rows.length === 0) {
+          // Fallback to our /api/financials proxy
+          return fetch(`/api/financials/statements?symbol=${symbol}&statement=${stmt.endpoint}&period=${fmpPeriod}&limit=8`)
+            .then(r => r.json())
+        }
+        return { rows }
+      })
+      .then(res => setData(res?.rows || res || []))
+      .catch(e => setError(String(e)))
+      .finally(() => setLoading(false))
+  }, [symbol, period, activeStmt])
+
+  const IS_ROWS = [
+    { key: 'revenue',                              label: 'Revenue',               fmt: 'bn',  bold: true },
+    { key: 'costOfRevenue',                        label: 'Cost of Revenue',        fmt: 'bn' },
+    { key: 'grossProfit',                          label: 'Gross Profit',           fmt: 'bn',  bold: true },
+    { key: 'grossProfitRatio',                     label: 'Gross Margin',           fmt: 'pct', color: true },
+    { key: 'researchAndDevelopmentExpenses',       label: 'R&D',                    fmt: 'bn' },
+    { key: 'sellingGeneralAndAdministrativeExpenses', label: 'SG&A',               fmt: 'bn' },
+    { key: 'operatingExpenses',                    label: 'Operating Expenses',     fmt: 'bn' },
+    { key: 'ebitda',                               label: 'EBITDA',                 fmt: 'bn',  bold: true },
+    { key: 'ebitdaratio',                          label: 'EBITDA Margin',          fmt: 'pct', color: true },
+    { key: 'operatingIncome',                      label: 'EBIT',                   fmt: 'bn',  bold: true },
+    { key: 'operatingIncomeRatio',                 label: 'EBIT Margin',            fmt: 'pct', color: true },
+    { key: 'interestExpense',                      label: 'Interest Expense',       fmt: 'bn' },
+    { key: 'netIncome',                            label: 'Net Income',             fmt: 'bn',  bold: true },
+    { key: 'netIncomeRatio',                       label: 'Net Margin',             fmt: 'pct', color: true },
+    { key: 'epsdiluted',                           label: 'EPS (Diluted)',          fmt: 'eps' },
+    { key: 'weightedAverageShsOutDil',             label: 'Diluted Shares',         fmt: 'sh' },
+  ]
+  const BS_ROWS = [
+    { key: 'cashAndCashEquivalents',       label: 'Cash & Equivalents',       fmt: 'bn', bold: true },
+    { key: 'cashAndShortTermInvestments',  label: 'Cash + ST Investments',    fmt: 'bn' },
+    { key: 'netReceivables',               label: 'Accounts Receivable',      fmt: 'bn' },
+    { key: 'inventory',                    label: 'Inventory',                fmt: 'bn' },
+    { key: 'totalCurrentAssets',           label: 'Total Current Assets',     fmt: 'bn', bold: true },
+    { key: 'propertyPlantEquipmentNet',    label: 'PP&E (Net)',               fmt: 'bn' },
+    { key: 'goodwill',                     label: 'Goodwill',                 fmt: 'bn' },
+    { key: 'totalAssets',                  label: 'Total Assets',             fmt: 'bn', bold: true },
+    { key: 'shortTermDebt',                label: 'Short-Term Debt',          fmt: 'bn' },
+    { key: 'totalCurrentLiabilities',      label: 'Total Current Liabilities',fmt: 'bn' },
+    { key: 'longTermDebt',                 label: 'Long-Term Debt',           fmt: 'bn' },
+    { key: 'totalDebt',                    label: 'Total Debt',               fmt: 'bn', bold: true },
+    { key: 'netDebt',                      label: 'Net Debt',                 fmt: 'bn' },
+    { key: 'totalLiabilities',             label: 'Total Liabilities',        fmt: 'bn', bold: true },
+    { key: 'totalStockholdersEquity',      label: 'Total Equity',             fmt: 'bn', bold: true },
+    { key: 'retainedEarnings',             label: 'Retained Earnings',        fmt: 'bn' },
+    { key: 'bookValuePerShare',            label: 'Book Value / Share',       fmt: 'eps' },
+  ]
+  const CF_ROWS = [
+    { key: 'operatingCashFlow',            label: 'Operating Cash Flow',      fmt: 'bn', bold: true },
+    { key: 'depreciationAndAmortization',  label: 'D&A',                      fmt: 'bn' },
+    { key: 'stockBasedCompensation',       label: 'Stock-Based Comp',         fmt: 'bn' },
+    { key: 'capitalExpenditure',           label: 'CapEx',                    fmt: 'bn' },
+    { key: 'freeCashFlow',                 label: 'Free Cash Flow',           fmt: 'bn', bold: true, color: true },
+    { key: 'netCashUsedForInvestingActivites', label: 'Investing CF',         fmt: 'bn' },
+    { key: 'commonStockRepurchased',       label: 'Buybacks',                 fmt: 'bn' },
+    { key: 'dividendsPaid',                label: 'Dividends Paid',           fmt: 'bn' },
+    { key: 'netCashUsedProvidedByFinancingActivities', label: 'Financing CF', fmt: 'bn' },
+    { key: 'netChangeInCash',              label: 'Net Change in Cash',       fmt: 'bn' },
+  ]
+
+  const rows = activeStmt === 'income' ? IS_ROWS : activeStmt === 'balance' ? BS_ROWS : CF_ROWS
+
+  function fmt(val: any, type: string) {
+    if (val === null || val === undefined || val === '') return '—'
+    const n = Number(val)
+    if (isNaN(n)) return String(val)
+    if (type === 'bn')  return `$${(n/1e9).toFixed(2)}B`
+    if (type === 'pct') return `${(n*100).toFixed(1)}%`
+    if (type === 'eps') return `$${n.toFixed(2)}`
+    if (type === 'sh')  return `${(n/1e9).toFixed(2)}B`
+    return n.toLocaleString()
+  }
+
+  const periods = data.slice(0, 8).map(r => r.date?.slice(0, 7) || '').reverse()
+  const orderedData = [...data.slice(0, 8)].reverse()
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+      {/* Controls */}
+      <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+        {(['quarterly','annual'] as const).map(p => (
+          <button key={p} onClick={() => setPeriod(p)}
+            style={{ padding:'5px 14px', borderRadius:7, border:'1.5px solid', borderColor:period===p?'#1B4FFF':'#E8EDF4', background:period===p?'#EEF3FF':'#fff', color:period===p?'#1B4FFF':'#7D8FA9', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'inherit', textTransform:'capitalize' }}>
+            {p}
+          </button>
+        ))}
+        <div style={{ width:1, height:20, background:'#E8EDF4', margin:'0 4px' }} />
+        {STMTS.map(s => (
+          <button key={s.id} onClick={() => setActiveStmt(s.id as any)}
+            style={{ padding:'5px 14px', borderRadius:7, border:'1.5px solid', borderColor:activeStmt===s.id?'#059669':'#E8EDF4', background:activeStmt===s.id?'#ECFDF5':'#fff', color:activeStmt===s.id?'#059669':'#7D8FA9', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>
+            {s.label}
+          </button>
+        ))}
+        <span style={{ marginLeft: 'auto', fontSize: 10, color: '#9DB0C8', display:'flex', alignItems:'center', gap:4 }}>
+          {loading ? '⏳ Loading...' : error ? '⚠️ Error' : <><span style={{color:'#059669'}}>●</span> FMP Live</>}
+        </span>
+      </div>
+
+      {/* Table */}
+      <div style={{ background:'#fff', border:'1px solid #E8EDF4', borderRadius:12, overflow:'auto' }}>
+        {loading ? (
+          <div style={{ padding:40, textAlign:'center', color:'#B0BCD0', fontSize:13 }}>Loading financial data...</div>
+        ) : error || data.length === 0 ? (
+          <div style={{ padding:40, textAlign:'center', color:'#B0BCD0', fontSize:13 }}>
+            {error || 'No data available'}
+            <div style={{ marginTop:8, fontSize:11, color:'#D0D9E8' }}>Check FMP_API_KEY is set in Vercel environment variables</div>
+          </div>
+        ) : (
+          <table style={{ width:'100%', fontSize:12, borderCollapse:'collapse', minWidth:700 }}>
+            <thead>
+              <tr style={{ background:'#F7F9FC', borderBottom:'2px solid #E8EDF4' }}>
+                <th style={{ padding:'10px 16px', textAlign:'left', fontWeight:700, color:'#7D8FA9', fontSize:11, position:'sticky', left:0, background:'#F7F9FC', minWidth:200 }}>Metric</th>
+                {periods.map(p => (
+                  <th key={p} style={{ padding:'10px 14px', textAlign:'right', fontWeight:700, color:'#7D8FA9', fontSize:11, minWidth:90 }}>{p}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {rows.map((row, ri) => (
+                <tr key={row.key} style={{ borderBottom:'1px solid #F5F7FB', background:ri%2===0?'#fff':'#FAFBFC' }}>
+                  <td style={{ padding:'8px 16px', fontWeight: row.bold ? 700 : 500, color: row.bold ? '#0A1628' : '#3D4F6E', fontSize:12, position:'sticky', left:0, background:ri%2===0?'#fff':'#FAFBFC' }}>
+                    {row.label}
+                  </td>
+                  {orderedData.map((record, ci) => {
+                    const val = fmt(record[row.key], row.fmt)
+                    const isPositive = row.color && Number(record[row.key]) > 0
+                    const isNegative = row.color && Number(record[row.key]) < 0
+                    return (
+                      <td key={ci} style={{ padding:'8px 14px', textAlign:'right', fontWeight: row.bold ? 700 : 500, color: isPositive ? '#059669' : isNegative ? '#DC2626' : '#0A1628', fontSize:12 }}>
+                        {val}
+                      </td>
+                    )
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        )}
+      </div>
+    </div>
+  )
+}
+
+
 export default function CompanyPage() {
   const params = useParams()
   const rawSym = (params.symbol as string || 'NVDA').toUpperCase()
@@ -322,8 +489,29 @@ export default function CompanyPage() {
   const [period, setPeriod]   = useState<'quarterly'|'annual'>('quarterly')
   const [chartRange, setChartRange] = useState<'1M'|'3M'|'6M'|'1Y'|'3Y'>('1Y')
   const [priceData]           = useState(() => mockPrice(profile.price))
-  const [financials]          = useState(() => mockFinancials(profile.revenue, profile.grossMargin, profile.netMargin))
+  const [financials, setFinancials] = useState(() => mockFinancials(profile.revenue, profile.grossMargin, profile.netMargin))
+  const [liveSnapshot, setLiveSnapshot] = useState<any>(null)
+  const [snapshotLoading, setSnapshotLoading] = useState(false)
   const [searchInput, setSearchInput] = useState(symbol)
+
+  // Load live financial snapshot from FMP via /api/financials
+  useEffect(() => {
+    if (!symbol) return
+    setSnapshotLoading(true)
+    fetch(`/api/financials?symbol=${symbol}&period=${period === 'quarterly' ? 'Q' : 'A'}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (data?.snapshot) {
+          setLiveSnapshot(data.snapshot)
+          // Backfill financials chart with real data if available
+          if (data.snapshot.revenue) {
+            // Keep mock chart but update the summary stats from live data
+          }
+        }
+      })
+      .catch(() => {})
+      .finally(() => setSnapshotLoading(false))
+  }, [symbol, period])
   const [copilotOpen, setCopilotOpen] = useState(false)
   const [copilotQ, setCopilotQ] = useState('')
   const [copilotAns, setCopilotAns] = useState('')
@@ -544,17 +732,21 @@ export default function CompanyPage() {
 
               {/* Key metrics */}
               <div style={{ background:'#fff', border:'1px solid #E8EDF4', borderRadius:12, padding:'16px 18px' }}>
-                <div style={{ fontSize:13, fontWeight:800, color:'#0A1628', marginBottom:12 }}>Key Metrics</div>
+                <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:12 }}>
+                  <span style={{ fontSize:13, fontWeight:800, color:'#0A1628' }}>Key Metrics</span>
+                  {liveSnapshot ? <span style={{ fontSize:10, padding:'2px 7px', background:'#ECFDF5', color:'#059669', borderRadius:20, fontWeight:600 }}>● Live</span> : snapshotLoading ? <span style={{ fontSize:10, color:'#9DB0C8' }}>Loading...</span> : <span style={{ fontSize:10, color:'#9DB0C8' }}>Mock data</span>}
+                </div>
                 <div style={{ display:'flex', flexDirection:'column', gap:0 }}>
                   {[
-                    ['Revenue (TTM)',   `$${profile.revenue}B`,   `+${profile.revenueGrowth}%`,'green'],
-                    ['Gross Margin',    `${profile.grossMargin}%`, '',''],
-                    ['Net Margin',      `${profile.netMargin}%`,   '',''],
-                    ['FCF Margin',      `${profile.fcfMargin}%`,   '',''],
-                    ['EPS (TTM)',       `$${profile.eps}`,         `+${profile.epsGrowth}% YoY`,'green'],
-                    ['P/E (NTM)',       `${profile.peRatio}x`,     '',''],
-                    ['EV/EBITDA',       `${profile.evEbitda}x`,    '',''],
-                    ['P/S',            `${profile.psRatio}x`,     '',''],
+                    ['Revenue (TTM)',   liveSnapshot ? `$${(liveSnapshot.revenue/1e9).toFixed(1)}B` : `$${profile.revenue}B`,   liveSnapshot ? '' : `+${profile.revenueGrowth}%`,'green'],
+                    ['Gross Margin',    liveSnapshot ? `${(liveSnapshot.grossMargin*100).toFixed(1)}%` : `${profile.grossMargin}%`, '',''],
+                    ['EBITDA Margin',   liveSnapshot ? `${(liveSnapshot.ebitdaMargin*100).toFixed(1)}%` : `${profile.ebitda_margin||'-'}%`, '',''],
+                    ['Net Margin',      liveSnapshot ? `${(liveSnapshot.netMargin*100).toFixed(1)}%` : `${profile.netMargin}%`,   '',''],
+                    ['EPS (diluted)',   liveSnapshot ? `$${liveSnapshot.epsDiluted}` : `$${profile.eps}`,         '',''],
+                    ['P/E',            liveSnapshot ? `${liveSnapshot.pe?.toFixed(1)||profile.peRatio}x` : `${profile.peRatio}x`,     '',''],
+                    ['EV/EBITDA',       liveSnapshot ? `${liveSnapshot.evEbitda?.toFixed(1)||profile.evEbitda}x` : `${profile.evEbitda}x`,    '',''],
+                    ['Net Debt',        liveSnapshot ? `$${(liveSnapshot.netDebt/1e9).toFixed(1)}B` : '-',    '',''],
+                    ['ROE',             liveSnapshot ? `${(liveSnapshot.roe*100).toFixed(1)}%` : '-', '',''],
                   ].map(([l,v,s,c],i)=>(
                     <div key={i} style={{ display:'flex', alignItems:'center', padding:'7px 0', borderBottom:'1px solid #F5F7FB' }}>
                       <span style={{ flex:1, fontSize:12, color:'#7D8FA9' }}>{l}</span>
@@ -666,43 +858,7 @@ export default function CompanyPage() {
 
         {/* ── FINANCIALS TAB ── */}
         {tab === 'financials' && (
-          <div style={{ display:'flex', flexDirection:'column', gap:16 }}>
-            <div style={{ display:'flex', gap:8, alignItems:'center' }}>
-              {(['quarterly','annual'] as const).map(p=>(
-                <button key={p} onClick={()=>setPeriod(p)} style={{ padding:'5px 14px', borderRadius:7, border:'1.5px solid', borderColor:period===p?'#1B4FFF':'#E8EDF4', background:period===p?'#EEF3FF':'#fff', color:period===p?'#1B4FFF':'#7D8FA9', fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'inherit', textTransform:'capitalize' }}>{p}</button>
-              ))}
-            </div>
-            <div style={{ background:'#fff', border:'1px solid #E8EDF4', borderRadius:12, overflow:'hidden' }}>
-              <table style={{ width:'100%', fontSize:12, borderCollapse:'collapse' }}>
-                <thead>
-                  <tr style={{ background:'#F7F9FC', borderBottom:'1px solid #E8EDF4' }}>
-                    {['Metric','Q1 \'25','Q2 \'25','Q3 \'25','Q4 \'25','Q1 \'26','Q2 \'26','Q3 \'26','Q4 \'26'].map(h=>(
-                      <th key={h} style={{ padding:'10px 14px', textAlign:h==='Metric'?'left':'right', fontWeight:700, color:'#7D8FA9', fontSize:11 }}>{h}</th>
-                    ))}
-                  </tr>
-                </thead>
-                <tbody>
-                  {[
-                    ['Revenue ($B)', financials.map(f=>f.revenue.toFixed(1))],
-                    ['Gross Profit ($B)', financials.map(f=>f.grossProfit.toFixed(1))],
-                    ['Net Income ($B)', financials.map(f=>f.netIncome.toFixed(1))],
-                    ['EPS (Diluted)', financials.map(f=>`$${f.eps.toFixed(2)}`)],
-                    ['FCF ($B)', financials.map(f=>f.fcf.toFixed(1))],
-                    ['Gross Margin', financials.map(_=>`${profile.grossMargin.toFixed(1)}%`)],
-                    ['Net Margin', financials.map(_=>`${profile.netMargin.toFixed(1)}%`)],
-                    ['FCF Margin', financials.map(_=>`${profile.fcfMargin.toFixed(1)}%`)],
-                  ].map(([label,vals],ri)=>(
-                    <tr key={ri} style={{ borderBottom:'1px solid #F5F7FB', background:ri%2===0?'#fff':'#FAFBFC' }}>
-                      <td style={{ padding:'9px 14px', fontWeight:600, color:'#3D4F6E', fontSize:12 }}>{label as string}</td>
-                      {(vals as string[]).map((v,ci)=>(
-                        <td key={ci} style={{ padding:'9px 14px', textAlign:'right', fontWeight:700, color:'#0A1628', fontSize:12 }}>{v}</td>
-                      ))}
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          <FinancialsTab symbol={symbol} period={period} setPeriod={setPeriod} />
         )}
 
         {/* ── ESTIMATES TAB ── */}

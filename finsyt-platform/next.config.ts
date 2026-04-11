@@ -11,6 +11,7 @@ const nextConfig: NextConfig = {
   },
   env: {
     FMP_API_KEY:           process.env.FMP_API_KEY           || '',
+    NEXT_PUBLIC_FMP_API_KEY: process.env.FMP_API_KEY           || '',
     ALPHA_VANTAGE_API_KEY: process.env.ALPHA_VANTAGE_API_KEY || '',
     FINNHUB_API_KEY:       process.env.FINNHUB_API_KEY       || '',
     SEC_API_KEY:           process.env.SEC_API_KEY           || '',

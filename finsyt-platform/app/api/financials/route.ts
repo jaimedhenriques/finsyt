@@ -1,181 +1,324 @@
 import { NextRequest, NextResponse } from "next/server"
 
-const EODHD_KEY = process.env.EODHD_API_KEY || ""
-const BASE = "https://eodhd.com/api"
+const FMP   = process.env.FMP_API_KEY || ""
+const EODHD = process.env.EODHD_API_KEY || process.env.eodhd_api || ""
 
-// ── Finsyt mnemonic → EODHD field mapping ────────────────────────────────────
-const METRIC_MAP: Record<string, { path: string; statement: "income_statement" | "balance_sheet" | "cash_flow" | "highlights" | "valuation"; transform?: (v: any) => any }> = {
-  // Income Statement
-  iq_total_rev:       { path: "totalRevenue",                    statement: "income_statement" },
-  iq_rev:             { path: "totalRevenue",                    statement: "income_statement" },
-  iq_gross_profit:    { path: "grossProfit",                     statement: "income_statement" },
-  iq_gross_profit_margin: { path: "grossProfit",                 statement: "income_statement", transform: (v, data) => data?.income_statement?.yearly?.[0] ? (v / data.income_statement.yearly[0].totalRevenue * 100).toFixed(2) : null },
-  iq_ebitda:          { path: "ebitda",                          statement: "highlights" },
-  iq_ebitda_margin:   { path: "EBITDAM",                         statement: "highlights" },
-  iq_ebit:            { path: "ebit",                            statement: "income_statement" },
-  iq_ebit_margin:     { path: "ebit",                            statement: "income_statement" },
-  iq_net_inc:         { path: "netIncome",                       statement: "income_statement" },
-  iq_net_inc_margin:  { path: "profitMargin",                    statement: "highlights" },
-  iq_eps_diluted:     { path: "dilutedEps",                      statement: "income_statement" },
-  iq_sga:             { path: "sellingGeneralAdministrative",    statement: "income_statement" },
-  iq_rd_exp:          { path: "researchDevelopment",             statement: "income_statement" },
-  iq_da_suppl:        { path: "depreciationAndAmortization",     statement: "cash_flow" },
-  iq_int_exp:         { path: "interestExpense",                 statement: "income_statement" },
-  iq_tax_exp:         { path: "incomeTaxExpense",                statement: "income_statement" },
-  // Balance Sheet
-  iq_total_assets:    { path: "totalAssets",                     statement: "balance_sheet" },
-  iq_cash_equiv:      { path: "cash",                            statement: "balance_sheet" },
-  iq_cash_st_invest:  { path: "shortTermInvestments",            statement: "balance_sheet" },
-  iq_ar:              { path: "netReceivables",                  statement: "balance_sheet" },
-  iq_total_debt:      { path: "shortLongTermDebtTotal",          statement: "balance_sheet" },
-  iq_st_debt:         { path: "shortTermDebt",                   statement: "balance_sheet" },
-  iq_lt_debt:         { path: "longTermDebtTotal",               statement: "balance_sheet" },
-  iq_net_debt:        { path: "netDebt",                         statement: "highlights" },
-  iq_total_equity:    { path: "totalStockholderEquity",          statement: "balance_sheet" },
-  iq_total_liab:      { path: "totalLiab",                       statement: "balance_sheet" },
-  iq_book_val_share:  { path: "bookValue",                       statement: "highlights" },
-  // Cash Flow
-  iq_net_cash_ops:    { path: "totalCashFromOperatingActivities",statement: "cash_flow" },
-  iq_capex:           { path: "capitalExpenditures",             statement: "cash_flow" },
-  iq_free_cash_flow:  { path: "freeCashFlow",                    statement: "highlights" },
-  iq_net_cash_inv:    { path: "totalCashflowsFromInvestingActivities", statement: "cash_flow" },
-  iq_net_cash_finan:  { path: "totalCashFromFinancingActivities",statement: "cash_flow" },
-  iq_div_paid:        { path: "dividendsPaid",                   statement: "cash_flow" },
-  iq_da_cf:           { path: "depreciationAndAmortization",     statement: "cash_flow" },
-  // Valuation / Market
-  iq_marketcap:       { path: "marketCapitalization",            statement: "highlights" },
-  iq_tev:             { path: "enterpriseValue",                 statement: "highlights" },
-  iq_tev_ebitda:      { path: "EnterpriseValueEbitda",           statement: "highlights" },
-  iq_pe_excl:         { path: "PERatio",                         statement: "highlights" },
-  iq_tev_rev:         { path: "EnterpriseValueRevenue",          statement: "highlights" },
-  iq_pb:              { path: "PriceBookMRQ",                    statement: "highlights" },
-  iq_ps:              { path: "PriceSalesTTM",                   statement: "highlights" },
-  iq_div_yield:       { path: "DividendYield",                   statement: "highlights" },
-  iq_diluted_shares:  { path: "SharesOutstanding",               statement: "highlights" },
-  // Estimates (from EODHD earnings)
-  iq_eps_agg_est:     { path: "epsEstimate",                     statement: "highlights" },
-  iq_total_rev_agg_est: { path: "revenueEstimate",               statement: "highlights" },
+const FMP_BASE   = "https://financialmodelingprep.com"
+const EODHD_BASE = "https://eodhd.com/api"
+
+// ─── FMP field maps ───────────────────────────────────────────────────────────
+// FMP income-statement fields (stable endpoint returns camelCase)
+const FMP_IS: Record<string, string> = {
+  iq_total_rev:        "revenue",
+  iq_gross_profit:     "grossProfit",
+  iq_gross_profit_margin: "grossProfitRatio",
+  iq_ebitda:           "ebitda",
+  iq_ebitda_margin:    "ebitdaratio",
+  iq_ebit:             "operatingIncome",
+  iq_ebit_margin:      "operatingIncomeRatio",
+  iq_net_inc:          "netIncome",
+  iq_net_inc_margin:   "netIncomeRatio",
+  iq_eps_diluted:      "epsdiluted",
+  iq_eps_basic:        "eps",
+  iq_sga:              "sellingGeneralAndAdministrativeExpenses",
+  iq_rd_exp:           "researchAndDevelopmentExpenses",
+  iq_da_suppl:         "depreciationAndAmortization",
+  iq_int_exp:          "interestExpense",
+  iq_tax_exp:          "incomeTaxExpense",
+  iq_cost_rev:         "costOfRevenue",
+  iq_diluted_shares:   "weightedAverageShsOutDil",
+  iq_operating_exp:    "operatingExpenses",
 }
 
-// ── Fetch helpers ─────────────────────────────────────────────────────────────
-async function fetchFinancials(symbol: string, exchange = "US") {
-  const url = `${BASE}/fundamentals/${symbol}.${exchange}?api_token=${EODHD_KEY}&filter=Financials,Highlights,Valuation`
-  const res = await fetch(url, { next: { revalidate: 3600 } })
-  if (!res.ok) throw new Error(`EODHD error: ${res.status}`)
+// FMP balance-sheet fields
+const FMP_BS: Record<string, string> = {
+  iq_total_assets:     "totalAssets",
+  iq_cash_equiv:       "cashAndCashEquivalents",
+  iq_cash_st_invest:   "cashAndShortTermInvestments",
+  iq_ar:               "netReceivables",
+  iq_inventory:        "inventory",
+  iq_total_current_assets: "totalCurrentAssets",
+  iq_ppe_net:          "propertyPlantEquipmentNet",
+  iq_goodwill:         "goodwill",
+  iq_intangibles:      "intangibleAssets",
+  iq_total_liab:       "totalLiabilities",
+  iq_total_current_liab: "totalCurrentLiabilities",
+  iq_st_debt:          "shortTermDebt",
+  iq_lt_debt:          "longTermDebt",
+  iq_total_debt:       "totalDebt",
+  iq_net_debt:         "netDebt",
+  iq_total_equity:     "totalStockholdersEquity",
+  iq_book_val_share:   "bookValuePerShare",
+  iq_retained_earnings:"retainedEarnings",
+}
+
+// FMP cash-flow fields
+const FMP_CF: Record<string, string> = {
+  iq_net_cash_ops:     "operatingCashFlow",
+  iq_capex:            "capitalExpenditure",
+  iq_free_cash_flow:   "freeCashFlow",
+  iq_net_cash_inv:     "netCashUsedForInvestingActivites",
+  iq_net_cash_finan:   "netCashUsedProvidedByFinancingActivities",
+  iq_div_paid:         "dividendsPaid",
+  iq_da_cf:            "depreciationAndAmortization",
+  iq_stock_comp:       "stockBasedCompensation",
+  iq_buy_back:         "commonStockRepurchased",
+  iq_net_change_cash:  "netChangeInCash",
+}
+
+// FMP key-metrics / ratios
+const FMP_KM: Record<string, string> = {
+  iq_marketcap:        "marketCap",
+  iq_tev:              "enterpriseValue",
+  iq_tev_ebitda:       "evToEbitda",
+  iq_pe_excl:          "peRatio",
+  iq_tev_rev:          "evToSales",
+  iq_pb:               "pbRatio",
+  iq_ps:               "priceToSalesRatio",
+  iq_div_yield:        "dividendYield",
+  iq_fcf_yield:        "freeCashFlowYield",
+  iq_roe:              "roe",
+  iq_roa:              "roa",
+  iq_roic:             "roic",
+  iq_peg:              "pegRatio",
+  iq_net_debt_ebitda:  "netDebtToEBITDA",
+  iq_current_ratio:    "currentRatio",
+  iq_debt_equity:      "debtToEquity",
+  iq_interest_cov:     "interestCoverage",
+}
+
+// Quick lookup: which statement is this mnemonic in?
+const ALL_MAPS = [
+  { map: FMP_IS, stmt: "income-statement" },
+  { map: FMP_BS, stmt: "balance-sheet-statement" },
+  { map: FMP_CF, stmt: "cash-flow-statement" },
+  { map: FMP_KM, stmt: "key-metrics" },
+] as const
+
+function findMapping(metric: string): { stmt: string; field: string } | null {
+  for (const { map, stmt } of ALL_MAPS) {
+    if (map[metric]) return { stmt, field: map[metric] }
+  }
+  return null
+}
+
+// ─── Fetch helpers ─────────────────────────────────────────────────────────────
+async function fmpFetch(path: string) {
+  const sep = path.includes("?") ? "&" : "?"
+  const res = await fetch(`${FMP_BASE}${path}${sep}apikey=${FMP}`, { next: { revalidate: 3600 } })
+  if (!res.ok) throw new Error(`FMP ${res.status}: ${path}`)
   return res.json()
 }
 
-function extractPeriods(data: any, statement: string, period: string, offset: number, fieldPath: string) {
-  const isAnnual = period === "A" || period === "annual"
-  const freq = isAnnual ? "yearly" : "quarterly"
-  
-  const stmtData = data?.Financials?.[statement === "income_statement" ? "Income_Statement" : statement === "balance_sheet" ? "Balance_Sheet" : "Cash_Flow"]
-  const highlights = data?.Highlights
-  const valuation = data?.Valuation
-  
-  // Highlights/Valuation are single-period (current)
-  if (statement === "highlights") {
-    const val = highlights?.[fieldPath] ?? valuation?.[fieldPath] ?? null
-    return { value: val, period: "latest", currency: "USD" }
+// period: "annual" | "quarter"
+async function fetchStatement(symbol: string, stmt: string, period: string, limit: number) {
+  const useStable = ["income-statement","balance-sheet-statement","cash-flow-statement"].includes(stmt)
+  if (useStable) {
+    // FMP stable endpoint
+    return fmpFetch(`/stable/${stmt}?symbol=${symbol}&period=${period}&limit=${limit}`)
   }
-  
-  const records = stmtData?.[freq]
-  if (!records) return { value: null, period: null, currency: "USD" }
-  
-  const dates = Object.keys(records).sort().reverse()
-  const idx = Math.abs(offset)
-  if (idx >= dates.length) return { value: null, period: null, currency: "USD" }
-  
-  const date = dates[idx]
-  const record = records[date]
-  const value = record?.[fieldPath] ?? null
-  
-  return { value, period: date, currency: record?.currency_symbol || "USD" }
+  // key-metrics
+  return fmpFetch(`/stable/key-metrics?symbol=${symbol}&period=${period}&limit=${limit}`)
 }
 
-// ── Main handler ──────────────────────────────────────────────────────────────
+// ─── EODHD fallback ───────────────────────────────────────────────────────────
+const EODHD_MAP: Record<string, { section: string; field: string }> = {
+  iq_total_rev:    { section: "Income_Statement", field: "totalRevenue" },
+  iq_gross_profit: { section: "Income_Statement", field: "grossProfit" },
+  iq_ebitda:       { section: "Highlights",       field: "EBITDA" },
+  iq_net_inc:      { section: "Income_Statement", field: "netIncome" },
+  iq_total_assets: { section: "Balance_Sheet",    field: "totalAssets" },
+  iq_total_debt:   { section: "Balance_Sheet",    field: "shortLongTermDebtTotal" },
+  iq_total_equity: { section: "Balance_Sheet",    field: "totalStockholderEquity" },
+  iq_net_cash_ops: { section: "Cash_Flow",        field: "totalCashFromOperatingActivities" },
+  iq_capex:        { section: "Cash_Flow",        field: "capitalExpenditures" },
+  iq_free_cash_flow:{ section:"Highlights",       field: "FreeCashflow" },
+  iq_marketcap:    { section: "Highlights",       field: "MarketCapitalization" },
+  iq_tev:          { section: "Highlights",       field: "EnterpriseValue" },
+  iq_pe_excl:      { section: "Highlights",       field: "PERatio" },
+}
+
+async function fetchEODHD(symbol: string, metric: string, period: string) {
+  const eodSymbol = symbol.includes(".") ? symbol : `${symbol}.US`
+  const freq = period === "annual" ? "yearly" : "quarterly"
+  const data = await fetch(`${EODHD_BASE}/fundamentals/${eodSymbol}?api_token=${EODHD}`).then(r => r.json())
+  const mapping = EODHD_MAP[metric]
+  if (!mapping) return null
+
+  if (mapping.section === "Highlights") {
+    return [{ date: "latest", value: data?.Highlights?.[mapping.field] ?? null }]
+  }
+  const sectionMap: Record<string, string> = { Income_Statement: "Income_Statement", Balance_Sheet: "Balance_Sheet", Cash_Flow: "Cash_Flow" }
+  const records = data?.Financials?.[sectionMap[mapping.section]]?.[freq] || {}
+  return Object.entries(records)
+    .sort(([a], [b]) => b.localeCompare(a))
+    .map(([date, rec]: any) => ({ date, value: rec?.[mapping.field] ?? null }))
+}
+
+// ─── Main handler ─────────────────────────────────────────────────────────────
 export async function GET(req: NextRequest) {
-  const { searchParams } = new URL(req.url)
-  const symbol = searchParams.get("symbol")?.toUpperCase()
-  const metric = searchParams.get("metric")?.toLowerCase()  // e.g. iq_total_rev or revenue
-  const period = searchParams.get("period") || "A"           // A, Q, LTM, NTM
-  const offset = parseInt(searchParams.get("offset") || "0") // 0=current, -1=prior, etc.
-  const exchange = searchParams.get("exchange") || "US"
-  const currency = searchParams.get("currency") || "USD"
+  const sp      = req.nextUrl.searchParams
+  const symbol  = sp.get("symbol")?.toUpperCase()
+  const metric  = sp.get("metric")?.toLowerCase()
+  const metrics = sp.get("metrics")  // comma-separated batch
+  const period  = (sp.get("period") || "A").toUpperCase()
+  const offset  = parseInt(sp.get("offset") || "0")
+  const limit   = parseInt(sp.get("limit") || "5")
 
   if (!symbol) return NextResponse.json({ error: "symbol required" }, { status: 400 })
 
-  // Multi-metric mode: ?metrics=revenue,ebitda,net_income
-  const metricsParam = searchParams.get("metrics")
+  // Map period param → FMP period string
+  const fmpPeriod = ["Q", "Q1", "Q2", "Q3", "Q4", "QUARTERLY"].includes(period) ? "quarter" : "annual"
 
-  try {
-    const raw = await fetchFinancials(symbol, exchange)
+  // ── SNAPSHOT mode (no metric) ─────────────────────────────────────────────
+  if (!metric && !metrics) {
+    try {
+      const [profile, ratios, income, balanceSheet] = await Promise.all([
+        fmpFetch(`/stable/profile?symbol=${symbol}`),
+        fmpFetch(`/stable/ratios?symbol=${symbol}&period=${fmpPeriod}&limit=1`),
+        fmpFetch(`/stable/income-statement?symbol=${symbol}&period=${fmpPeriod}&limit=1`),
+        fmpFetch(`/stable/balance-sheet-statement?symbol=${symbol}&period=${fmpPeriod}&limit=1`),
+      ])
+      const p  = Array.isArray(profile) ? profile[0] : profile
+      const r  = (Array.isArray(ratios) ? ratios : [])[0] || {}
+      const is = (Array.isArray(income) ? income : [])[0] || {}
+      const bs = (Array.isArray(balanceSheet) ? balanceSheet : [])[0] || {}
 
-    if (metricsParam) {
-      // Batch mode — return multiple metrics at once
-      const metricKeys = metricsParam.split(",").map(m => m.trim().toLowerCase())
-      const results: Record<string, any> = { symbol, period, exchange }
-      
-      for (const key of metricKeys) {
-        const mapping = METRIC_MAP[key] || METRIC_MAP[`iq_${key}`]
-        if (!mapping) { results[key] = { value: null, error: "unknown metric" }; continue }
-        const extracted = extractPeriods(raw, mapping.statement, period, offset, mapping.path)
-        results[key] = extracted
-      }
-      
-      return NextResponse.json(results)
-    }
-
-    if (!metric) {
-      // Return full financial snapshot
-      const h = raw?.Highlights || {}
-      const v = raw?.Valuation || {}
       return NextResponse.json({
         symbol,
-        exchange,
+        period: fmpPeriod,
+        asOf: is.date || r.date || null,
         snapshot: {
-          marketCap: h.MarketCapitalization,
-          revenue: h.RevenueTTM,
-          ebitda: h.EBITDA,
-          eps: h.DilutedEpsTTM,
-          pe: h.PERatio,
-          evEbitda: h.EnterpriseValueEbitda,
-          grossMargin: h.GrossProfitTTM,
-          profitMargin: h.ProfitMargin,
-          roe: h.ReturnOnEquityTTM,
-          bookValue: h.BookValue,
-          freeCashFlow: h.FreeCashflow,
-          enterpriseValue: h.EnterpriseValue,
-          dividendYield: h.DividendYield,
-          sharesOutstanding: h.SharesOutstanding,
+          name:             p?.companyName,
+          sector:           p?.sector,
+          industry:         p?.industry,
+          currency:         p?.currency || "USD",
+          marketCap:        p?.mktCap,
+          enterpriseValue:  p?.enterpriseValue ?? null,
+          price:            p?.price,
+          // Income
+          revenue:          is.revenue,
+          grossProfit:      is.grossProfit,
+          grossMargin:      is.grossProfitRatio,
+          ebitda:           is.ebitda,
+          ebitdaMargin:     is.ebitdaratio,
+          ebit:             is.operatingIncome,
+          ebitMargin:       is.operatingIncomeRatio,
+          netIncome:        is.netIncome,
+          netMargin:        is.netIncomeRatio,
+          epsDiluted:       is.epsdiluted,
+          // Balance
+          totalAssets:      bs.totalAssets,
+          totalDebt:        bs.totalDebt,
+          netDebt:          bs.netDebt,
+          totalEquity:      bs.totalStockholdersEquity,
+          cash:             bs.cashAndCashEquivalents,
+          // Ratios
+          pe:               r.priceEarningsRatio ?? p?.pe,
+          evEbitda:         r.enterpriseValueMultiple,
+          evRevenue:        r.evToSales ?? r.priceToSalesRatio,
+          pb:               r.priceToBookRatio,
+          ps:               r.priceToSalesRatio,
+          roe:              r.returnOnEquity,
+          roa:              r.returnOnAssets,
+          roic:             r.returnOnCapitalEmployed,
+          currentRatio:     r.currentRatio,
+          debtEquity:       r.debtEquityRatio,
+          fcfYield:         r.freeCashFlowYield,
+          dividendYield:    r.dividendYield,
         },
-        currency: "USD",
+        source: "fmp",
       })
+    } catch (e) {
+      console.error("FMP snapshot failed:", e)
+      return NextResponse.json({ error: String(e) }, { status: 500 })
     }
-
-    // Single metric
-    const mapping = METRIC_MAP[metric] || METRIC_MAP[`iq_${metric}`]
-    if (!mapping) {
-      return NextResponse.json({ error: `Unknown metric: ${metric}. Check /api/financials/metrics for available metrics.` }, { status: 400 })
-    }
-
-    const extracted = extractPeriods(raw, mapping.statement, period, offset, mapping.path)
-    return NextResponse.json({ symbol, metric, ...extracted, exchange })
-
-  } catch (err) {
-    return NextResponse.json({ error: String(err) }, { status: 500 })
   }
+
+  // ── BATCH mode ────────────────────────────────────────────────────────────
+  if (metrics) {
+    const keys = metrics.split(",").map(m => m.trim().toLowerCase())
+    // Group by statement to minimise API calls
+    const stmtGroups: Record<string, string[]> = {}
+    for (const key of keys) {
+      const mapping = findMapping(key)
+      if (!mapping) continue
+      if (!stmtGroups[mapping.stmt]) stmtGroups[mapping.stmt] = []
+      stmtGroups[mapping.stmt].push(key)
+    }
+    try {
+      const fetched: Record<string, any[]> = {}
+      await Promise.all(
+        Object.keys(stmtGroups).map(async stmt => {
+          const rows = await fetchStatement(symbol, stmt, fmpPeriod, limit + Math.abs(offset))
+          fetched[stmt] = Array.isArray(rows) ? rows : []
+        })
+      )
+      const results: Record<string, any> = { symbol, period, source: "fmp" }
+      for (const key of keys) {
+        const mapping = findMapping(key)
+        if (!mapping) { results[key] = { value: null, error: "unknown metric" }; continue }
+        const rows = fetched[mapping.stmt] || []
+        const idx  = Math.abs(offset)
+        if (idx >= rows.length) { results[key] = { value: null, error: "period out of range" }; continue }
+        results[key] = { value: rows[idx]?.[mapping.field] ?? null, date: rows[idx]?.date, currency: rows[idx]?.reportedCurrency || "USD" }
+      }
+      return NextResponse.json(results)
+    } catch (e) {
+      return NextResponse.json({ error: String(e) }, { status: 500 })
+    }
+  }
+
+  // ── SINGLE metric mode ────────────────────────────────────────────────────
+  const mapping = findMapping(metric!)
+  if (!mapping) {
+    return NextResponse.json({ error: `Unknown metric: ${metric}. See /api/financials/metrics` }, { status: 400 })
+  }
+
+  // Try FMP first
+  if (FMP) {
+    try {
+      const rows = await fetchStatement(symbol, mapping.stmt, fmpPeriod, limit + Math.abs(offset))
+      const data  = Array.isArray(rows) ? rows : []
+      const series = data.map((r: any) => ({ date: r.date, value: r[mapping.field] ?? null, currency: r.reportedCurrency || "USD" }))
+      const single  = series[Math.abs(offset)] || null
+
+      return NextResponse.json({
+        symbol, metric, period, offset,
+        value:    single?.value ?? null,
+        date:     single?.date  ?? null,
+        currency: single?.currency || "USD",
+        series,   // all periods
+        source:   "fmp",
+      })
+    } catch (e) {
+      console.error("FMP single metric failed:", e)
+    }
+  }
+
+  // EODHD fallback
+  if (EODHD) {
+    try {
+      const series = await fetchEODHD(symbol, metric!, fmpPeriod)
+      if (series) {
+        const single = series[Math.abs(offset)]
+        return NextResponse.json({ symbol, metric, period, offset, value: single?.value ?? null, date: single?.date ?? null, series, source: "eodhd" })
+      }
+    } catch (e) {
+      console.error("EODHD fallback failed:", e)
+    }
+  }
+
+  return NextResponse.json({ error: "All sources failed or no API keys configured" }, { status: 500 })
 }
 
-// ── Metrics catalog endpoint ──────────────────────────────────────────────────
-// GET /api/financials?catalog=true  → returns all supported metrics
-export async function POST(req: NextRequest) {
-  // Return the full metric catalog
-  const catalog = Object.entries(METRIC_MAP).map(([key, val]) => ({
-    finsyt_key: key,
-    ciq_mnemonic: key.toUpperCase(),
-    statement: val.statement,
-    eodhd_field: val.path,
-  }))
-  return NextResponse.json({ count: catalog.length, metrics: catalog })
+export async function POST() {
+  // Catalog
+  const catalog = [
+    ...Object.entries(FMP_IS).map(([k, v]) => ({ key: k, field: v, statement: "income_statement" })),
+    ...Object.entries(FMP_BS).map(([k, v]) => ({ key: k, field: v, statement: "balance_sheet" })),
+    ...Object.entries(FMP_CF).map(([k, v]) => ({ key: k, field: v, statement: "cash_flow" })),
+    ...Object.entries(FMP_KM).map(([k, v]) => ({ key: k, field: v, statement: "key_metrics" })),
+  ]
+  return NextResponse.json({ count: catalog.length, source: "fmp_primary", catalog })
 }
