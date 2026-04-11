@@ -1,33 +1,102 @@
 import { NextRequest, NextResponse } from 'next/server'
-const DATA = [
-  { symbol:'AAPL', name:'Apple Inc.', sector:'Technology', mcap:3828662403000, pe:33.02, eps:6.42, change:1.2, price:189.3 },
-  { symbol:'MSFT', name:'Microsoft Corp.', sector:'Technology', mcap:3100000000000, pe:34.1, eps:11.5, change:-0.4, price:415.2 },
-  { symbol:'NVDA', name:'NVIDIA Corp.', sector:'Technology', mcap:2900000000000, pe:52.3, eps:2.13, change:2.8, price:924.8 },
-  { symbol:'GOOGL', name:'Alphabet Inc.', sector:'Technology', mcap:2050000000000, pe:21.8, eps:7.4, change:0.6, price:178.5 },
-  { symbol:'AMZN', name:'Amazon.com Inc.', sector:'Consumer Disc.', mcap:1980000000000, pe:43.2, eps:4.2, change:1.1, price:192.4 },
-  { symbol:'META', name:'Meta Platforms', sector:'Technology', mcap:1340000000000, pe:27.1, eps:19.8, change:0.9, price:529.3 },
-  { symbol:'TSLA', name:'Tesla Inc.', sector:'Consumer Disc.', mcap:780000000000, pe:48.5, eps:3.1, change:-1.8, price:248.2 },
-  { symbol:'JPM', name:'JPMorgan Chase', sector:'Financials', mcap:710000000000, pe:12.4, eps:18.2, change:0.3, price:224.5 },
-  { symbol:'V', name:'Visa Inc.', sector:'Financials', mcap:590000000000, pe:29.3, eps:9.7, change:0.5, price:280.1 },
-  { symbol:'LLY', name:'Eli Lilly', sector:'Healthcare', mcap:760000000000, pe:65.4, eps:12.1, change:1.5, price:795.2 },
-  { symbol:'ABBV', name:'AbbVie Inc.', sector:'Healthcare', mcap:348000000000, pe:18.7, eps:10.5, change:0.2, price:197.3 },
-  { symbol:'BAC', name:'Bank of America', sector:'Financials', mcap:315000000000, pe:13.1, eps:3.2, change:-0.2, price:40.2 },
-  { symbol:'XOM', name:'Exxon Mobil', sector:'Energy', mcap:498000000000, pe:14.2, eps:8.6, change:-0.8, price:116.4 },
-  { symbol:'WMT', name:'Walmart Inc.', sector:'Consumer Staples', mcap:685000000000, pe:36.2, eps:2.4, change:0.4, price:85.2 },
-  { symbol:'MA', name:'Mastercard Inc.', sector:'Financials', mcap:478000000000, pe:38.4, eps:13.4, change:0.6, price:510.2 },
-  { symbol:'NFLX', name:'Netflix Inc.', sector:'Technology', mcap:382000000000, pe:44.2, eps:19.8, change:1.9, price:890.4 },
-  { symbol:'AVGO', name:'Broadcom Inc.', sector:'Technology', mcap:920000000000, pe:31.2, eps:5.1, change:1.4, price:218.5 },
-  { symbol:'CVX', name:'Chevron Corp.', sector:'Energy', mcap:268000000000, pe:13.6, eps:10.5, change:-0.5, price:148.2 },
-  { symbol:'ADBE', name:'Adobe Inc.', sector:'Technology', mcap:225000000000, pe:30.2, eps:17.3, change:-0.4, price:508.3 },
-  { symbol:'AMD', name:'Advanced Micro', sector:'Technology', mcap:258000000000, pe:42.1, eps:3.8, change:2.1, price:158.4 },
-]
+
+const FMP     = process.env.FMP_API_KEY
+const FINNHUB = process.env.FINNHUB_API_KEY
+const EODHD   = process.env.EODHD_API_KEY || process.env.eodhd_api
+
+function normaliseResult(s: any, source: string) {
+  return {
+    symbol:    s.symbol,
+    name:      s.companyName || s.name || s.description || '',
+    price:     s.price || s.last || 0,
+    marketCap: s.marketCap || s.mktCap || 0,
+    sector:    s.sector || '',
+    industry:  s.industry || '',
+    beta:      s.beta || 0,
+    volume:    s.volume || s.avgVolume || 0,
+    exchange:  s.exchangeShortName || s.exchange || '',
+    country:   s.country || 'US',
+    pe:        s.peRatioTTM || s.pe || null,
+    changePct: s.changes || s.change_p || 0,
+    revenue:   s.revenue || null,
+    grossMargin: s.grossProfitMarginTTM || null,
+    roe:       s.roeTTM || null,
+    debtEquity:s.debtEquityRatioTTM || null,
+    source,
+  }
+}
+
 export async function GET(req: NextRequest) {
-  const sector = req.nextUrl.searchParams.get('sector')||''
-  const minMcap = parseFloat(req.nextUrl.searchParams.get('minMcap')||'0')
-  const maxPE = parseFloat(req.nextUrl.searchParams.get('maxPE')||'9999')
-  let filtered = DATA
-  if (sector) filtered = filtered.filter(s => s.sector.toLowerCase().includes(sector.toLowerCase()))
-  if (minMcap) filtered = filtered.filter(s => s.mcap >= minMcap)
-  if (maxPE < 9999) filtered = filtered.filter(s => s.pe <= maxPE && s.pe > 0)
-  return NextResponse.json({ results: filtered, total: filtered.length })
+  const p = req.nextUrl.searchParams
+  const sector       = p.get('sector') || ''
+  const minMcap      = p.get('minMcap') || '500000000'
+  const maxMcap      = p.get('maxMcap') || ''
+  const country      = p.get('country') || 'US'
+  const exchange     = p.get('exchange') || 'NYSE,NASDAQ'
+  const minPe        = p.get('minPe') || ''
+  const maxPe        = p.get('maxPe') || ''
+  const minPrice     = p.get('minPrice') || ''
+  const maxPrice     = p.get('maxPrice') || ''
+  const minBeta      = p.get('minBeta') || ''
+  const maxBeta      = p.get('maxBeta') || ''
+  const minVolume    = p.get('minVolume') || ''
+  const industry     = p.get('industry') || ''
+  const limit        = Math.min(parseInt(p.get('limit') || '50'), 100)
+  const sort         = p.get('sort') || 'marketCap'  // marketCap | pe | volume | changePct
+  const order        = p.get('order') || 'desc'
+
+  // ── Primary: FMP Stock Screener ───────────────────────────────────────────
+  if (FMP) {
+    try {
+      let url = `https://financialmodelingprep.com/stable/company-screener?apikey=${FMP}&limit=${limit}&isActivelyTrading=true&exchange=${exchange}`
+      if (sector)    url += `&sector=${encodeURIComponent(sector)}`
+      if (industry)  url += `&industry=${encodeURIComponent(industry)}`
+      if (country)   url += `&country=${country}`
+      if (minMcap)   url += `&marketCapMoreThan=${minMcap}`
+      if (maxMcap)   url += `&marketCapLowerThan=${maxMcap}`
+      if (minPrice)  url += `&priceMoreThan=${minPrice}`
+      if (maxPrice)  url += `&priceLowerThan=${maxPrice}`
+      if (minBeta)   url += `&betaMoreThan=${minBeta}`
+      if (maxBeta)   url += `&betaLowerThan=${maxBeta}`
+      if (minVolume) url += `&volumeMoreThan=${minVolume}`
+
+      const res  = await fetch(url, { next: { revalidate: 300 } })
+      const data = await res.json()
+
+      if (Array.isArray(data) && data.length > 0) {
+        let results = data.map(s => normaliseResult(s, 'fmp'))
+
+        // Apply P/E filter client-side (FMP screener doesn't support it on stable)
+        if (minPe) results = results.filter(s => s.pe !== null && s.pe >= parseFloat(minPe))
+        if (maxPe) results = results.filter(s => s.pe !== null && s.pe <= parseFloat(maxPe))
+
+        // Sort
+        results.sort((a, b) => {
+          const av = (a as any)[sort] ?? 0
+          const bv = (b as any)[sort] ?? 0
+          return order === 'desc' ? bv - av : av - bv
+        })
+
+        return NextResponse.json({ results, total: results.length, source: 'fmp' })
+      }
+    } catch (e) { console.error('FMP screener failed:', e) }
+  }
+
+  // ── Fallback: Finnhub ─────────────────────────────────────────────────────
+  if (FINNHUB) {
+    try {
+      const params = new URLSearchParams({ token: FINNHUB })
+      if (sector) params.set('sector', sector)
+      if (exchange) params.set('exchange', exchange.split(',')[0])
+      const res  = await fetch(`https://finnhub.io/api/v1/stock/symbol?${params}`)
+      const syms = await res.json()
+      const results = (Array.isArray(syms) ? syms : []).slice(0, limit).map((s: any) => ({
+        symbol: s.symbol, name: s.description, exchange: s.mic, source: 'finnhub',
+        price: 0, marketCap: 0, sector: '', industry: '', beta: 0, volume: 0, country, pe: null, changePct: 0,
+      }))
+      return NextResponse.json({ results, source: 'finnhub' })
+    } catch (e) { console.error('Finnhub screener failed:', e) }
+  }
+
+  return NextResponse.json({ results: [], error: 'No screener source available' })
 }
