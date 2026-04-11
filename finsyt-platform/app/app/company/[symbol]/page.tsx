@@ -311,6 +311,198 @@ function FilingsTab({ symbol }: { symbol: string }) {
   )
 }
 
+// ── Live Estimates Tab ───────────────────────────────────────────────────────
+function EstimatesTab({ symbol }: { symbol: string }) {
+  const [estimates, setEstimates] = useState<any[]>([])
+  const [surprises, setSurprises] = useState<any[]>([])
+  const [priceTargets, setPriceTargets] = useState<any[]>([])
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    if (!symbol) return
+    setLoading(true)
+    Promise.all([
+      fetch(`/api/financials/statements?symbol=${symbol}&statement=analyst-estimates&period=annual&limit=4`).then(r => r.ok ? r.json() : { rows: [] }),
+      fetch(`/api/financials/statements?symbol=${symbol}&statement=earnings-surprises&period=annual&limit=8`).then(r => r.ok ? r.json() : { rows: [] }),
+      fetch(`https://financialmodelingprep.com/stable/price-target-consensus?symbol=${symbol}&apikey=${process.env.NEXT_PUBLIC_FMP_API_KEY}`).then(r => r.ok ? r.json() : null),
+    ]).then(([estData, surpriseData, ptData]) => {
+      setEstimates(estData.rows || [])
+      setSurprises(surpriseData.rows || [])
+      if (ptData) setPriceTargets(Array.isArray(ptData) ? ptData : [ptData])
+    }).catch(() => {}).finally(() => setLoading(false))
+  }, [symbol])
+
+  if (loading) return <div style={{ padding:40, textAlign:'center', color:'#B0BCD0', fontSize:13 }}>Loading estimates...</div>
+
+  const pt = priceTargets[0]
+
+  return (
+    <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16 }}>
+      {/* Price Targets */}
+      {pt && (
+        <div style={{ background:'#fff', border:'1px solid #E8EDF4', borderRadius:12, padding:'18px 20px' }}>
+          <div style={{ fontSize:13, fontWeight:800, color:'#0A1628', marginBottom:14 }}>Analyst Price Targets</div>
+          <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
+            {[
+              ['Consensus Target', `$${pt.targetConsensus?.toFixed(2) || 'N/A'}`],
+              ['High Target', `$${pt.targetHigh?.toFixed(2) || 'N/A'}`],
+              ['Low Target', `$${pt.targetLow?.toFixed(2) || 'N/A'}`],
+              ['Median Target', `$${pt.targetMedian?.toFixed(2) || 'N/A'}`],
+            ].map(([l, v], i) => (
+              <div key={i} style={{ display:'flex', justifyContent:'space-between', padding:'7px 0', borderBottom:'1px solid #F5F7FB' }}>
+                <span style={{ fontSize:12, color:'#7D8FA9' }}>{l}</span>
+                <span style={{ fontSize:13, fontWeight:700, color:'#0A1628' }}>{v}</span>
+              </div>
+            ))}
+          </div>
+          <div style={{ fontSize:10, color:'#B0BCD0', marginTop:8 }}>Source: FMP Analyst Consensus</div>
+        </div>
+      )}
+
+      {/* Forward Estimates */}
+      {estimates.length > 0 && (
+        <div style={{ background:'#fff', border:'1px solid #E8EDF4', borderRadius:12, padding:'18px 20px' }}>
+          <div style={{ fontSize:13, fontWeight:800, color:'#0A1628', marginBottom:14 }}>Forward Estimates (Consensus)</div>
+          <table style={{ width:'100%', fontSize:12, borderCollapse:'collapse' }}>
+            <thead>
+              <tr style={{ borderBottom:'2px solid #E8EDF4' }}>
+                <th style={{ textAlign:'left', padding:'4px 0', color:'#7D8FA9', fontWeight:700, fontSize:11 }}>Period</th>
+                <th style={{ textAlign:'right', padding:'4px 6px', color:'#7D8FA9', fontWeight:700, fontSize:11 }}>Rev Est.</th>
+                <th style={{ textAlign:'right', padding:'4px 6px', color:'#7D8FA9', fontWeight:700, fontSize:11 }}>EBITDA Est.</th>
+                <th style={{ textAlign:'right', padding:'4px 6px', color:'#7D8FA9', fontWeight:700, fontSize:11 }}>EPS Est.</th>
+              </tr>
+            </thead>
+            <tbody>
+              {estimates.map((e: any, i: number) => (
+                <tr key={i} style={{ borderBottom:'1px solid #F5F7FB' }}>
+                  <td style={{ padding:'7px 0', fontWeight:600, color:'#3D4F6E', fontSize:11 }}>{e.date?.slice(0,7) || ''}</td>
+                  <td style={{ padding:'7px 6px', textAlign:'right', color:'#0A1628', fontWeight:600, fontSize:11 }}>
+                    {e.estimatedRevenueAvg ? `$${(e.estimatedRevenueAvg/1e9).toFixed(1)}B` : '—'}
+                  </td>
+                  <td style={{ padding:'7px 6px', textAlign:'right', color:'#0A1628', fontWeight:600, fontSize:11 }}>
+                    {e.estimatedEbitdaAvg ? `$${(e.estimatedEbitdaAvg/1e9).toFixed(1)}B` : '—'}
+                  </td>
+                  <td style={{ padding:'7px 6px', textAlign:'right', color:'#0A1628', fontWeight:700, fontSize:11 }}>
+                    {e.estimatedEpsAvg ? `$${e.estimatedEpsAvg.toFixed(2)}` : '—'}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* Beat/Miss History */}
+      {surprises.length > 0 && (
+        <div style={{ gridColumn:'1/-1', background:'#fff', border:'1px solid #E8EDF4', borderRadius:12, padding:'18px 20px' }}>
+          <div style={{ fontSize:13, fontWeight:800, color:'#0A1628', marginBottom:14 }}>Earnings Beat / Miss History</div>
+          <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
+            {surprises.map((s: any, i: number) => {
+              const beat = s.actualEarningResult >= s.estimatedEarning
+              const pct = s.estimatedEarning !== 0 ? ((s.actualEarningResult - s.estimatedEarning) / Math.abs(s.estimatedEarning) * 100) : 0
+              return (
+                <div key={i} style={{ display:'flex', alignItems:'center', gap:10, padding:'8px 12px', background:i%2===0?'#F9FAFB':'#fff', borderRadius:8 }}>
+                  <span style={{ fontSize:11, fontWeight:700, color:'#7D8FA9', minWidth:80 }}>{s.date?.slice(0,7) || ''}</span>
+                  <span style={{ fontSize:11, padding:'2px 8px', borderRadius:5, background:beat?'#ECFDF5':'#FEF2F2', color:beat?'#059669':'#DC2626', fontWeight:700 }}>
+                    {beat ? '✓ Beat' : '✗ Miss'}
+                  </span>
+                  <span style={{ fontSize:12, color:'#3D4F6E', flex:1 }}>
+                    Actual: <strong>${s.actualEarningResult?.toFixed(2)}</strong> vs Est: ${s.estimatedEarning?.toFixed(2)}
+                  </span>
+                  <span style={{ fontSize:12, fontWeight:700, color: beat ? '#059669' : '#DC2626' }}>
+                    {beat ? '+' : ''}{pct.toFixed(1)}%
+                  </span>
+                </div>
+              )
+            })}
+          </div>
+          <div style={{ fontSize:10, color:'#B0BCD0', marginTop:8 }}>Source: FMP Earnings Surprises</div>
+        </div>
+      )}
+
+      {(!pt && estimates.length === 0 && surprises.length === 0) && (
+        <div style={{ gridColumn:'1/-1', padding:40, textAlign:'center', color:'#B0BCD0', fontSize:13 }}>
+          No estimate data available for {symbol}
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ── Live Transcripts Tab ──────────────────────────────────────────────────────
+function TranscriptsTab({ symbol }: { symbol: string }) {
+  const [list, setList] = useState<any[]>([])
+  const [selected, setSelected] = useState<any>(null)
+  const [transcript, setTranscript] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+  const [loadingTranscript, setLoadingTranscript] = useState(false)
+
+  useEffect(() => {
+    if (!symbol) return
+    setLoading(true)
+    fetch(`/api/transcripts?symbol=${symbol}`).then(r => r.ok ? r.json() : { transcripts: [] })
+      .then(d => {
+        setList(d.transcripts || [])
+        if (d.transcripts?.length > 0) setSelected(d.transcripts[0])
+      })
+      .catch(() => {})
+      .finally(() => setLoading(false))
+  }, [symbol])
+
+  useEffect(() => {
+    if (!selected || !symbol) return
+    setLoadingTranscript(true)
+    fetch(`/api/transcripts?symbol=${symbol}&year=${selected.year}&quarter=${selected.quarter}`)
+      .then(r => r.ok ? r.json() : null)
+      .then(d => setTranscript(d))
+      .catch(() => {})
+      .finally(() => setLoadingTranscript(false))
+  }, [selected, symbol])
+
+  if (loading) return <div style={{ padding:40, textAlign:'center', color:'#B0BCD0' }}>Loading transcripts...</div>
+  if (list.length === 0) return <div style={{ padding:40, textAlign:'center', color:'#B0BCD0' }}>No earnings transcripts available for {symbol}</div>
+
+  return (
+    <div style={{ display:'grid', gridTemplateColumns:'200px 1fr', gap:12, height:600 }}>
+      {/* Sidebar */}
+      <div style={{ background:'#fff', border:'1px solid #E8EDF4', borderRadius:12, overflow:'auto', padding:8 }}>
+        <div style={{ fontSize:11, fontWeight:700, color:'#7D8FA9', padding:'8px 8px 6px', textTransform:'uppercase', letterSpacing:'0.06em' }}>Transcripts</div>
+        {list.map((t: any, i: number) => (
+          <button key={i} onClick={() => setSelected(t)}
+            style={{ width:'100%', textAlign:'left', padding:'8px 10px', borderRadius:8, border:'none', background: selected?.year === t.year && selected?.quarter === t.quarter ? '#EEF3FF' : 'transparent', color: selected?.year === t.year && selected?.quarter === t.quarter ? '#1B4FFF' : '#3D4F6E', fontSize:12, fontWeight:600, cursor:'pointer', marginBottom:2 }}>
+            Q{t.quarter} {t.year}
+            <div style={{ fontSize:10, color:'#B0BCD0', fontWeight:400, marginTop:1 }}>{t.date?.slice(0,10) || ''}</div>
+          </button>
+        ))}
+      </div>
+
+      {/* Content */}
+      <div style={{ background:'#fff', border:'1px solid #E8EDF4', borderRadius:12, overflow:'auto', padding:'18px 20px' }}>
+        {loadingTranscript ? (
+          <div style={{ color:'#B0BCD0', textAlign:'center', padding:40 }}>Loading transcript...</div>
+        ) : transcript?.segments?.length > 0 ? (
+          <>
+            <div style={{ fontSize:13, fontWeight:800, color:'#0A1628', marginBottom:4 }}>
+              {symbol} Q{transcript.quarter} FY{transcript.year} Earnings Call
+            </div>
+            <div style={{ fontSize:11, color:'#7D8FA9', marginBottom:16 }}>{transcript.date} · Source: FMP</div>
+            {transcript.segments.map((seg: any, i: number) => (
+              <div key={i} style={{ marginBottom:14, paddingBottom:14, borderBottom:'1px solid #F5F7FB' }}>
+                <div style={{ fontSize:11, fontWeight:700, color:'#1B4FFF', marginBottom:4 }}>
+                  {seg.speaker} <span style={{ color:'#B0BCD0', fontWeight:400 }}>— {seg.role}</span>
+                </div>
+                <div style={{ fontSize:12.5, color:'#3D4F6E', lineHeight:1.6 }}>{seg.text}</div>
+              </div>
+            ))}
+          </>
+        ) : (
+          <div style={{ color:'#B0BCD0', textAlign:'center', padding:40 }}>Select a transcript from the list</div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ── Live Financials Tab Component ─────────────────────────────────────────────
 function FinancialsTab({ symbol, period, setPeriod }: { symbol: string; period: 'quarterly'|'annual'; setPeriod: (p:'quarterly'|'annual')=>void }) {
   const [activeStmt, setActiveStmt] = useState<'income'|'balance'|'cashflow'>('income')
@@ -494,23 +686,20 @@ export default function CompanyPage() {
   const [snapshotLoading, setSnapshotLoading] = useState(false)
   const [searchInput, setSearchInput] = useState(symbol)
 
-  // Load live financial snapshot from FMP via /api/financials
+  // Load live financial snapshot + quote from FMP
   useEffect(() => {
     if (!symbol) return
     setSnapshotLoading(true)
-    fetch(`/api/financials?symbol=${symbol}&period=${period === 'quarterly' ? 'Q' : 'A'}`)
-      .then(r => r.ok ? r.json() : null)
-      .then(data => {
-        if (data?.snapshot) {
-          setLiveSnapshot(data.snapshot)
-          // Backfill financials chart with real data if available
-          if (data.snapshot.revenue) {
-            // Keep mock chart but update the summary stats from live data
-          }
-        }
-      })
-      .catch(() => {})
-      .finally(() => setSnapshotLoading(false))
+    Promise.all([
+      fetch(`/api/financials?symbol=${symbol}&period=${period === 'quarterly' ? 'Q' : 'A'}`).then(r => r.ok ? r.json() : null),
+      fetch(`/api/quote?symbol=${symbol}`).then(r => r.ok ? r.json() : null),
+    ])
+    .then(([finData, quoteData]) => {
+      if (finData?.snapshot) setLiveSnapshot({ ...finData.snapshot, ...(quoteData || {}) })
+      else if (quoteData) setLiveSnapshot(quoteData)
+    })
+    .catch(() => {})
+    .finally(() => setSnapshotLoading(false))
   }, [symbol, period])
   const [copilotOpen, setCopilotOpen] = useState(false)
   const [copilotQ, setCopilotQ] = useState('')
@@ -863,52 +1052,17 @@ export default function CompanyPage() {
 
         {/* ── ESTIMATES TAB ── */}
         {tab === 'estimates' && (
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:16 }}>
-            <div style={{ background:'#fff', border:'1px solid #E8EDF4', borderRadius:12, padding:'18px 20px' }}>
-              <div style={{ fontSize:13, fontWeight:800, color:'#0A1628', marginBottom:14 }}>Revenue Estimates</div>
-              <ResponsiveContainer width="100%" height={200}>
-                <BarChart data={[
-                  {q:'Q1\'26',actual:43.0,est:41.5},
-                  {q:'Q2\'26',actual:null,est:46.2},
-                  {q:'Q3\'26',actual:null,est:49.8},
-                  {q:'Q4\'26',actual:null,est:53.5},
-                ]} margin={{top:5,right:5,bottom:0,left:0}}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#F0F4FA" />
-                  <XAxis dataKey="q" tick={{fontSize:10,fill:'#B0BCD0'}} />
-                  <YAxis tick={{fontSize:10,fill:'#B0BCD0'}} tickFormatter={v=>`$${v}B`} />
-                  <Tooltip formatter={(v:any,n)=>[`$${Number(v).toFixed(1)}B`,n]} contentStyle={{fontSize:11,borderRadius:8}} />
-                  <Bar dataKey="actual" name="Actual" fill="#1B4FFF" radius={[3,3,0,0]} />
-                  <Bar dataKey="est" name="Consensus Est." fill="#E8EDF4" radius={[3,3,0,0]} />
-                </BarChart>
-              </ResponsiveContainer>
-            </div>
-            <div style={{ background:'#fff', border:'1px solid #E8EDF4', borderRadius:12, padding:'18px 20px' }}>
-              <div style={{ fontSize:13, fontWeight:800, color:'#0A1628', marginBottom:14 }}>Beat / Miss History</div>
-              <div style={{ display:'flex', flexDirection:'column', gap:6 }}>
-                {[
-                  {q:"Q4 FY'26",rev:39.3,est:38.1,beat:true,eps:0.78,epsEst:0.74},
-                  {q:"Q3 FY'26",rev:35.1,est:32.8,beat:true,eps:0.74,epsEst:0.71},
-                  {q:"Q2 FY'26",rev:30.0,est:28.6,beat:true,eps:0.67,epsEst:0.64},
-                  {q:"Q1 FY'26",rev:26.0,est:24.6,beat:true,eps:0.60,epsEst:0.57},
-                ].map((r,i)=>(
-                  <div key={i} style={{ display:'flex', alignItems:'center', gap:10, padding:'8px 10px', background:'#F9FAFB', borderRadius:8 }}>
-                    <span style={{ fontSize:11, fontWeight:700, color:'#7D8FA9', minWidth:60 }}>{r.q}</span>
-                    <span style={{ fontSize:11, padding:'2px 7px', borderRadius:4, background:r.beat?'#ECFDF5':'#FEF2F2', color:r.beat?'#059669':'#DC2626', fontWeight:700 }}>{r.beat?'✓ Beat':'✗ Miss'}</span>
-                    <span style={{ fontSize:11, color:'#3D4F6E', flex:1 }}>Rev ${r.rev}B vs ${r.est}B est.</span>
-                    <span style={{ fontSize:11, color:'#3D4F6E' }}>EPS ${r.eps} vs ${r.epsEst}</span>
-                    <span style={{ fontSize:11, fontWeight:700, color:'#059669' }}>+{(((r.rev/r.est)-1)*100).toFixed(1)}%</span>
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
+          <EstimatesTab symbol={symbol} />
         )}
 
         {/* ── TRANSCRIPTS TAB ── */}
         {tab === 'transcripts' && (
+          <TranscriptsTab symbol={symbol} />
+        )}
+        {false && tab === '_old_transcripts' && (
           <div style={{ display:'flex', flexDirection:'column', gap:10 }}>
             {[
-              {q:'Q4 FY2026',date:'Feb 26, 2026',speakers:['Jensen Huang','Colette Kress'],highlight:'Blackwell demand continues to exceed supply. We expect to ship significantly more in Q1.',type:'Earnings Call'},
+              {q:'Q4 FY2026',date:'Feb 26, 2026',speakers:['Jensen Huang','Colette Kress'],highlight:'Blackwell demand continues to exceed supply.',type:'Earnings Call'},
               {q:'Q3 FY2026',date:'Nov 20, 2025',speakers:['Jensen Huang','Colette Kress'],highlight:'Data center revenue of $30.8B, up 112% YoY. H200 and Blackwell ramping well.',type:'Earnings Call'},
               {q:'Q2 FY2026',date:'Aug 28, 2025',speakers:['Jensen Huang','Colette Kress'],highlight:'Revenue of $30.0B beat $28.6B consensus by $1.4B. Gross margin 75.1%.',type:'Earnings Call'},
               {q:'Analyst Day 2025',date:'Mar 18, 2025',speakers:['Jensen Huang'],highlight:'$3-4T annual AI infrastructure spend by 2030. Foresee sovereign AI as major driver.',type:'Analyst Day'},

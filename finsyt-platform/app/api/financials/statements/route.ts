@@ -12,13 +12,21 @@ export async function GET(req: NextRequest) {
   if (!symbol) return NextResponse.json({ error: "symbol required" }, { status: 400 })
   if (!FMP)    return NextResponse.json({ error: "FMP_API_KEY not configured" }, { status: 500 })
 
-  const VALID_STMTS = ["income-statement", "balance-sheet-statement", "cash-flow-statement", "key-metrics", "ratios"]
+  const VALID_STMTS = ["income-statement", "balance-sheet-statement", "cash-flow-statement", "key-metrics", "ratios", "analyst-estimates", "earnings-surprises"]
   if (!VALID_STMTS.includes(statement)) {
     return NextResponse.json({ error: `Invalid statement. Use: ${VALID_STMTS.join(", ")}` }, { status: 400 })
   }
 
   try {
-    const url = `https://financialmodelingprep.com/stable/${statement}?symbol=${symbol}&period=${period}&limit=${limit}&apikey=${FMP}`
+    // Some endpoints use different param names or paths
+    let url: string
+    if (statement === "earnings-surprises") {
+      url = `https://financialmodelingprep.com/stable/earnings-surprises?symbol=${symbol}&limit=${limit}&apikey=${FMP}`
+    } else if (statement === "analyst-estimates") {
+      url = `https://financialmodelingprep.com/stable/analyst-estimates?symbol=${symbol}&period=${period}&limit=${limit}&apikey=${FMP}`
+    } else {
+      url = `https://financialmodelingprep.com/stable/${statement}?symbol=${symbol}&period=${period}&limit=${limit}&apikey=${FMP}`
+    }
     const res = await fetch(url, { next: { revalidate: 3600 } })
 
     if (!res.ok) {
