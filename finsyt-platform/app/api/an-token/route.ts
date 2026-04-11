@@ -1,5 +1,6 @@
-import { createTokenHandler } from "@21st-sdk/nextjs/server"
+// Stub — 21st-sdk removed. Route kept so existing imports don't 404.
+import { NextResponse } from 'next/server'
 
-export const POST = createTokenHandler({
-  apiKey: process.env.API_KEY_21ST!,
-})
+export async function POST() {
+  return NextResponse.json({ message: 'SDK removed — use /api/ai-research directly.' }, { status: 410 })
+}
