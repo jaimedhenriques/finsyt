@@ -56,13 +56,13 @@ const FEATURES = [
   },
   {
     tag: 'Excel Plugin',
-    title: 'Capital IQ-style formulas in your spreadsheet',
-    desc: 'Pull live financial data directly into Excel using familiar formula syntax. 22 formulas covering income statements, balance sheets, ratios, and macro data.',
+    title: 'Live financial data, directly in your spreadsheet',
+    desc: 'Pull real-time financial data into Excel with a single formula. 22 built-in metrics covering income statements, balance sheets, ratios, and macro indicators.',
     bullets: [
-      '=FINSYT("AAPL", "IQ_TOTAL_REV") — live revenue',
-      '=FINSYT("MSFT", "IQ_EBITDA") — live EBITDA',
+      '=FINSYT("AAPL", "TOTAL_REV") — live revenue in any cell',
+      '=FINSYT("MSFT", "EBITDA") — live EBITDA, always fresh',
       'Auto-refreshing data every market session',
-      'No Bloomberg terminal required',
+      'No expensive terminal subscription needed',
     ],
   },
 ]
@@ -257,9 +257,75 @@ export default function LandingPage() {
                       {f.demo.badges.map(b => <span key={b} style={{ padding: '3px 10px', background: '#1B4FFF22', color: '#60A5FA', borderRadius: 5, fontSize: 11, fontWeight: 600 }}>{b}</span>)}
                     </div>
                   </div>
+                ) : i === 1 ? (
+                  /* Market Monitor mockup */
+                  <div style={{ background: '#0A1628', borderRadius: 14, padding: 20, boxShadow: '0 16px 48px rgba(27,79,255,0.12)' }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: '#5A6B82', letterSpacing: '0.08em', marginBottom: 12 }}>MARKETS — LIVE</div>
+                    {[
+                      { label: 'S&P 500',  val: '5,842.47', chg: '+0.87%', up: true  },
+                      { label: 'NASDAQ',   val: '18,294.10',chg: '+1.12%', up: true  },
+                      { label: 'FTSE 100', val: '8,183.22', chg: '-0.23%', up: false },
+                      { label: 'BTC/USD',  val: '84,211.00',chg: '+2.41%', up: true  },
+                    ].map(r => (
+                      <div key={r.label} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '8px 0', borderBottom: '1px solid #1B2E4A' }}>
+                        <span style={{ fontSize: 13, color: '#CBD5E1' }}>{r.label}</span>
+                        <span style={{ fontSize: 13, color: '#E2E8F0', fontWeight: 600 }}>{r.val}</span>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: r.up ? '#10B981' : '#EF4444' }}>{r.chg}</span>
+                      </div>
+                    ))}
+                    <div style={{ marginTop: 14, background: '#131F35', borderRadius: 8, padding: '10px 14px' }}>
+                      <div style={{ fontSize: 11, color: '#5A6B82', marginBottom: 6 }}>US CPI YoY — FRED</div>
+                      <div style={{ display: 'flex', gap: 4, alignItems: 'flex-end', height: 40 }}>
+                        {[60, 75, 85, 70, 90, 80, 95, 88].map((h, i) => (
+                          <div key={i} style={{ flex: 1, height: `${h}%`, background: 'linear-gradient(180deg, #1B4FFF, #06B6D4)', borderRadius: 3, opacity: 0.7 + i * 0.04 }} />
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                ) : i === 2 ? (
+                  /* AI Agents mockup */
+                  <div style={{ background: '#0A1628', borderRadius: 14, padding: 20, boxShadow: '0 16px 48px rgba(27,79,255,0.12)' }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: '#1B4FFF', letterSpacing: '0.08em', marginBottom: 12 }}>⚡ AGENT RUNNING — MSFT DD</div>
+                    {[
+                      { step: '✓', label: 'Fetched Q2 FY2026 10-Q from EDGAR',    done: true  },
+                      { step: '✓', label: 'Pulled 3-year revenue trend from FMP',  done: true  },
+                      { step: '✓', label: 'Analysed 847 analyst notes',            done: true  },
+                      { step: '…', label: 'Generating investment memo…',            done: false },
+                    ].map((s, i) => (
+                      <div key={i} style={{ display: 'flex', gap: 10, alignItems: 'flex-start', marginBottom: 10 }}>
+                        <span style={{ fontSize: 12, fontWeight: 700, color: s.done ? '#10B981' : '#F59E0B', minWidth: 14, marginTop: 1 }}>{s.step}</span>
+                        <span style={{ fontSize: 13, color: s.done ? '#94A3B8' : '#E2E8F0' }}>{s.label}</span>
+                      </div>
+                    ))}
+                    <div style={{ marginTop: 14, background: '#131F35', borderRadius: 8, padding: '10px 14px', borderLeft: '3px solid #1B4FFF' }}>
+                      <div style={{ fontSize: 11, color: '#5A6B82', marginBottom: 4 }}>Draft memo excerpt</div>
+                      <div style={{ fontSize: 12, color: '#94A3B8', lineHeight: 1.6 }}>Microsoft's Azure segment continues to accelerate, with 31% CC growth driven by AI services. Copilot monetisation represents a significant upside catalyst…</div>
+                    </div>
+                  </div>
                 ) : (
-                  <div style={{ background: 'linear-gradient(135deg, #EEF3FF 0%, #F0FDFF 100%)', borderRadius: 14, padding: 32, height: 200, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <div style={{ fontSize: 48 }}>{['📊', '🤖', '📝'][i - 1]}</div>
+                  /* Excel plugin mockup */
+                  <div style={{ background: '#0A1628', borderRadius: 14, padding: 20, boxShadow: '0 16px 48px rgba(27,79,255,0.12)' }}>
+                    <div style={{ fontSize: 11, fontWeight: 700, color: '#5A6B82', letterSpacing: '0.08em', marginBottom: 12 }}>EXCEL — FINSYT PLUGIN</div>
+                    <div style={{ background: '#0D1B32', borderRadius: 8, overflow: 'hidden', border: '1px solid #1B2E4A' }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: '32px 1fr 1fr 1fr', background: '#131F35', fontSize: 11, color: '#5A6B82', fontWeight: 700 }}>
+                        {['', 'A', 'B', 'C'].map((h, i) => <div key={i} style={{ padding: '6px 8px', borderRight: '1px solid #1B2E4A', textAlign: 'center' }}>{h}</div>)}
+                      </div>
+                      {[
+                        ['1', 'Ticker',  'Metric',       'Value'],
+                        ['2', 'AAPL',    'TOTAL_REV',    '$391.0B'],
+                        ['3', 'MSFT',    'EBITDA',       '$133.3B'],
+                        ['4', 'GOOGL',   'NET_INCOME',   '$94.0B'],
+                        ['5', 'AMZN',    'FCF',          '$54.3B'],
+                      ].map((row, ri) => (
+                        <div key={ri} style={{ display: 'grid', gridTemplateColumns: '32px 1fr 1fr 1fr', borderTop: '1px solid #1B2E4A' }}>
+                          <div style={{ padding: '5px 8px', background: '#131F35', fontSize: 11, color: '#5A6B82', textAlign: 'center', borderRight: '1px solid #1B2E4A' }}>{row[0]}</div>
+                          {row.slice(1).map((cell, ci) => (
+                            <div key={ci} style={{ padding: '5px 8px', fontSize: ri === 0 ? 11 : 12, color: ri === 0 ? '#5A6B82' : ci === 2 ? '#10B981' : '#E2E8F0', fontWeight: ri === 0 ? 700 : 400, borderRight: '1px solid #1B2E4A', fontFamily: 'monospace' }}>{cell}</div>
+                          ))}
+                        </div>
+                      ))}
+                    </div>
+                    <div style={{ marginTop: 10, fontSize: 11, color: '#5A6B82', fontFamily: 'monospace' }}>= FINSYT( B2, C2 ) → live data</div>
                   </div>
                 )}
               </div>
