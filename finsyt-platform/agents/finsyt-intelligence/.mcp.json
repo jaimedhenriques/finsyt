@@ -4,7 +4,7 @@
       "type": "http",
       "url": "https://mcp.21st.dev/api/mcp",
       "headers": {
-        "Authorization": "Bearer ${MAGIC_API_KEY}"
+        "Authorization": "Bearer ${MAGIC_API_KEY_21ST}"
       }
     }
   }
