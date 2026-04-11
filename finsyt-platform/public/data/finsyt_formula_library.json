@@ -1,0 +1,255 @@
+{
+  "revenue": {
+    "finsyt_key": "revenue",
+    "display": "Total Revenue",
+    "category": "income_statement",
+    "ciq_mnemonic": "IQ_TOTAL_REV",
+    "ciq_excel": "=CIQ(\"IQ_TOTAL_REV\", ticker, \"A\", 0, \"USD\")",
+    "ciq_gdsp": "PERIODTYPE, ASOFDATE, CURRENCYID, RESTATEMENTTYPEID, FILINGMODE, CONSOLIDATEDFLAG",
+    "eodhd_key": "totalRevenue",
+    "eodhd_path": "financials.income_statement.yearly[0].totalRevenue",
+    "unit": "USD millions",
+    "format": "currency",
+    "description": "Total revenues including all operating revenue streams"
+  },
+  "gross_profit": {
+    "finsyt_key": "gross_profit",
+    "display": "Gross Profit",
+    "category": "income_statement",
+    "ciq_mnemonic": "IQ_GROSS_PROFIT",
+    "ciq_excel": "=CIQ(\"IQ_GROSS_PROFIT\", ticker, \"A\", 0, \"USD\")",
+    "eodhd_key": "grossProfit",
+    "unit": "USD millions",
+    "format": "currency"
+  },
+  "gross_margin": {
+    "finsyt_key": "gross_margin",
+    "display": "Gross Margin %",
+    "category": "income_statement",
+    "ciq_mnemonic": "IQ_GROSS_PROFIT_MARGIN",
+    "ciq_excel": "=CIQ(\"IQ_GROSS_PROFIT_MARGIN\", ticker, \"A\", 0)",
+    "eodhd_key": "grossProfitMargin",
+    "unit": "%",
+    "format": "percent"
+  },
+  "ebitda": {
+    "finsyt_key": "ebitda",
+    "display": "EBITDA",
+    "category": "income_statement",
+    "ciq_mnemonic": "IQ_EBITDA",
+    "ciq_excel": "=CIQ(\"IQ_EBITDA\", ticker, \"A\", 0, \"USD\")",
+    "eodhd_key": "ebitda",
+    "unit": "USD millions",
+    "format": "currency"
+  },
+  "ebitda_margin": {
+    "finsyt_key": "ebitda_margin",
+    "display": "EBITDA Margin %",
+    "category": "income_statement",
+    "ciq_mnemonic": "IQ_EBITDA_MARGIN",
+    "ciq_excel": "=CIQ(\"IQ_EBITDA_MARGIN\", ticker, \"A\", 0)",
+    "eodhd_key": "ebitdaMargin",
+    "unit": "%",
+    "format": "percent"
+  },
+  "ebit": {
+    "finsyt_key": "ebit",
+    "display": "EBIT",
+    "category": "income_statement",
+    "ciq_mnemonic": "IQ_EBIT",
+    "ciq_excel": "=CIQ(\"IQ_EBIT\", ticker, \"A\", 0, \"USD\")",
+    "eodhd_key": "ebit",
+    "unit": "USD millions",
+    "format": "currency"
+  },
+  "net_income": {
+    "finsyt_key": "net_income",
+    "display": "Net Income",
+    "category": "income_statement",
+    "ciq_mnemonic": "IQ_NET_INC",
+    "ciq_excel": "=CIQ(\"IQ_NET_INC\", ticker, \"A\", 0, \"USD\")",
+    "eodhd_key": "netIncome",
+    "unit": "USD millions",
+    "format": "currency"
+  },
+  "eps_diluted": {
+    "finsyt_key": "eps_diluted",
+    "display": "Diluted EPS",
+    "category": "income_statement",
+    "ciq_mnemonic": "IQ_EPS_DILUTED",
+    "ciq_excel": "=CIQ(\"IQ_EPS_DILUTED\", ticker, \"A\", 0, \"USD\")",
+    "eodhd_key": "dilutedEps",
+    "unit": "USD",
+    "format": "number"
+  },
+  "rd_expense": {
+    "finsyt_key": "rd_expense",
+    "display": "R&D Expense",
+    "category": "income_statement",
+    "ciq_mnemonic": "IQ_RD_EXP",
+    "ciq_excel": "=CIQ(\"IQ_RD_EXP\", ticker, \"A\", 0, \"USD\")",
+    "eodhd_key": "researchAndDevelopmentExpenses",
+    "unit": "USD millions",
+    "format": "currency"
+  },
+  "total_assets": {
+    "finsyt_key": "total_assets",
+    "display": "Total Assets",
+    "category": "balance_sheet",
+    "ciq_mnemonic": "IQ_TOTAL_ASSETS",
+    "ciq_excel": "=CIQ(\"IQ_TOTAL_ASSETS\", ticker, \"A\", 0, \"USD\")",
+    "eodhd_key": "totalAssets",
+    "unit": "USD millions",
+    "format": "currency"
+  },
+  "cash": {
+    "finsyt_key": "cash",
+    "display": "Cash & Equivalents",
+    "category": "balance_sheet",
+    "ciq_mnemonic": "IQ_CASH_EQUIV",
+    "ciq_excel": "=CIQ(\"IQ_CASH_EQUIV\", ticker, \"A\", 0, \"USD\")",
+    "eodhd_key": "cashAndEquivalents",
+    "unit": "USD millions",
+    "format": "currency"
+  },
+  "total_debt": {
+    "finsyt_key": "total_debt",
+    "display": "Total Debt",
+    "category": "balance_sheet",
+    "ciq_mnemonic": "IQ_TOTAL_DEBT",
+    "ciq_excel": "=CIQ(\"IQ_TOTAL_DEBT\", ticker, \"A\", 0, \"USD\")",
+    "eodhd_key": "totalDebt",
+    "unit": "USD millions",
+    "format": "currency"
+  },
+  "net_debt": {
+    "finsyt_key": "net_debt",
+    "display": "Net Debt",
+    "category": "balance_sheet",
+    "ciq_mnemonic": "IQ_NET_DEBT",
+    "ciq_excel": "=CIQ(\"IQ_NET_DEBT\", ticker, \"A\", 0, \"USD\")",
+    "eodhd_key": "netDebt",
+    "unit": "USD millions",
+    "format": "currency"
+  },
+  "total_equity": {
+    "finsyt_key": "total_equity",
+    "display": "Total Equity",
+    "category": "balance_sheet",
+    "ciq_mnemonic": "IQ_TOTAL_EQUITY",
+    "ciq_excel": "=CIQ(\"IQ_TOTAL_EQUITY\", ticker, \"A\", 0, \"USD\")",
+    "eodhd_key": "totalEquity",
+    "unit": "USD millions",
+    "format": "currency"
+  },
+  "operating_cash_flow": {
+    "finsyt_key": "operating_cash_flow",
+    "display": "Operating Cash Flow",
+    "category": "cash_flow",
+    "ciq_mnemonic": "IQ_NET_CASH_OPS",
+    "ciq_excel": "=CIQ(\"IQ_NET_CASH_OPS\", ticker, \"A\", 0, \"USD\")",
+    "eodhd_key": "totalCashFromOperatingActivities",
+    "unit": "USD millions",
+    "format": "currency"
+  },
+  "capex": {
+    "finsyt_key": "capex",
+    "display": "Capital Expenditure",
+    "category": "cash_flow",
+    "ciq_mnemonic": "IQ_CAPEX",
+    "ciq_excel": "=CIQ(\"IQ_CAPEX\", ticker, \"A\", 0, \"USD\")",
+    "eodhd_key": "capitalExpenditures",
+    "unit": "USD millions",
+    "format": "currency"
+  },
+  "free_cash_flow": {
+    "finsyt_key": "free_cash_flow",
+    "display": "Free Cash Flow",
+    "category": "cash_flow",
+    "ciq_mnemonic": "IQ_FREE_CASH_FLOW",
+    "ciq_excel": "=CIQ(\"IQ_FREE_CASH_FLOW\", ticker, \"A\", 0, \"USD\")",
+    "eodhd_key": "freeCashFlow",
+    "unit": "USD millions",
+    "format": "currency"
+  },
+  "market_cap": {
+    "finsyt_key": "market_cap",
+    "display": "Market Cap",
+    "category": "valuation",
+    "ciq_mnemonic": "IQ_MARKETCAP",
+    "ciq_excel": "=CIQ(\"IQ_MARKETCAP\", ticker, , , \"USD\")",
+    "eodhd_key": "marketCapitalization",
+    "unit": "USD millions",
+    "format": "currency"
+  },
+  "enterprise_value": {
+    "finsyt_key": "enterprise_value",
+    "display": "Enterprise Value",
+    "category": "valuation",
+    "ciq_mnemonic": "IQ_TEV",
+    "ciq_excel": "=CIQ(\"IQ_TEV\", ticker, , , \"USD\")",
+    "eodhd_key": "enterpriseValue",
+    "unit": "USD millions",
+    "format": "currency"
+  },
+  "ev_ebitda": {
+    "finsyt_key": "ev_ebitda",
+    "display": "EV / EBITDA",
+    "category": "valuation",
+    "ciq_mnemonic": "IQ_TEV_EBITDA",
+    "ciq_excel": "=CIQ(\"IQ_TEV_EBITDA\", ticker, \"A\", 0)",
+    "eodhd_key": "enterpriseValueEbitda",
+    "unit": "x",
+    "format": "multiple"
+  },
+  "pe_ratio": {
+    "finsyt_key": "pe_ratio",
+    "display": "P/E Ratio",
+    "category": "valuation",
+    "ciq_mnemonic": "IQ_PE_EXCL",
+    "ciq_excel": "=CIQ(\"IQ_PE_EXCL\", ticker, \"A\", 0)",
+    "eodhd_key": "peRatio",
+    "unit": "x",
+    "format": "multiple"
+  },
+  "ev_revenue": {
+    "finsyt_key": "ev_revenue",
+    "display": "EV / Revenue",
+    "category": "valuation",
+    "ciq_mnemonic": "IQ_TEV_REV",
+    "ciq_excel": "=CIQ(\"IQ_TEV_REV\", ticker, \"A\", 0)",
+    "eodhd_key": "enterpriseValueRevenue",
+    "unit": "x",
+    "format": "multiple"
+  },
+  "eps_estimate": {
+    "finsyt_key": "eps_estimate",
+    "display": "EPS Estimate (Consensus)",
+    "category": "estimates",
+    "ciq_mnemonic": "IQ_EPS_AGG_EST",
+    "ciq_excel": "=CIQ(\"IQ_EPS_AGG_EST\", ticker, \"A\", 0, \"USD\")",
+    "eodhd_key": "epsEstimate",
+    "unit": "USD",
+    "format": "number"
+  },
+  "revenue_estimate": {
+    "finsyt_key": "revenue_estimate",
+    "display": "Revenue Estimate (Consensus)",
+    "category": "estimates",
+    "ciq_mnemonic": "IQ_TOTAL_REV_AGG_EST",
+    "ciq_excel": "=CIQ(\"IQ_TOTAL_REV_AGG_EST\", ticker, \"A\", 0, \"USD\")",
+    "eodhd_key": "revenueEstimate",
+    "unit": "USD millions",
+    "format": "currency"
+  },
+  "lt_eps_growth": {
+    "finsyt_key": "lt_eps_growth",
+    "display": "LT EPS Growth (5yr consensus)",
+    "category": "estimates",
+    "ciq_mnemonic": "IQ_EPS_AGG_EST_GROWTH_5YR",
+    "ciq_excel": "=CIQ(\"IQ_EPS_AGG_EST_GROWTH_5YR\", ticker)",
+    "eodhd_key": "earningsGrowth",
+    "unit": "%",
+    "format": "percent"
+  }
+}

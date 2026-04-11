@@ -57,6 +57,7 @@ export const DEFAULT_NAV: NavItem[] = [
   { id:'watchlist',  href:'/app/watchlist', labelKey:'watchlist',   iconKey:'watchlist',   visible:true },
   { id:'alerts',     href:'/app/alerts',    labelKey:'alerts',      iconKey:'alerts',      badge:'3', visible:true },
   { id:'workspaces', href:'/app/workspaces', labelKey:'workspaces', iconKey:'workspaces', visible:true },
+  { id:'formulas',    href:'/app/formulas',    labelKey:'formulas',    iconKey:'formulas',    visible:true },
   { id:'research',   href:'/app/research',  labelKey:'ai_research', iconKey:'ai_research', visible:true },
   { id:'screener',   href:'/app/screener',  labelKey:'screener',    iconKey:'screener',    visible:true },
   { id:'news',       href:'/app/news',      labelKey:'news_signals',iconKey:'news_signals',visible:true },
