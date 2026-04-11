@@ -426,6 +426,161 @@ const searchSECFilings = tool({
   },
 })
 
+
+const NOTEBOOKLM_SKILL = `---
+name: NotebookLM Enterprise Integration
+description: How to use Finsyt's NotebookLM Enterprise integration
+---
+
+# NotebookLM Enterprise
+
+Project: 769449610437
+UI: https://notebooklm.cloud.google.com/global/?project=769449610437
+
+## Available Tools
+- createNotebookLM: Create a notebook + add sources in one shot
+- listNotebooksLM: List all recent notebooks
+- addSourcesToNotebook: Add more sources to existing notebook
+- generateAudioOverview: Generate a podcast-style audio overview
+
+## Finance Workflows
+- "Create a NotebookLM for NVDA earnings" → createNotebookLM with SEC + transcript URLs
+- "Build earnings research workspace for Q1 top 10" → createNotebookLM × 10
+- "Generate a podcast from this notebook" → generateAudioOverview
+- "Add the 10-K to my NVDA notebook" → addSourcesToNotebook
+
+## Source Types
+- url: any public web page, SEC filing, news article
+- youtube: earnings call webcasts on YouTube
+- text: raw EODHD data, custom analysis text
+`
+
+const NOTEBOOKLM_PROJECT = "769449610437"
+const NOTEBOOKLM_BASE = `https://global-discoveryengine.googleapis.com/v1alpha/projects/${NOTEBOOKLM_PROJECT}/locations/global`
+
+async function nlmRequest(method: string, path: string, body?: object) {
+  const token = process.env.GOOGLE_ACCESS_TOKEN || ""
+  const res = await fetch(`${NOTEBOOKLM_BASE}${path}`, {
+    method,
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: body ? JSON.stringify(body) : undefined,
+  })
+  return res.json()
+}
+
+const createNotebookLM = tool({
+  name: "createNotebookLM",
+  description: "Create a NotebookLM Enterprise notebook and optionally add web/text sources. Returns the notebook ID and a direct UI link.",
+  parameters: z.object({
+    title: z.string().describe("Notebook title e.g. 'Q1 2025 Earnings — NVDA'"),
+    sources: z.array(z.object({
+      type: z.enum(["url", "youtube", "text"]),
+      url: z.string().optional().describe("URL for web or YouTube sources"),
+      text: z.string().optional().describe("Raw text content"),
+      name: z.string().describe("Display name for the source"),
+    })).optional().describe("Sources to add immediately after creation"),
+  }),
+  execute: async ({ title, sources }) => {
+    // Create notebook
+    const nb = await nlmRequest("POST", "/notebooks", { title })
+    if (!nb.notebookId) return { error: "Failed to create notebook", details: nb }
+    const notebookId = nb.notebookId
+    const uiLink = `https://notebooklm.cloud.google.com/global/notebook/${notebookId}?project=${NOTEBOOKLM_PROJECT}`
+
+    // Add sources if provided
+    let addedSources: any[] = []
+    if (sources && sources.length > 0) {
+      const userContents = sources.map((s) => {
+        if (s.type === "url")      return { webContent:   { url: s.url, sourceName: s.name } }
+        if (s.type === "youtube")  return { videoContent: { youtubeUrl: s.url } }
+        if (s.type === "text")     return { textContent:  { sourceName: s.name, content: s.text } }
+      }).filter(Boolean)
+      const result = await nlmRequest("POST", `/notebooks/${notebookId}/sources:batchCreate`, { userContents })
+      addedSources = result.sources || []
+    }
+
+    return {
+      notebookId,
+      title,
+      uiLink,
+      sourcesAdded: addedSources.length,
+      sources: addedSources.map((s: any) => ({ id: s.sourceId?.id, title: s.title, status: s.settings?.status })),
+      message: `Notebook created. Open in NotebookLM Enterprise: ${uiLink}`,
+    }
+  },
+})
+
+const listNotebooksLM = tool({
+  name: "listNotebooksLM",
+  description: "List recent NotebookLM Enterprise notebooks",
+  parameters: z.object({}),
+  execute: async () => {
+    const data = await nlmRequest("GET", "/notebooks:listRecentlyViewed")
+    const notebooks = (data.notebooks || []).map((n: any) => ({
+      id: n.notebookId,
+      title: n.title,
+      created: n.metadata?.createTime,
+      lastViewed: n.metadata?.lastViewed,
+      uiLink: `https://notebooklm.cloud.google.com/global/notebook/${n.notebookId}?project=${NOTEBOOKLM_PROJECT}`,
+    }))
+    return { count: notebooks.length, notebooks }
+  },
+})
+
+const addSourcesToNotebook = tool({
+  name: "addSourcesToNotebook",
+  description: "Add sources (URLs, YouTube videos, or raw text) to an existing NotebookLM Enterprise notebook",
+  parameters: z.object({
+    notebookId: z.string(),
+    sources: z.array(z.object({
+      type: z.enum(["url", "youtube", "text"]),
+      url: z.string().optional(),
+      text: z.string().optional(),
+      name: z.string(),
+    })),
+  }),
+  execute: async ({ notebookId, sources }) => {
+    const userContents = sources.map((s) => {
+      if (s.type === "url")     return { webContent:   { url: s.url, sourceName: s.name } }
+      if (s.type === "youtube") return { videoContent: { youtubeUrl: s.url } }
+      if (s.type === "text")    return { textContent:  { sourceName: s.name, content: s.text } }
+    }).filter(Boolean)
+    const result = await nlmRequest("POST", `/notebooks/${notebookId}/sources:batchCreate`, { userContents })
+    const uiLink = `https://notebooklm.cloud.google.com/global/notebook/${notebookId}?project=${NOTEBOOKLM_PROJECT}`
+    return {
+      notebookId,
+      uiLink,
+      sourcesAdded: (result.sources || []).length,
+      sources: (result.sources || []).map((s: any) => ({ id: s.sourceId?.id, title: s.title, status: s.settings?.status })),
+    }
+  },
+})
+
+const generateAudioOverview = tool({
+  name: "generateAudioOverview",
+  description: "Generate a NotebookLM Enterprise audio overview (podcast-style) for a notebook",
+  parameters: z.object({
+    notebookId: z.string(),
+    language: z.string().default("en-US"),
+  }),
+  execute: async ({ notebookId, language }) => {
+    const result = await nlmRequest("POST", `/notebooks/${notebookId}:generateAudioOverview`, { language })
+    return {
+      notebookId,
+      operation: result.name,
+      status: result.done ? "complete" : "processing",
+      audioUri: result.response?.audioOverviewUri || null,
+      uiLink: `https://notebooklm.cloud.google.com/global/notebook/${notebookId}?project=${NOTEBOOKLM_PROJECT}`,
+      message: result.done
+        ? `Audio overview ready: ${result.response?.audioOverviewUri}`
+        : "Audio generation started — check the notebook UI in a few minutes.",
+    }
+  },
+})
+
 // ─── Agent ───────────────────────────────────────────────────────────────────
 
 export default agent({
@@ -451,6 +606,7 @@ Real-time market data, SEC filings, financial statements, insider transactions, 
 - Macro indicators: GDP, CPI, unemployment, PMI, interest rates with trend direction
 - Historical price data for trend analysis
 - News sentiment with polarity scoring
+- NotebookLM Enterprise: create research workspaces, add sources, generate audio overviews/podcasts
 
 ### Skills available
 - When working with EODHD data APIs -> follow the "EODHD Data API" skill
@@ -484,6 +640,7 @@ You have access to the 21st.dev Magic MCP server with three tools. Follow the "M
       "/home/user/workspace/.claude/skills/financial-analysis/SKILL.md": ANALYSIS_SKILL,
       "/home/user/workspace/.claude/skills/output-formatting/SKILL.md": FORMATTING_SKILL,
       "/home/user/workspace/.claude/skills/magic-ui/SKILL.md": MAGIC_UI_SKILL,
+      "/home/user/workspace/.claude/skills/notebooklm-enterprise/SKILL.md": NOTEBOOKLM_SKILL,
     },
   }),
 
@@ -498,5 +655,9 @@ You have access to the 21st.dev Magic MCP server with three tools. Follow the "M
     getMacroIndicator,
     getEarningsCalendar,
     searchSECFilings,
+    createNotebookLM,
+    listNotebooksLM,
+    addSourcesToNotebook,
+    generateAudioOverview,
   ],
 })
