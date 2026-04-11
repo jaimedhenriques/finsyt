@@ -1,115 +1,204 @@
 'use client'
-import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, LineChart, Line } from 'recharts'
+import { useEffect, useState } from 'react'
+import { AreaChart, Area, BarChart, Bar, LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
 
 const INDICATORS = [
-  { label: 'US GDP Growth', value: '2.8%', prev: '2.1%', period: 'Q3 2024', trend: 'up' },
-  { label: 'US CPI (YoY)', value: '3.2%', prev: '3.7%', period: 'Nov 2024', trend: 'down' },
-  { label: 'Fed Funds Rate', value: '5.25%', prev: '5.50%', period: 'Dec 2024', trend: 'down' },
-  { label: 'US Unemployment', value: '3.7%', prev: '3.9%', period: 'Nov 2024', trend: 'down' },
-  { label: 'US 10Y Yield', value: '4.38%', prev: '4.60%', period: 'Live', trend: 'down' },
-  { label: 'DXY Index', value: '104.2', prev: '106.1', period: 'Live', trend: 'down' },
-  { label: 'Gold (XAU)', value: '$2,074', prev: '$1,998', period: 'Live', trend: 'up' },
-  { label: 'WTI Crude Oil', value: '$71.4', prev: '$78.2', period: 'Live', trend: 'down' },
+  { key:'GDP_GROWTH_RATE',        label:'US GDP Growth',       country:'US', unit:'%',  icon:'🏛️', desc:'Real GDP quarter-over-quarter annualised growth rate' },
+  { key:'INFLATION_CPI_YOY',      label:'US CPI (YoY)',        country:'US', unit:'%',  icon:'📈', desc:'Consumer Price Index year-over-year % change' },
+  { key:'UNEMPLOYMENT_RATE',      label:'US Unemployment',     country:'US', unit:'%',  icon:'👷', desc:'Seasonally adjusted unemployment rate' },
+  { key:'REAL_INTEREST_RATE',     label:'US Real Rate',        country:'US', unit:'%',  icon:'🏦', desc:'Real (inflation-adjusted) interest rate' },
+  { key:'MANUFACTURING_PMI',      label:'US Mfg PMI',          country:'US', unit:'',   icon:'🏭', desc:'Manufacturing Purchasing Managers Index (>50 = expansion)' },
+  { key:'CONSUMER_CONFIDENCE',    label:'Consumer Confidence', country:'US', unit:'',   icon:'🛒', desc:'University of Michigan Consumer Sentiment Index' },
+  { key:'GDP_GROWTH_RATE',        label:'UK GDP Growth',       country:'GB', unit:'%',  icon:'🇬🇧', desc:'UK Real GDP quarter-over-quarter growth rate' },
+  { key:'INFLATION_CPI_YOY',      label:'UK CPI (YoY)',        country:'GB', unit:'%',  icon:'💷', desc:'UK Consumer Price Index year-over-year' },
+  { key:'GDP_GROWTH_RATE',        label:'EU GDP Growth',       country:'DE', unit:'%',  icon:'🇪🇺', desc:'Germany GDP as proxy for EU growth' },
+  { key:'GDP_GROWTH_RATE',        label:'China GDP Growth',    country:'CN', unit:'%',  icon:'🇨🇳', desc:'China Real GDP year-over-year growth rate' },
 ]
 
-const cpiData = [
-  { month: 'Jan', cpi: 6.4 }, { month: 'Feb', cpi: 6.0 }, { month: 'Mar', cpi: 5.0 },
-  { month: 'Apr', cpi: 4.9 }, { month: 'May', cpi: 4.0 }, { month: 'Jun', cpi: 3.0 },
-  { month: 'Jul', cpi: 3.2 }, { month: 'Aug', cpi: 3.7 }, { month: 'Sep', cpi: 3.7 },
-  { month: 'Oct', cpi: 3.2 }, { month: 'Nov', cpi: 3.1 }, { month: 'Dec', cpi: 3.2 },
+const CENTRAL_BANKS = [
+  { name:'Federal Reserve', rate:'5.25-5.50%', next:'Jan 29, 2026', stance:'Restrictive', color:'#1B4FFF' },
+  { name:'Bank of England', rate:'5.25%',      next:'Feb 6, 2026',  stance:'Restrictive', color:'#059669' },
+  { name:'ECB',             rate:'4.50%',      next:'Jan 30, 2026', stance:'Restrictive', color:'#D97706' },
+  { name:'Bank of Japan',   rate:'-0.10%',     next:'Jan 23, 2026', stance:'Ultra-loose', color:'#8B5CF6' },
+  { name:"People's Bank",   rate:'3.45%',      next:'Feb 20, 2026', stance:'Easing',      color:'#EF4444' },
 ]
 
-const yieldData = [
-  { label: '1M', yield: 5.42 }, { label: '3M', yield: 5.38 }, { label: '6M', yield: 5.21 },
-  { label: '1Y', yield: 4.98 }, { label: '2Y', yield: 4.72 }, { label: '5Y', yield: 4.52 },
-  { label: '10Y', yield: 4.38 }, { label: '20Y', yield: 4.62 }, { label: '30Y', yield: 4.55 },
-]
-
-const gdpData = [
-  { q: 'Q1 23', gdp: 2.0 }, { q: 'Q2 23', gdp: 2.1 }, { q: 'Q3 23', gdp: 4.9 },
-  { q: 'Q4 23', gdp: 3.4 }, { q: 'Q1 24', gdp: 1.6 }, { q: 'Q2 24', gdp: 3.0 },
-  { q: 'Q3 24', gdp: 2.8 },
-]
+function SparkLine({ data, color = '#1B4FFF' }: { data: any[]; color?: string }) {
+  return (
+    <ResponsiveContainer width="100%" height={48}>
+      <LineChart data={data} margin={{ top: 4, right: 4, bottom: 4, left: 4 }}>
+        <Line type="monotone" dataKey="value" stroke={color} strokeWidth={1.5} dot={false} />
+      </LineChart>
+    </ResponsiveContainer>
+  )
+}
 
 export default function MacroPage() {
+  const [data, setData]     = useState<Record<string, any[]>>({})
+  const [loading, setLoading] = useState<Record<string, boolean>>({})
+  const [selected, setSelected] = useState<typeof INDICATORS[0] | null>(null)
+  const [detailData, setDetailData] = useState<any[]>([])
+
+  useEffect(() => {
+    // Load first 4 indicators upfront
+    INDICATORS.slice(0, 6).forEach(ind => loadIndicator(ind))
+  }, [])
+
+  async function loadIndicator(ind: typeof INDICATORS[0]) {
+    const cacheKey = `${ind.country}_${ind.key}`
+    if (data[cacheKey]) return
+    setLoading(prev => ({ ...prev, [cacheKey]: true }))
+    try {
+      const res = await fetch(`/api/macro?country=${ind.country}&indicator=${ind.key}&periods=16`)
+      const d   = await res.json()
+      setData(prev => ({ ...prev, [cacheKey]: d.history || [] }))
+    } catch {}
+    setLoading(prev => ({ ...prev, [cacheKey]: false }))
+  }
+
+  async function selectIndicator(ind: typeof INDICATORS[0]) {
+    setSelected(ind)
+    const cacheKey = `${ind.country}_${ind.key}`
+    await loadIndicator(ind)
+    const history = data[cacheKey] || []
+    setDetailData(history.slice(-24).map((d: any) => ({ period: d.date?.slice(0, 7), value: parseFloat(d.value?.toFixed(2)) })))
+  }
+
+  function getLatest(ind: typeof INDICATORS[0]) {
+    const cacheKey = `${ind.country}_${ind.key}`
+    const history  = data[cacheKey]
+    if (!history?.length) return null
+    const sorted = [...history].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    return sorted[0]
+  }
+
+  function getTrend(ind: typeof INDICATORS[0]) {
+    const cacheKey = `${ind.country}_${ind.key}`
+    const history  = data[cacheKey]
+    if (!history || history.length < 2) return 'flat'
+    const sorted = [...history].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+    return sorted[0].value > sorted[1].value ? 'up' : 'down'
+  }
+
+  function getSparkData(ind: typeof INDICATORS[0]) {
+    const cacheKey = `${ind.country}_${ind.key}`
+    const history  = data[cacheKey] || []
+    return history.slice(-10).map((d: any) => ({ value: d.value }))
+  }
+
   return (
     <div className="page-content">
-      <div className="flex items-center justify-between mb-5">
+      <div className="flex items-center justify-between mb-5 flex-wrap gap-3">
         <div>
           <h1 className="page-title">Macro Dashboard</h1>
-          <p className="text-sm mt-0.5" style={{ color: '#7D8FA9' }}>Global economic indicators & yield curves</p>
+          <p style={{ color: '#7D8FA9', fontSize: 13 }}>Global economic indicators · EODHD live data</p>
+        </div>
+        <div style={{ display:'flex', alignItems:'center', gap:8 }}>
+          <div style={{ width:8, height:8, borderRadius:'50%', background:'#059669', animation:'pulse 2s infinite' }} />
+          <span style={{ fontSize:12, fontWeight:600, color:'#059669' }}>Live Data</span>
+        </div>
+      </div>
+
+      {/* Central Banks strip */}
+      <div className="card p-4 mb-6">
+        <div className="section-title mb-3">Central Bank Rates</div>
+        <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(180px,1fr))', gap:12 }}>
+          {CENTRAL_BANKS.map(cb => (
+            <div key={cb.name} style={{ borderLeft:`3px solid ${cb.color}`, paddingLeft:12 }}>
+              <div style={{ fontSize:11, color:'#7D8FA9', marginBottom:2 }}>{cb.name}</div>
+              <div style={{ fontSize:20, fontWeight:900, color:'#0A1628', letterSpacing:'-0.02em' }}>{cb.rate}</div>
+              <div style={{ fontSize:11, marginTop:4, display:'flex', gap:8 }}>
+                <span style={{ color:'#7D8FA9' }}>Next: {cb.next}</span>
+              </div>
+              <span style={{
+                fontSize:10, fontWeight:700, padding:'2px 6px', borderRadius:4, marginTop:4, display:'inline-block',
+                background: cb.stance === 'Easing' ? '#DCFCE7' : cb.stance === 'Ultra-loose' ? '#EFF6FF' : '#FEF3C7',
+                color:       cb.stance === 'Easing' ? '#059669' : cb.stance === 'Ultra-loose' ? '#1B4FFF' : '#D97706',
+              }}>{cb.stance}</span>
+            </div>
+          ))}
         </div>
       </div>
 
       {/* Indicators grid */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
-        {INDICATORS.map(ind => (
-          <div key={ind.label} className="metric-card">
-            <div className="label mb-2">{ind.label}</div>
-            <div className="flex items-end gap-2">
-              <span className="font-black text-xl" style={{ color: '#0A1628', letterSpacing: '-0.02em' }}>{ind.value}</span>
-              <span className={`text-sm font-semibold mb-0.5 ${ind.trend === 'up' ? 'pos' : 'neg'}`}>{ind.trend === 'up' ? '↑' : '↓'}</span>
+      <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill, minmax(280px,1fr))', gap:16, marginBottom:32 }}>
+        {INDICATORS.map((ind, i) => {
+          const cacheKey = `${ind.country}_${ind.key}`
+          const latest   = getLatest(ind)
+          const trend    = getTrend(ind)
+          const spark    = getSparkData(ind)
+          const isLoad   = loading[cacheKey]
+          return (
+            <div
+              key={i}
+              className="card p-4 hover-lift cursor-pointer"
+              style={{ cursor:'pointer' }}
+              onClick={() => { loadIndicator(ind); selectIndicator(ind) }}
+            >
+              <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:8 }}>
+                <div>
+                  <div style={{ fontSize:11, color:'#7D8FA9', marginBottom:2 }}>{ind.icon} {ind.label}</div>
+                  {isLoad ? (
+                    <div className="skeleton" style={{ width:80, height:28, borderRadius:6 }} />
+                  ) : latest ? (
+                    <div style={{ fontSize:26, fontWeight:900, color:'#0A1628', letterSpacing:'-0.02em' }}>
+                      {parseFloat(latest.value?.toFixed(2))}{ind.unit}
+                    </div>
+                  ) : (
+                    <div style={{ fontSize:14, color:'#C5CFDF' }}>Click to load</div>
+                  )}
+                </div>
+                {latest && (
+                  <span style={{ fontSize:18 }}>{trend === 'up' ? '↑' : '↓'}</span>
+                )}
+              </div>
+              {spark.length > 0 && (
+                <SparkLine
+                  data={spark}
+                  color={ind.key === 'INFLATION_CPI_YOY' || ind.key === 'UNEMPLOYMENT_RATE' ? '#EF4444' : '#1B4FFF'}
+                />
+              )}
+              {latest && (
+                <div style={{ fontSize:11, color:'#7D8FA9', marginTop:4 }}>
+                  Period: {latest.date?.slice(0, 7)} · Click for full chart
+                </div>
+              )}
             </div>
-            <div className="text-xs mt-1" style={{ color: '#7D8FA9' }}>Prev: {ind.prev} · {ind.period}</div>
-          </div>
-        ))}
+          )
+        })}
       </div>
 
-      <div className="grid lg:grid-cols-3 gap-5">
-        {/* CPI Chart */}
+      {/* Detail panel */}
+      {selected && (
         <div className="card p-5">
-          <div className="section-title">US CPI Inflation (2023)</div>
-          <div className="h-48">
-            <ResponsiveContainer width="100%" height="100%">
-              <AreaChart data={cpiData} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
-                <defs>
-                  <linearGradient id="cpiGrad" x1="0" y1="0" x2="0" y2="1">
-                    <stop offset="5%" stopColor="#1B4FFF" stopOpacity={0.15} />
-                    <stop offset="95%" stopColor="#1B4FFF" stopOpacity={0} />
-                  </linearGradient>
-                </defs>
-                <CartesianGrid strokeDasharray="3 3" stroke="#F0F4FA" />
-                <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#7D8FA9' }} />
-                <YAxis tick={{ fontSize: 11, fill: '#7D8FA9' }} tickFormatter={v => `${v}%`} />
-                <Tooltip formatter={(v: any) => [`${v}%`, 'CPI']} contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #E2E8F2' }} />
-                <Area type="monotone" dataKey="cpi" stroke="#1B4FFF" strokeWidth={2} fill="url(#cpiGrad)" dot={false} />
-              </AreaChart>
-            </ResponsiveContainer>
+          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:20 }}>
+            <div>
+              <h2 style={{ fontSize:18, fontWeight:800, color:'#0A1628' }}>{selected.icon} {selected.label}</h2>
+              <p style={{ fontSize:13, color:'#7D8FA9', marginTop:2 }}>{selected.desc}</p>
+            </div>
+            <button onClick={() => setSelected(null)} className="btn btn-ghost btn-sm">✕ Close</button>
           </div>
+          <ResponsiveContainer width="100%" height={280}>
+            <AreaChart data={detailData.length ? detailData : getSparkData(selected).map((d,i)=>({period:String(i),value:d.value}))}>
+              <defs>
+                <linearGradient id="macroGrad" x1="0" y1="0" x2="0" y2="1">
+                  <stop offset="5%"  stopColor="#1B4FFF" stopOpacity={0.2} />
+                  <stop offset="95%" stopColor="#1B4FFF" stopOpacity={0} />
+                </linearGradient>
+              </defs>
+              <CartesianGrid strokeDasharray="3 3" stroke="#E8EDF5" />
+              <XAxis dataKey="period" tick={{ fontSize:11, fill:'#7D8FA9' }} />
+              <YAxis tick={{ fontSize:11, fill:'#7D8FA9' }} />
+              <Tooltip
+                contentStyle={{ background:'#fff', border:'1px solid #E8EDF5', borderRadius:8, fontSize:12 }}
+                formatter={(v: any) => [`${parseFloat(v).toFixed(2)}${selected.unit}`, selected.label]}
+              />
+              {selected.key === 'MANUFACTURING_PMI' && <ReferenceLine y={50} stroke="#D97706" strokeDasharray="4 4" label={{ value:'50 = expansion', fill:'#D97706', fontSize:10 }} />}
+              <Area type="monotone" dataKey="value" stroke="#1B4FFF" strokeWidth={2} fill="url(#macroGrad)" />
+            </AreaChart>
+          </ResponsiveContainer>
         </div>
-
-        {/* Yield Curve */}
-        <div className="card p-5">
-          <div className="section-title">US Treasury Yield Curve</div>
-          <div className="h-48">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={yieldData} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#F0F4FA" />
-                <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#7D8FA9' }} />
-                <YAxis tick={{ fontSize: 11, fill: '#7D8FA9' }} tickFormatter={v => `${v}%`} domain={[4, 6]} />
-                <Tooltip formatter={(v: any) => [`${v}%`, 'Yield']} contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #E2E8F2' }} />
-                <Line type="monotone" dataKey="yield" stroke="#059669" strokeWidth={2.5} dot={{ fill: '#059669', r: 3 }} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-
-        {/* GDP */}
-        <div className="card p-5">
-          <div className="section-title">US GDP Growth (QoQ %)</div>
-          <div className="h-48">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={gdpData} margin={{ top: 4, right: 0, bottom: 0, left: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#F0F4FA" />
-                <XAxis dataKey="q" tick={{ fontSize: 11, fill: '#7D8FA9' }} />
-                <YAxis tick={{ fontSize: 11, fill: '#7D8FA9' }} tickFormatter={v => `${v}%`} />
-                <Tooltip formatter={(v: any) => [`${v}%`, 'GDP Growth']} contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #E2E8F2' }} />
-                <Bar dataKey="gdp" fill="#1B4FFF" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
-        </div>
-      </div>
+      )}
     </div>
   )
 }
