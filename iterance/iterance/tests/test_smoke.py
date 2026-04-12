@@ -6,6 +6,7 @@ No external test framework -- stdlib only.
 """
 
 import os
+import re
 import subprocess
 import sys
 import tempfile
@@ -58,6 +59,16 @@ def stop_any_session():
             except (ProcessLookupError, PermissionError):
                 pass
         PID_FILE.unlink(missing_ok=True)
+
+
+def _extract_listener_pid(output: str) -> int | None:
+    m = re.search(r"PID\s+(\d+)", output or "")
+    if not m:
+        return None
+    try:
+        return int(m.group(1))
+    except ValueError:
+        return None
 
 
 # ---------------------------------------------------------------------------
@@ -284,6 +295,7 @@ def test_webhook_listen_and_test():
     rc, out, err = run(["listen", "--background"])
     if not assert_ok(rc, out, err, "webhook: listen --background"):
         return False
+    listener_pid = _extract_listener_pid(out)
 
     time.sleep(1)   # let the server start
 
@@ -301,9 +313,12 @@ def test_webhook_listen_and_test():
 
     print("  ok    webhook: listener accepted event and wrote ledger entry")
 
-    # Kill the listener (find by port)
-    import subprocess as _sp
-    _sp.run(["fuser", "-k", "7734/tcp"], capture_output=True)
+    # Kill listener by PID from CLI output (portable fallback when fuser is unavailable)
+    if listener_pid is not None:
+        try:
+            os.kill(listener_pid, 15)
+        except (ProcessLookupError, PermissionError):
+            pass
     return True
 
 
