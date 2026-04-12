@@ -18,6 +18,7 @@ const nextConfig: NextConfig = {
     EODHD_API_KEY:            process.env.EODHD_API_KEY            || process.env.eodhd_api || '',
     API_KEY_21ST:             process.env.API_KEY_21ST             || process.env._21st_api  || '',
     POSTGRES_URL:             process.env.POSTGRES_URL             || '',
+    FIGMA_ACCESS_TOKEN:       process.env.FIGMA_ACCESS_TOKEN       || '',
   },
   async headers() {
     return [{

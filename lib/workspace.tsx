@@ -68,6 +68,7 @@ export const DEFAULT_NAV: NavItem[] = [
   { id:'alerts',     href:'/app/alerts',    labelKey:'alerts',      iconKey:'alerts',      badge:'3', visible:true },
   { id:'widgets',    href:'/app/widgets',   labelKey:'widgets',     iconKey:'widgets',     visible:true },
   { id:'developer',  href:'/app/developer', labelKey:'developer',   iconKey:'developer',   visible:true },
+  { id:'figma',      href:'/app/figma',     labelKey:'figma',       iconKey:'figma',       visible:true },
 ]
 
 // ── Topbar items ──────────────────────────────────────────────────────────────

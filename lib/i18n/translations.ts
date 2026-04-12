@@ -28,6 +28,7 @@ export const T: Record<Locale, Record<string, string>> = {
     macro: 'Macro',
     widgets: 'Widget Builder',
     developer: 'Developer API',
+    figma: 'Figma',
     settings: 'Settings',
     research: 'Research',
     intelligence: 'Intelligence',

@@ -19,6 +19,7 @@
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
     "ai": "^5.0.172",
+    "figma-api": "^2.1.2-beta",
     "lucide-react": "^1.8.0",
     "next": "^15.3.0",
     "pdf-parse": "^1.1.1",
