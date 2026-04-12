@@ -7,6 +7,13 @@
         "Authorization": "Bearer ${SUPABASE_ACCESS_TOKEN}"
       }
     },
+    "base44": {
+      "type": "http",
+      "url": "${BASE44_MCP_URL}",
+      "headers": {
+        "Authorization": "Bearer ${BASE44_ACCESS_TOKEN}"
+      }
+    },
     "github": {
       "type": "http",
       "url": "${GITHUB_MCP_URL}",
