@@ -4,6 +4,7 @@
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html { scroll-behavior: smooth; }
+html, body { background: #ffffff !important; }
 body { font-family: 'Inter', system-ui, -apple-system, sans-serif; background: #F5F7FB; color: #0A1628; -webkit-font-smoothing: antialiased; }
 
 .app-shell { display: flex; min-height: 100vh; }
