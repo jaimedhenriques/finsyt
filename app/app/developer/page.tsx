@@ -1,404 +1,430 @@
 'use client'
-import { useState } from 'react'
 
-// ── Code block ────────────────────────────────────────────────────────────────
-function Code({ lang, code }: { lang: string; code: string }) {
+import { useState, useEffect, useRef } from 'react'
+
+// ─── Code syntax highlight (simple) ──────────────────────────────────────────
+function CodeBlock({ lang, code, active }: { lang: string; code: string; active?: boolean }) {
   const [copied, setCopied] = useState(false)
-  function copy() { navigator.clipboard.writeText(code); setCopied(true); setTimeout(() => setCopied(false), 1600) }
+  const keywords = ['from', 'import', 'const', 'let', 'await', 'async', 'return', 'new', 'func', 'package', 'main', 'import', 'public', 'class', 'static', 'void']
+  const strings = /"[^"]*"|'[^']*'/g
+  const comments = /\/\/.*/g
+
+  function highlight(line: string) {
+    // Very basic: just render as-is with CSS color classes
+    return line
+  }
+
   return (
-    <div style={{ position:'relative', marginBottom:16 }}>
-      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'6px 14px', background:'#1A2436', borderRadius:'8px 8px 0 0' }}>
-        <span style={{ fontSize:11, fontWeight:700, color:'#7D8FA9', letterSpacing:'0.06em', textTransform:'uppercase' }}>{lang}</span>
-        <button onClick={copy} style={{ fontSize:11, fontWeight:600, color:copied?'#10B981':'#7D8FA9', background:'none', border:'none', cursor:'pointer', fontFamily:'inherit', display:'flex', alignItems:'center', gap:4 }}>
+    <div style={{ borderRadius: 12, overflow: 'hidden', border: '1px solid rgba(255,255,255,0.08)', background: '#0D1117' }}>
+      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 16px', background: 'rgba(255,255,255,0.03)', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+          <div style={{ display: 'flex', gap: 5 }}>
+            <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#FF5F57' }} />
+            <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#FEBC2E' }} />
+            <div style={{ width: 10, height: 10, borderRadius: '50%', background: '#28C840' }} />
+          </div>
+          <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.3)', fontFamily: 'monospace' }}>{lang}</span>
+        </div>
+        <button onClick={() => { navigator.clipboard.writeText(code); setCopied(true); setTimeout(() => setCopied(false), 1600) }}
+          style={{ fontSize: 11, fontWeight: 600, color: copied ? '#10B981' : 'rgba(255,255,255,0.35)', background: 'none', border: 'none', cursor: 'pointer', fontFamily: 'inherit', display: 'flex', alignItems: 'center', gap: 4 }}>
           {copied ? '✓ Copied' : '⎘ Copy'}
         </button>
       </div>
-      <pre style={{ margin:0, padding:'14px 16px', background:'#0D1117', borderRadius:'0 0 8px 8px', fontSize:12, lineHeight:1.65, color:'#E2E8F0', overflowX:'auto', whiteSpace:'pre' }}><code>{code}</code></pre>
+      <pre style={{ margin: 0, padding: '18px 20px', fontSize: 12.5, lineHeight: 1.7, color: '#E2E8F0', overflowX: 'auto', fontFamily: "'JetBrains Mono', 'Fira Code', 'Cascadia Code', monospace" }}>
+        <code>{code}</code>
+      </pre>
     </div>
   )
 }
 
-// ── Endpoint card ─────────────────────────────────────────────────────────────
-function EndpointCard({ method, path, description, params, example }: { method:'GET'|'POST'; path:string; description:string; params:{name:string;type:string;req:boolean;desc:string}[]; example:string }) {
-  const [open, setOpen] = useState(false)
-  const mc: Record<string,string> = { GET:'#059669', POST:'#1B4FFF' }
-  return (
-    <div style={{ border:'1px solid #E8EDF4', borderRadius:10, overflow:'hidden', marginBottom:8 }}>
-      <button onClick={() => setOpen(o=>!o)} style={{ display:'flex', alignItems:'center', gap:12, width:'100%', padding:'12px 16px', background:'#fff', border:'none', cursor:'pointer', fontFamily:'inherit', textAlign:'left' }}>
-        <span style={{ fontSize:11, fontWeight:800, padding:'3px 8px', borderRadius:5, background:mc[method]+'18', color:mc[method], flexShrink:0, minWidth:40, textAlign:'center' }}>{method}</span>
-        <code style={{ fontSize:13, fontWeight:700, color:'#0A1628', flex:1 }}>{path}</code>
-        <span style={{ fontSize:12, color:'#7D8FA9', flex:2, textAlign:'left' }}>{description}</span>
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#B0BCD0" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" style={{ transform:open?'rotate(180deg)':'none', transition:'transform 0.2s', flexShrink:0 }}><polyline points="6 9 12 15 18 9"/></svg>
-      </button>
-      {open && (
-        <div style={{ padding:'0 16px 16px', borderTop:'1px solid #F0F4FA', background:'#F9FAFB' }}>
-          <div style={{ marginTop:12, marginBottom:10 }}>
-            <div style={{ fontSize:11, fontWeight:700, color:'#7D8FA9', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:8 }}>Parameters</div>
-            <table style={{ width:'100%', fontSize:12, borderCollapse:'collapse' }}>
-              <thead><tr style={{ background:'#F0F4FA' }}>
-                {['Name','Type','Required','Description'].map(h=><th key={h} style={{ padding:'6px 10px', textAlign:'left', fontWeight:700, color:'#7D8FA9', fontSize:11 }}>{h}</th>)}
-              </tr></thead>
-              <tbody>
-                {params.map(p=>(
-                  <tr key={p.name} style={{ borderTop:'1px solid #E8EDF4' }}>
-                    <td style={{ padding:'7px 10px' }}><code style={{ fontSize:11, color:'#1B4FFF', fontWeight:700 }}>{p.name}</code></td>
-                    <td style={{ padding:'7px 10px' }}><span style={{ fontSize:11, color:'#7D8FA9' }}>{p.type}</span></td>
-                    <td style={{ padding:'7px 10px' }}>{p.req ? <span style={{ fontSize:10, fontWeight:700, color:'#DC2626', background:'#FEF2F2', padding:'1px 6px', borderRadius:4 }}>required</span> : <span style={{ fontSize:10, color:'#B0BCD0' }}>optional</span>}</td>
-                    <td style={{ padding:'7px 10px', fontSize:12, color:'#3D4F6E' }}>{p.desc}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-          <div style={{ fontSize:11, fontWeight:700, color:'#7D8FA9', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:6 }}>Example Response</div>
-          <pre style={{ background:'#0D1117', borderRadius:8, padding:'12px 14px', fontSize:11.5, color:'#E2E8F0', overflowX:'auto', margin:0, lineHeight:1.65 }}><code>{example}</code></pre>
-        </div>
-      )}
-    </div>
-  )
-}
-
-const API_ENDPOINTS = [
-  { method:'GET' as const, path:'/api/quote?symbol=NVDA', description:'Real-time stock quote + profile + key metrics',
-    params:[{name:'symbol',type:'string',req:true,desc:'Ticker symbol (e.g. NVDA, AAPL)'}],
-    example:`{\n  "symbol": "NVDA",\n  "price": 924.80,\n  "change": 23.45,\n  "changePct": 2.60,\n  "name": "NVIDIA Corporation",\n  "marketCap": 2270000000000,\n  "pe": 42.3,\n  "grossMargin": 0.759,\n  "source": "finnhub"\n}` },
-  { method:'GET' as const, path:'/api/financials?symbol=NVDA&type=income', description:'Income statement, balance sheet, cash flow, earnings, ratios',
-    params:[{name:'symbol',type:'string',req:true,desc:'Ticker symbol'},{name:'type',type:'string',req:false,desc:'income | balance | cashflow | earnings | ratios | growth | dcf'},{name:'limit',type:'number',req:false,desc:'Periods to return (default 8)'}],
-    example:`{\n  "statements": [\n    {\n      "date": "2026-01-26",\n      "period": "Q4",\n      "revenue": 39327000000,\n      "grossMargin": 0.759,\n      "netIncome": 19311000000,\n      "eps": 0.78\n    }\n  ]\n}` },
-  { method:'GET' as const, path:'/api/news?symbol=NVDA&limit=10', description:'Company or market news with source and sentiment',
-    params:[{name:'symbol',type:'string',req:false,desc:'Ticker for company news'},{name:'topics',type:'string',req:false,desc:'general | technology | economy | forex | crypto'},{name:'limit',type:'number',req:false,desc:'Max articles (default 20)'}],
-    example:`{\n  "articles": [\n    {\n      "title": "NVIDIA Blackwell B300 Shipments Ahead of Schedule",\n      "publishedAt": "2026-04-10T09:14:00Z",\n      "source": "Bloomberg",\n      "sentiment": "Bullish",\n      "tickers": ["NVDA"]\n    }\n  ]\n}` },
-  { method:'GET' as const, path:'/api/macro?series=dashboard', description:'Macroeconomic indicators from FRED (Fed, CPI, GDP, yields, VIX)',
-    params:[{name:'series',type:'string',req:false,desc:'dashboard | fed_rate | cpi | gdp_growth | yield_curve | vix | unemployment | ...'},{name:'limit',type:'number',req:false,desc:'History depth'}],
-    example:`{\n  "indicators": [\n    {\n      "key": "fed_rate",\n      "label": "Fed Funds Rate",\n      "latest": { "date": "2026-03-01", "value": 4.33 },\n      "change": -0.25\n    }\n  ]\n}` },
-  { method:'GET' as const, path:'/api/transcripts?symbol=NVDA&year=2026&quarter=4', description:'Earnings call transcripts with speaker segmentation',
-    params:[{name:'symbol',type:'string',req:true,desc:'Ticker symbol'},{name:'year',type:'string',req:false,desc:'Year (omit to list available)'},{name:'quarter',type:'string',req:false,desc:'Quarter 1-4'}],
-    example:`{\n  "symbol": "NVDA",\n  "year": 2026,\n  "quarter": 4,\n  "segments": [\n    {\n      "speaker": "Jensen Huang",\n      "role": "CEO",\n      "text": "Blackwell demand continues to exceed supply..."\n    }\n  ]\n}` },
-  { method:'GET' as const, path:'/api/filings?symbol=NVDA&type=10-K', description:'SEC filings with direct document URLs',
-    params:[{name:'symbol',type:'string',req:true,desc:'Ticker symbol'},{name:'type',type:'string',req:false,desc:'10-K | 10-Q | 8-K | DEF 14A'},{name:'limit',type:'number',req:false,desc:'Max results'}],
-    example:`{\n  "filings": [\n    {\n      "form": "10-K",\n      "date": "2026-02-21",\n      "description": "Annual Report",\n      "documentUrl": "https://sec.gov/..."\n    }\n  ]\n}` },
-  { method:'GET' as const, path:'/api/search?q=nvidia', description:'Search companies by name or ticker',
-    params:[{name:'q',type:'string',req:true,desc:'Company name or ticker fragment'}],
-    example:`{\n  "results": [\n    { "symbol": "NVDA", "name": "NVIDIA Corporation", "type": "Common Stock" }\n  ]\n}` },
-  { method:'POST' as const, path:'/api/ai-research', description:'AI research — live data-grounded answers via Groq + Perplexity',
-    params:[{name:'query',type:'string',req:true,desc:'Natural language research question'},{name:'symbol',type:'string',req:false,desc:'Optional ticker for context injection'},{name:'messages',type:'array',req:false,desc:'Prior conversation messages for multi-turn'}],
-    example:`{\n  "bullets": ["Revenue +73% YoY to $39.3B ...", "Gross margin 75.9% ..."],\n  "content": "NVIDIA Q4 FY2026 summary...",\n  "sources": [...],\n  "modelUsed": "groq/llama-3.3-70b",\n  "hasLiveData": true\n}` },
-  { method:'POST' as const, path:'/api/mcp', description:'MCP server — connect to Claude Desktop, Cursor, any LLM client',
-    params:[{name:'method',type:'string',req:true,desc:'MCP method: initialize | tools/list | tools/call'},{name:'params',type:'object',req:false,desc:'Tool name and arguments for tools/call'},{name:'id',type:'string',req:false,desc:'Request ID for JSON-RPC'}],
-    example:`// tools/list response:\n{\n  "result": {\n    "tools": [\n      { "name": "get_stock_quote", "description": "..." },\n      { "name": "get_financials", "description": "..." },\n      ...\n    ]\n  }\n}` },
-]
-
-const MCP_CONFIG = `{
-  "mcpServers": {
-    "finsyt": {
-      "url": "https://finsyt-platform.vercel.app/api/mcp",
-      "headers": {
-        "Authorization": "Bearer YOUR_API_KEY"
+// ─── Animated counter ─────────────────────────────────────────────────────────
+function Counter({ target, suffix = '', prefix = '' }: { target: number; suffix?: string; prefix?: string }) {
+  const [val, setVal] = useState(0)
+  const ref = useRef<HTMLSpanElement>(null)
+  useEffect(() => {
+    const obs = new IntersectionObserver(([e]) => {
+      if (e.isIntersecting) {
+        let start = 0
+        const step = target / 60
+        const timer = setInterval(() => {
+          start += step
+          if (start >= target) { setVal(target); clearInterval(timer) }
+          else setVal(Math.floor(start))
+        }, 16)
+        obs.disconnect()
       }
+    })
+    if (ref.current) obs.observe(ref.current)
+    return () => obs.disconnect()
+  }, [target])
+  return <span ref={ref}>{prefix}{val.toLocaleString()}{suffix}</span>
+}
+
+// ─── Pricing tier ─────────────────────────────────────────────────────────────
+function PricingCard({ name, price, tag, features, highlighted, cta }: {
+  name: string; price: string; tag: string; features: string[]; highlighted?: boolean; cta: string
+}) {
+  return (
+    <div style={{ flex: 1, minWidth: 220, borderRadius: 16, border: `1.5px solid ${highlighted ? '#1B4FFF' : 'rgba(255,255,255,0.08)'}`, background: highlighted ? 'linear-gradient(180deg, rgba(27,79,255,0.08) 0%, rgba(27,79,255,0.03) 100%)' : 'rgba(255,255,255,0.02)', padding: '28px 24px', display: 'flex', flexDirection: 'column', position: 'relative', boxShadow: highlighted ? '0 0 40px rgba(27,79,255,0.12)' : 'none' }}>
+      {highlighted && <div style={{ position: 'absolute', top: -12, left: '50%', transform: 'translateX(-50%)', padding: '3px 14px', background: 'linear-gradient(135deg,#1B4FFF,#06B6D4)', borderRadius: 20, fontSize: 11, fontWeight: 800, color: '#fff', letterSpacing: '0.08em', whiteSpace: 'nowrap' }}>MOST POPULAR</div>}
+      <div style={{ marginBottom: 6 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: 'rgba(255,255,255,0.5)', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: 8 }}>{name}</div>
+        <div style={{ display: 'flex', alignItems: 'baseline', gap: 4 }}>
+          <span style={{ fontSize: 32, fontWeight: 900, color: '#fff', letterSpacing: '-0.02em' }}>{price}</span>
+          {price !== 'Free' && <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.35)' }}>/month</span>}
+        </div>
+        <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', marginTop: 4 }}>{tag}</div>
+      </div>
+      <div style={{ height: 1, background: 'rgba(255,255,255,0.06)', margin: '20px 0' }} />
+      <ul style={{ listStyle: 'none', padding: 0, margin: '0 0 24px', flex: 1 }}>
+        {features.map((f, i) => (
+          <li key={i} style={{ display: 'flex', alignItems: 'flex-start', gap: 8, marginBottom: 10, fontSize: 13, color: 'rgba(255,255,255,0.65)', lineHeight: 1.4 }}>
+            <svg style={{ flexShrink: 0, marginTop: 1 }} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#10B981" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+            {f}
+          </li>
+        ))}
+      </ul>
+      <button style={{ width: '100%', padding: '11px 0', borderRadius: 9, background: highlighted ? 'linear-gradient(135deg,#1B4FFF,#2563EB)' : 'rgba(255,255,255,0.06)', border: highlighted ? 'none' : '1px solid rgba(255,255,255,0.1)', color: '#fff', fontWeight: 700, fontSize: 14, cursor: 'pointer', fontFamily: 'inherit', boxShadow: highlighted ? '0 4px 16px rgba(27,79,255,0.3)' : 'none', transition: 'all 0.15s' }}
+        onMouseEnter={e => { if (!highlighted) e.currentTarget.style.background = 'rgba(255,255,255,0.1)' }}
+        onMouseLeave={e => { if (!highlighted) e.currentTarget.style.background = 'rgba(255,255,255,0.06)' }}
+      >{cta}</button>
+    </div>
+  )
+}
+
+// ─── Code snippets per language ───────────────────────────────────────────────
+const CODE_SNIPPETS: Record<string, string> = {
+  Python: `from finsyt import RESTClient
+
+client = RESTClient("YOUR_API_KEY")
+
+# Get AAPL stock aggregates (OHLCV)
+aggs = client.get_aggs(
+    ticker="AAPL",
+    multiplier=1,
+    timespan="day",
+    from_date="2024-01-01",
+    to_date="2025-01-01",
+)
+
+for bar in aggs:
+    print(f"{bar.timestamp}: O={bar.open} H={bar.high} L={bar.low} C={bar.close} V={bar.volume}")`,
+
+  JavaScript: `import { FinsytClient } from '@finsyt/api'
+
+const client = new FinsytClient({ apiKey: 'YOUR_API_KEY' })
+
+// Stream real-time trades for NVDA
+const ws = client.websocket('trades')
+ws.subscribe(['T.NVDA', 'T.AAPL', 'T.MSFT'])
+
+ws.on('message', (trade) => {
+  console.log(\`\${trade.sym}: $\${trade.p} × \${trade.s} shares at \${trade.t}ns\`)
+})`,
+
+  cURL: `# Get latest financials for AAPL (Income Statement)
+curl -X GET "https://api.finsyt.com/v1/fundamentals/financials" \\
+  -H "Authorization: Bearer YOUR_API_KEY" \\
+  -G --data-urlencode "ticker=AAPL" \\
+     --data-urlencode "type=income_statement" \\
+     --data-urlencode "period=annual" \\
+     --data-urlencode "limit=5"
+
+# Response: structured JSON with revenue, EBITDA, EPS, FCF...`,
+
+  Go: `package main
+
+import (
+    "fmt"
+    finsyt "github.com/finsyt-io/finsyt-go"
+)
+
+func main() {
+    c := finsyt.NewClient("YOUR_API_KEY")
+
+    // Get SEC filings for TSLA
+    filings, err := c.Filings.List("TSLA", finsyt.FilingOptions{
+        Type:  "10-K",
+        Limit: 5,
+    })
+    if err != nil { panic(err) }
+
+    for _, f := range filings {
+        fmt.Printf("[%s] %s — %s\n", f.FiledAt, f.Type, f.URL)
+    }
+}`,
+}
+
+// ─── JSON response preview ────────────────────────────────────────────────────
+const JSON_RESPONSE = `{
+  "ticker": "AAPL",
+  "period": "Q4 2024",
+  "source": "SEC EDGAR (10-Q)",
+  "filed_at": "2024-11-01",
+  "financials": {
+    "income_statement": {
+      "revenue":         { "value": 94930000000, "unit": "USD", "label": "Revenue" },
+      "gross_profit":    { "value": 43884000000, "unit": "USD", "label": "Gross Profit" },
+      "operating_income":{ "value": 29596000000, "unit": "USD", "label": "Operating Income" },
+      "net_income":      { "value": 14736000000, "unit": "USD", "label": "Net Income" },
+      "eps_diluted":     { "value": 0.97,        "unit": "USD", "label": "Diluted EPS" }
+    },
+    "kpis": {
+      "gross_margin":    { "value": 0.462, "label": "Gross Margin %" },
+      "operating_margin":{ "value": 0.312, "label": "Operating Margin %" },
+      "revenue_yoy":     { "value": 0.061, "label": "Revenue YoY Growth" }
     }
   }
 }`
 
-const MCP_PYTHON = `import anthropic
+// ─── Endpoint list ────────────────────────────────────────────────────────────
+const ENDPOINTS = [
+  { method: 'GET', path: '/v1/quotes/{ticker}', desc: 'Real-time & delayed quote', badge: 'Real-time' },
+  { method: 'GET', path: '/v1/aggs/{ticker}/{timespan}', desc: 'OHLCV bars (1m → 1d)', badge: 'Historical' },
+  { method: 'GET', path: '/v1/trades/{ticker}', desc: 'Nanosecond trade ticks', badge: 'Real-time' },
+  { method: 'GET', path: '/v1/fundamentals/financials', desc: 'Income / Balance / Cash Flow', badge: 'Fundamentals' },
+  { method: 'GET', path: '/v1/fundamentals/kpis', desc: 'Margins, ratios, growth rates', badge: 'Fundamentals' },
+  { method: 'GET', path: '/v1/sec/filings', desc: 'SEC EDGAR 10-K / 10-Q / 8-K', badge: 'Filings' },
+  { method: 'GET', path: '/v1/news', desc: 'News with sentiment scores', badge: 'News' },
+  { method: 'GET', path: '/v1/insider', desc: 'Insider transactions', badge: 'Alternative' },
+  { method: 'GET', path: '/v1/screener', desc: 'Filter 10k+ tickers by any metric', badge: 'Screener' },
+  { method: 'WS', path: 'wss://stream.finsyt.com/v1/trades', desc: 'WebSocket real-time stream', badge: 'Stream' },
+  { method: 'GET', path: '/v1/macro', desc: 'GDP, CPI, rates via FRED', badge: 'Macro' },
+  { method: 'GET', path: '/v1/private/companies', desc: 'Private co. discovery (75M+)', badge: 'Private' },
+]
 
-client = anthropic.Anthropic()
+const BADGE_COLORS: Record<string, string> = {
+  'Real-time': '#10B981', 'Historical': '#1B4FFF', 'Fundamentals': '#7C3AED',
+  'Filings': '#0891B2', 'News': '#F59E0B', 'Alternative': '#E11D48',
+  'Screener': '#6366F1', 'Stream': '#10B981', 'Macro': '#059669', 'Private': '#D97706',
+}
 
-# Finsyt tools are automatically available
-result = client.beta.messages.create(
-    model="claude-opus-4-5",
-    max_tokens=1024,
-    mcp_servers=[{
-        "type": "url",
-        "url": "https://finsyt-platform.vercel.app/api/mcp",
-        "authorization_token": "YOUR_API_KEY",
-    }],
-    messages=[{
-        "role": "user",
-        "content": "What is NVIDIA's gross margin trend over the last 4 quarters?"
-    }]
-)`
-
-const CURL_QUOTE = `curl -X GET \\
-  "https://finsyt-platform.vercel.app/api/quote?symbol=NVDA" \\
-  -H "Authorization: Bearer YOUR_API_KEY"`
-
-const CURL_AI = `curl -X POST \\
-  "https://finsyt-platform.vercel.app/api/ai-research" \\
-  -H "Authorization: Bearer YOUR_API_KEY" \\
-  -H "Content-Type: application/json" \\
-  -d '{"query": "Summarise NVIDIA Q4 earnings", "symbol": "NVDA"}'`
-
-const JS_EXAMPLE = `import Finsyt from '@finsyt/js'
-
-const finsyt = new Finsyt({ apiKey: 'YOUR_API_KEY' })
-
-// Real-time quote
-const quote = await finsyt.quote('NVDA')
-console.log(quote.price, quote.changePct)
-
-// Financials
-const income = await finsyt.financials('NVDA', { type: 'income' })
-
-// AI research
-const research = await finsyt.research({
-  query: 'What drove NVDA margin expansion?',
-  symbol: 'NVDA',
-})`
-
-const PYTHON_EXAMPLE = `import finsyt
-
-client = finsyt.Client(api_key="YOUR_API_KEY")
-
-# Real-time quote
-quote = client.quote("NVDA")
-print(f"Price: " + str(quote.price) + ", Change: " + str(quote.change_pct) + "%")
-
-# Income statement
-income = client.financials("NVDA", type="income", limit=8)
-
-# AI research (Groq + live data)
-result = client.research(
-    query="What drove NVDA margin expansion this quarter?",
-    symbol="NVDA"
-)
-print(result.bullets)`
-
+// ─── Main ─────────────────────────────────────────────────────────────────────
 export default function DeveloperPage() {
-  const [activeTab, setActiveTab] = useState<'rest'|'mcp'|'sdks'|'keys'>('rest')
-  const [apiKey] = useState('fsy_live_••••••••••••••••••••••••••••••••')
-  const [copied, setCopied] = useState(false)
-  const tabs = [
-    { id:'rest',  label:'REST API',    icon:'⚡' },
-    { id:'mcp',   label:'MCP Server',  icon:'🔗' },
-    { id:'sdks',  label:'SDKs',        icon:'📦' },
-    { id:'keys',  label:'API Keys',    icon:'🔑' },
+  const [activeLang, setActiveLang] = useState('Python')
+  const [billingAnnual, setBillingAnnual] = useState(false)
+  const [activeTab, setActiveTab] = useState<'request' | 'response'>('response')
+
+  const PRICING = [
+    {
+      name: 'Basic', price: 'Free', tag: 'Perfect for prototyping',
+      features: ['All US stock tickers', '5 API calls/minute', '2 years historical data', 'End-of-day data only', 'Reference & company data', 'Community support'],
+      cta: 'Start free',
+    },
+    {
+      name: 'Starter', price: billingAnnual ? '$23' : '$29', tag: '15-min delayed data',
+      features: ['Unlimited API calls', '5 years historical data', '15-min delayed quotes', 'Corporate actions', 'Technical indicators', 'Email support'],
+      cta: 'Get Starter',
+    },
+    {
+      name: 'Developer', price: billingAnnual ? '$63' : '$79', tag: 'For serious builders', highlighted: true,
+      features: ['Everything in Starter', '10 years historical data', '15-min delayed data', 'Options & forex data', 'Fundamentals & filings', 'WebSocket streaming', 'Priority support'],
+      cta: 'Get Developer',
+    },
+    {
+      name: 'Advanced', price: billingAnnual ? '$159' : '$199', tag: 'Real-time, no delays',
+      features: ['Everything in Developer', 'Real-time quotes & trades', 'Full tick-level data', 'SEC filings access', 'Private company data', 'SLA guarantee', 'Dedicated support'],
+      cta: 'Get Advanced',
+    },
+    {
+      name: 'Business', price: 'Custom', tag: 'Enterprise & scale',
+      features: ['Unlimited everything', 'White-label options', 'Custom data feeds', 'On-prem deployment', 'SOC 2 compliance docs', '24/7 dedicated support'],
+      cta: 'Contact sales',
+    },
   ]
 
   return (
-    <div style={{ minHeight:'calc(100vh - 60px)', background:'#F7F9FC' }}>
-      {/* Header */}
-      <div style={{ background:'#0D1117', borderBottom:'1px solid rgba(255,255,255,0.06)', padding:'28px 32px 0' }}>
-        <div style={{ maxWidth:1100, margin:'0 auto' }}>
-          <div style={{ display:'flex', alignItems:'flex-end', justifyContent:'space-between', marginBottom:20 }}>
-            <div>
-              <p style={{ fontSize:11, fontWeight:700, color:'rgba(255,255,255,0.3)', textTransform:'uppercase', letterSpacing:'0.1em', marginBottom:4 }}>DEVELOPER</p>
-              <h1 style={{ fontSize:'1.625rem', fontWeight:900, color:'#fff', letterSpacing:'-0.03em', marginBottom:6 }}>Finsyt API & MCP</h1>
-              <p style={{ fontSize:13.5, color:'rgba(255,255,255,0.5)', lineHeight:1.5, maxWidth:500 }}>
-                Access institutional financial data via REST API, connect directly to Claude and other LLMs via MCP, and build on top of the same data powering Finsyt.
-              </p>
-            </div>
-            <div style={{ display:'flex', gap:10 }}>
-              <div style={{ padding:'6px 14px', background:'rgba(16,185,129,0.1)', border:'1px solid rgba(16,185,129,0.3)', borderRadius:8, fontSize:12, fontWeight:600, color:'#10B981', display:'flex', alignItems:'center', gap:6 }}>
-                <span style={{ width:6, height:6, borderRadius:'50%', background:'#10B981', display:'inline-block' }} />
-                API Operational
-              </div>
-            </div>
+    <div style={{ background: '#07101F', minHeight: '100%', color: '#fff', fontFamily: 'inherit' }}>
+      <style>{`
+        @keyframes fadeUp { from{opacity:0;transform:translateY(12px)} to{opacity:1;transform:none} }
+        @keyframes pulseDot { 0%,100%{opacity:1} 50%{opacity:0.4} }
+        .devpage-scroll::-webkit-scrollbar { display: none }
+        .ep-row:hover { background: rgba(27,79,255,0.06) !important; }
+      `}</style>
+
+      {/* ── HERO ── */}
+      <div style={{ maxWidth: 1200, margin: '0 auto', padding: '64px 32px 80px', display: 'flex', gap: 60, alignItems: 'center', flexWrap: 'wrap' }}>
+        {/* Left */}
+        <div style={{ flex: 1, minWidth: 320, animation: 'fadeUp 0.5s ease' }}>
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 7, padding: '5px 12px', background: 'rgba(27,79,255,0.1)', border: '1px solid rgba(27,79,255,0.2)', borderRadius: 20, marginBottom: 20 }}>
+            <div style={{ width: 6, height: 6, borderRadius: '50%', background: '#10B981', animation: 'pulseDot 2s infinite' }} />
+            <span style={{ fontSize: 11, fontWeight: 700, color: '#93B4FF', letterSpacing: '0.06em' }}>FINSYT DATA API — NOW IN BETA</span>
           </div>
-          {/* Tab nav */}
-          <div style={{ display:'flex', gap:0 }}>
-            {tabs.map(t => (
-              <button key={t.id} onClick={() => setActiveTab(t.id as any)} style={{ display:'flex', alignItems:'center', gap:6, padding:'10px 18px', background:'none', border:'none', cursor:'pointer', fontFamily:'inherit', fontSize:13, fontWeight:600, color:activeTab===t.id?'#fff':'rgba(255,255,255,0.4)', borderBottom:`2px solid ${activeTab===t.id?'#1B4FFF':'transparent'}`, transition:'all 0.15s', marginBottom:-1 }}>
-                <span>{t.icon}</span><span>{t.label}</span>
-              </button>
+          <h1 style={{ fontSize: 'clamp(32px,4vw,52px)', fontWeight: 900, lineHeight: 1.1, letterSpacing: '-0.03em', marginBottom: 20, color: '#fff' }}>
+            Institutional-grade<br/>
+            <span style={{ background: 'linear-gradient(135deg,#1B4FFF,#06B6D4)', WebkitBackgroundClip: 'text', WebkitTextFillColor: 'transparent' }}>financial data</span><br/>
+            for your next project
+          </h1>
+          <p style={{ fontSize: 17, color: 'rgba(255,255,255,0.5)', lineHeight: 1.65, maxWidth: 480, marginBottom: 32 }}>
+            One API for real-time quotes, tick data, SEC filings, fundamentals, macro indicators, and private company intelligence. Standardised JSON, WebSocket streams, and SDKs in 4 languages.
+          </p>
+          <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
+            <button style={{ padding: '13px 28px', background: 'linear-gradient(135deg,#1B4FFF,#2563EB)', border: 'none', borderRadius: 10, color: '#fff', fontWeight: 800, fontSize: 15, cursor: 'pointer', fontFamily: 'inherit', boxShadow: '0 4px 20px rgba(27,79,255,0.35)' }}>
+              Get free API key →
+            </button>
+            <button style={{ padding: '13px 28px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, color: 'rgba(255,255,255,0.7)', fontWeight: 600, fontSize: 15, cursor: 'pointer', fontFamily: 'inherit' }}>
+              View docs
+            </button>
+          </div>
+          {/* Trust signals */}
+          <div style={{ display: 'flex', gap: 24, marginTop: 32, flexWrap: 'wrap' }}>
+            {[['0 credit card', 'Free tier forever'], ['5 min', 'To first API call'], ['99.9%', 'Uptime SLA']].map(([stat, label]) => (
+              <div key={label}>
+                <div style={{ fontSize: 17, fontWeight: 900, color: '#fff' }}>{stat}</div>
+                <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)' }}>{label}</div>
+              </div>
             ))}
+          </div>
+        </div>
+
+        {/* Right: code window */}
+        <div style={{ flex: 1.1, minWidth: 320, animation: 'fadeUp 0.6s ease' }}>
+          {/* Language tabs */}
+          <div style={{ display: 'flex', gap: 2, marginBottom: 8, background: 'rgba(255,255,255,0.04)', borderRadius: 10, padding: 3, width: 'fit-content' }}>
+            {Object.keys(CODE_SNIPPETS).map(lang => (
+              <button key={lang} onClick={() => setActiveLang(lang)}
+                style={{ padding: '5px 14px', borderRadius: 8, background: activeLang === lang ? '#1B4FFF' : 'transparent', border: 'none', color: activeLang === lang ? '#fff' : 'rgba(255,255,255,0.4)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', transition: 'all 0.15s' }}
+              >{lang}</button>
+            ))}
+          </div>
+          <CodeBlock lang={activeLang} code={CODE_SNIPPETS[activeLang]} />
+        </div>
+      </div>
+
+      {/* ── STATS STRIP ── */}
+      <div style={{ background: 'rgba(255,255,255,0.02)', borderTop: '1px solid rgba(255,255,255,0.05)', borderBottom: '1px solid rgba(255,255,255,0.05)' }}>
+        <div style={{ maxWidth: 1200, margin: '0 auto', padding: '32px 32px', display: 'flex', justifyContent: 'space-between', flexWrap: 'wrap', gap: 24 }}>
+          {[
+            { val: 1, suffix: 'T+', label: 'Data points served' },
+            { val: 20, suffix: ' years', label: 'Historical depth' },
+            { val: 10413, suffix: '', label: 'US stock tickers' },
+            { val: 99, suffix: '.9%', label: 'API uptime' },
+            { val: 12, suffix: '', label: 'Endpoint categories' },
+          ].map(s => (
+            <div key={s.label} style={{ textAlign: 'center', flex: 1, minWidth: 120 }}>
+              <div style={{ fontSize: 28, fontWeight: 900, color: '#fff', letterSpacing: '-0.02em' }}>
+                <Counter target={s.val} suffix={s.suffix} />
+              </div>
+              <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.35)', marginTop: 4 }}>{s.label}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── ENDPOINTS ── */}
+      <div style={{ maxWidth: 1200, margin: '0 auto', padding: '72px 32px 0' }}>
+        <div style={{ textAlign: 'center', marginBottom: 48 }}>
+          <div style={{ fontSize: 11, fontWeight: 800, color: '#93B4FF', letterSpacing: '0.1em', marginBottom: 10 }}>ENDPOINTS</div>
+          <h2 style={{ fontSize: 'clamp(24px,3vw,38px)', fontWeight: 900, letterSpacing: '-0.02em', color: '#fff', marginBottom: 12 }}>Every data type. One API key.</h2>
+          <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 15, maxWidth: 520, margin: '0 auto' }}>Standardised RESTful endpoints and WebSocket streams with consistent JSON schemas across all asset classes.</p>
+        </div>
+
+        <div style={{ background: '#0A1525', borderRadius: 14, border: '1px solid rgba(255,255,255,0.07)', overflow: 'hidden' }}>
+          {/* Header row */}
+          <div style={{ display: 'grid', gridTemplateColumns: '72px 280px 1fr 100px', padding: '10px 20px', borderBottom: '1px solid rgba(255,255,255,0.06)', fontSize: 10, fontWeight: 800, color: 'rgba(255,255,255,0.3)', letterSpacing: '0.1em' }}>
+            <span>METHOD</span><span>ENDPOINT</span><span>DESCRIPTION</span><span>CATEGORY</span>
+          </div>
+          {ENDPOINTS.map((ep, i) => (
+            <div key={i} className="ep-row" style={{ display: 'grid', gridTemplateColumns: '72px 280px 1fr 100px', padding: '12px 20px', borderBottom: i < ENDPOINTS.length - 1 ? '1px solid rgba(255,255,255,0.04)' : 'none', alignItems: 'center', cursor: 'pointer', transition: 'background 0.15s' }}>
+              <span style={{ fontSize: 10, fontWeight: 800, color: ep.method === 'WS' ? '#F59E0B' : ep.method === 'GET' ? '#10B981' : '#1B4FFF', fontFamily: 'monospace', letterSpacing: '0.05em' }}>{ep.method}</span>
+              <span style={{ fontSize: 12, color: '#93B4FF', fontFamily: 'monospace' }}>{ep.path}</span>
+              <span style={{ fontSize: 13, color: 'rgba(255,255,255,0.55)' }}>{ep.desc}</span>
+              <span style={{ display: 'inline-flex', padding: '2px 8px', borderRadius: 5, background: `${BADGE_COLORS[ep.badge]}15`, border: `1px solid ${BADGE_COLORS[ep.badge]}30`, fontSize: 10, fontWeight: 700, color: BADGE_COLORS[ep.badge], width: 'fit-content' }}>{ep.badge}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* ── RESPONSE EXPLORER ── */}
+      <div style={{ maxWidth: 1200, margin: '0 auto', padding: '72px 32px 0' }}>
+        <div style={{ display: 'flex', gap: 60, alignItems: 'flex-start', flexWrap: 'wrap' }}>
+          <div style={{ flex: 1, minWidth: 280 }}>
+            <div style={{ fontSize: 11, fontWeight: 800, color: '#93B4FF', letterSpacing: '0.1em', marginBottom: 10 }}>FINANCIAL STATEMENTS API</div>
+            <h2 style={{ fontSize: 'clamp(22px,2.5vw,34px)', fontWeight: 900, letterSpacing: '-0.02em', color: '#fff', marginBottom: 16 }}>Source-linked financials, parsed from XBRL</h2>
+            <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: 15, lineHeight: 1.65, marginBottom: 28 }}>Every data point is hyperlinked to its original SEC filing. Income statements, balance sheets, and cash flow data standardised across 10,000+ companies — comparable quarter by quarter.</p>
+            <ul style={{ listStyle: 'none', padding: 0 }}>
+              {[
+                'XBRL-parsed and mapped to standard concepts',
+                'Hyperlinked citations to source filings',
+                'Annual and quarterly granularity',
+                'Derived KPIs: margins, growth rates, ratios',
+                '10+ years of history per company',
+              ].map(f => (
+                <li key={f} style={{ display: 'flex', alignItems: 'flex-start', gap: 10, marginBottom: 10, fontSize: 14, color: 'rgba(255,255,255,0.65)' }}>
+                  <svg style={{ flexShrink: 0, marginTop: 2 }} width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#1B4FFF" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                  {f}
+                </li>
+              ))}
+            </ul>
+          </div>
+          <div style={{ flex: 1.2, minWidth: 320 }}>
+            <div style={{ display: 'flex', gap: 2, marginBottom: 8 }}>
+              {(['response', 'request'] as const).map(t => (
+                <button key={t} onClick={() => setActiveTab(t)}
+                  style={{ padding: '5px 14px', borderRadius: 7, background: activeTab === t ? '#1B4FFF' : 'rgba(255,255,255,0.05)', border: 'none', color: activeTab === t ? '#fff' : 'rgba(255,255,255,0.4)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit', textTransform: 'capitalize' }}>
+                  {t}
+                </button>
+              ))}
+            </div>
+            <CodeBlock lang="JSON" code={activeTab === 'response' ? JSON_RESPONSE : `GET /v1/fundamentals/financials?ticker=AAPL&period=Q4+2024&type=all\nAuthorization: Bearer YOUR_API_KEY\nContent-Type: application/json`} />
           </div>
         </div>
       </div>
 
-      <div style={{ maxWidth:1100, margin:'0 auto', padding:'28px 32px' }}>
+      {/* ── FEATURE GRID ── */}
+      <div style={{ maxWidth: 1200, margin: '0 auto', padding: '72px 32px 0' }}>
+        <div style={{ textAlign: 'center', marginBottom: 48 }}>
+          <h2 style={{ fontSize: 'clamp(24px,3vw,38px)', fontWeight: 900, letterSpacing: '-0.02em', color: '#fff', marginBottom: 12 }}>Built for the way developers actually work</h2>
+        </div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(280px, 1fr))', gap: 16 }}>
+          {[
+            { icon: '⚡', title: 'Nanosecond precision', desc: 'Every trade and quote message timestamped at the nanosecond. Reconstruct order books, validate fills, backtest with total fidelity.' },
+            { icon: '📚', title: 'Client SDKs', desc: 'Official libraries for Python, JavaScript/TypeScript, Go, and Java. Or use any HTTP client with our well-documented REST API.' },
+            { icon: '🔁', title: 'WebSocket streaming', desc: 'Subscribe to real-time trade and quote streams. Built on a HA messaging layer — no dropped ticks, no reconnect hell.' },
+            { icon: '📊', title: 'Flat file exports', desc: 'Bulk download via S3 or SFTP. Pre-partitioned parquet and CSV files for every asset class, updated after market close.' },
+            { icon: '🛡️', title: 'Data redundancy', desc: 'Two fully isolated networks ingest and process all exchange feeds. Failover in milliseconds. 99.9% uptime SLA on paid plans.' },
+            { icon: '🔑', title: 'Transparent pricing', desc: 'No surprises, no per-call fees on paid tiers. Unlimited API calls from $29/mo. Cancel anytime — no annual lock-in required.' },
+          ].map(f => (
+            <div key={f.title} style={{ background: 'rgba(255,255,255,0.02)', border: '1px solid rgba(255,255,255,0.06)', borderRadius: 14, padding: '24px', transition: 'border-color 0.15s' }}
+              onMouseEnter={e => e.currentTarget.style.borderColor = 'rgba(27,79,255,0.3)'}
+              onMouseLeave={e => e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)'}
+            >
+              <div style={{ fontSize: 28, marginBottom: 12 }}>{f.icon}</div>
+              <h3 style={{ fontSize: 15, fontWeight: 800, color: '#fff', marginBottom: 8 }}>{f.title}</h3>
+              <p style={{ fontSize: 13, color: 'rgba(255,255,255,0.45)', lineHeight: 1.65, margin: 0 }}>{f.desc}</p>
+            </div>
+          ))}
+        </div>
+      </div>
 
-        {/* ── REST API ── */}
-        {activeTab === 'rest' && (
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 360px', gap:24 }}>
-            <div>
-              <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:16 }}>
-                <h2 style={{ fontSize:16, fontWeight:800, color:'#0A1628' }}>Endpoints</h2>
-                <span style={{ fontSize:11, padding:'2px 8px', borderRadius:999, background:'#EEF3FF', color:'#1B4FFF', fontWeight:700 }}>{API_ENDPOINTS.length} endpoints</span>
-              </div>
-              {API_ENDPOINTS.map((e,i) => <EndpointCard key={i} {...e} />)}
-            </div>
-            <div>
-              <div style={{ background:'#0D1117', borderRadius:12, padding:'16px', marginBottom:16, position:'sticky', top:20 }}>
-                <div style={{ fontSize:12, fontWeight:700, color:'rgba(255,255,255,0.4)', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:12 }}>Quick Start</div>
-                <Code lang="curl" code={CURL_QUOTE} />
-                <Code lang="curl — AI Research" code={CURL_AI} />
-                <div style={{ background:'rgba(27,79,255,0.1)', border:'1px solid rgba(27,79,255,0.3)', borderRadius:8, padding:'10px 12px', marginTop:8 }}>
-                  <p style={{ fontSize:11.5, color:'rgba(255,255,255,0.6)', lineHeight:1.5, margin:0 }}>
-                    Replace <code style={{ color:'#93B4FF' }}>YOUR_API_KEY</code> with your key from the API Keys tab. Base URL: <code style={{ color:'#93B4FF' }}>https://finsyt-platform.vercel.app</code>
-                  </p>
-                </div>
-              </div>
-            </div>
+      {/* ── PRICING ── */}
+      <div style={{ maxWidth: 1200, margin: '0 auto', padding: '80px 32px 0' }}>
+        <div style={{ textAlign: 'center', marginBottom: 40 }}>
+          <div style={{ fontSize: 11, fontWeight: 800, color: '#93B4FF', letterSpacing: '0.1em', marginBottom: 10 }}>PRICING</div>
+          <h2 style={{ fontSize: 'clamp(24px,3vw,38px)', fontWeight: 900, letterSpacing: '-0.02em', color: '#fff', marginBottom: 12 }}>Simple pricing. Instant access.</h2>
+          <p style={{ color: 'rgba(255,255,255,0.4)', fontSize: 15 }}>Unlimited access. Cancel anytime. No credit card required for the free tier.</p>
+          {/* Toggle */}
+          <div style={{ display: 'inline-flex', alignItems: 'center', gap: 12, marginTop: 20, background: 'rgba(255,255,255,0.04)', borderRadius: 10, padding: '5px 8px' }}>
+            <button onClick={() => setBillingAnnual(false)} style={{ padding: '5px 14px', borderRadius: 7, background: !billingAnnual ? '#1B4FFF' : 'transparent', border: 'none', color: !billingAnnual ? '#fff' : 'rgba(255,255,255,0.4)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Monthly</button>
+            <button onClick={() => setBillingAnnual(true)} style={{ padding: '5px 14px', borderRadius: 7, background: billingAnnual ? '#1B4FFF' : 'transparent', border: 'none', color: billingAnnual ? '#fff' : 'rgba(255,255,255,0.4)', fontSize: 12, fontWeight: 600, cursor: 'pointer', fontFamily: 'inherit' }}>Annually</button>
+            {billingAnnual && <span style={{ fontSize: 11, fontWeight: 700, color: '#10B981', background: 'rgba(16,185,129,0.1)', padding: '2px 8px', borderRadius: 6 }}>Save 20%</span>}
           </div>
-        )}
+        </div>
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap', alignItems: 'stretch' }}>
+          {PRICING.map(p => <PricingCard key={p.name} {...p} />)}
+        </div>
+      </div>
 
-        {/* ── MCP ── */}
-        {activeTab === 'mcp' && (
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 380px', gap:24 }}>
-            <div>
-              <div style={{ background:'#fff', border:'1px solid #E8EDF4', borderRadius:12, padding:'20px 22px', marginBottom:16 }}>
-                <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:6 }}>
-                  <span style={{ fontSize:22 }}>🔗</span>
-                  <h2 style={{ fontSize:15, fontWeight:800, color:'#0A1628' }}>Model Context Protocol (MCP)</h2>
-                </div>
-                <p style={{ fontSize:13, color:'#7D8FA9', lineHeight:1.6 }}>
-                  Connect Finsyt data directly into Claude, Cursor, Windsurf, and any MCP-compatible LLM client. Your AI gets live stock quotes, financials, transcripts, filings, and macro data — no copy-paste required.
-                </p>
-              </div>
-
-              {/* MCP Tools */}
-              <div style={{ background:'#fff', border:'1px solid #E8EDF4', borderRadius:12, padding:'20px 22px', marginBottom:16 }}>
-                <div style={{ fontSize:13, fontWeight:800, color:'#0A1628', marginBottom:14 }}>Available MCP Tools</div>
-                {[
-                  { name:'get_stock_quote',        icon:'📈', desc:'Real-time price, change, PE, margin, market cap' },
-                  { name:'get_financials',          icon:'📊', desc:'Income statement, balance sheet, cash flow, ratios' },
-                  { name:'get_news',                icon:'📰', desc:'Company or market news with sentiment tags' },
-                  { name:'get_macro_data',          icon:'🌍', desc:'Fed rate, CPI, GDP, yield curve, VIX from FRED' },
-                  { name:'get_earnings_transcript', icon:'📋', desc:'Earnings call transcript with speaker segmentation' },
-                  { name:'get_filings',             icon:'📄', desc:'SEC 10-K, 10-Q, 8-K with direct document URLs' },
-                  { name:'search_companies',        icon:'🔍', desc:'Search by name or ticker fragment' },
-                  { name:'screen_stocks',           icon:'⚙️', desc:'Filter by sector, market cap, exchange, beta' },
-                ].map(t => (
-                  <div key={t.name} style={{ display:'flex', alignItems:'center', gap:12, padding:'9px 0', borderBottom:'1px solid #F5F7FB' }}>
-                    <span style={{ fontSize:16 }}>{t.icon}</span>
-                    <div>
-                      <code style={{ fontSize:12, fontWeight:700, color:'#1B4FFF' }}>{t.name}</code>
-                      <p style={{ fontSize:11.5, color:'#7D8FA9', margin:0, marginTop:1 }}>{t.desc}</p>
-                    </div>
-                  </div>
-                ))}
-              </div>
-
-              {/* Claude API example */}
-              <div style={{ background:'#fff', border:'1px solid #E8EDF4', borderRadius:12, padding:'20px 22px' }}>
-                <div style={{ fontSize:13, fontWeight:800, color:'#0A1628', marginBottom:12 }}>Use in Claude API (Python)</div>
-                <Code lang="python" code={MCP_PYTHON} />
-              </div>
-            </div>
-
-            <div>
-              {/* Claude Desktop config */}
-              <div style={{ background:'#0D1117', borderRadius:12, padding:'16px', marginBottom:16, position:'sticky', top:20 }}>
-                <div style={{ fontSize:12, fontWeight:700, color:'rgba(255,255,255,0.4)', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:12 }}>Claude Desktop — claude_desktop_config.json</div>
-                <Code lang="json" code={MCP_CONFIG} />
-                <div style={{ display:'flex', flexDirection:'column', gap:8, marginTop:8 }}>
-                  {[
-                    { app:'Claude Desktop', icon:'🤖', path:'~/Library/Application Support/Claude/claude_desktop_config.json' },
-                    { app:'Cursor',         icon:'⌨️', path:'.cursor/mcp.json in project root' },
-                    { app:'Windsurf',       icon:'🏄', path:'~/.codeium/windsurf/mcp_config.json' },
-                    { app:'Cline',          icon:'🖥', path:'VS Code settings → MCP Servers' },
-                  ].map(item => (
-                    <div key={item.app} style={{ display:'flex', gap:10, padding:'8px 10px', background:'rgba(255,255,255,0.04)', borderRadius:7 }}>
-                      <span style={{ fontSize:14 }}>{item.icon}</span>
-                      <div>
-                        <div style={{ fontSize:11.5, fontWeight:700, color:'rgba(255,255,255,0.75)' }}>{item.app}</div>
-                        <div style={{ fontSize:10, color:'rgba(255,255,255,0.35)', fontFamily:'monospace' }}>{item.path}</div>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-                <div style={{ marginTop:12, padding:'10px 12px', background:'rgba(27,79,255,0.12)', border:'1px solid rgba(27,79,255,0.25)', borderRadius:8 }}>
-                  <p style={{ fontSize:11.5, color:'rgba(255,255,255,0.55)', lineHeight:1.5, margin:0 }}>MCP endpoint: <code style={{ color:'#93B4FF' }}>https://finsyt-platform.vercel.app/api/mcp</code></p>
-                </div>
-              </div>
-            </div>
+      {/* ── CTA FOOTER ── */}
+      <div style={{ maxWidth: 1200, margin: '0 auto', padding: '80px 32px 64px', textAlign: 'center' }}>
+        <div style={{ background: 'linear-gradient(135deg, rgba(27,79,255,0.12) 0%, rgba(6,182,212,0.08) 100%)', border: '1px solid rgba(27,79,255,0.2)', borderRadius: 20, padding: '56px 32px' }}>
+          <h2 style={{ fontSize: 'clamp(22px,3vw,38px)', fontWeight: 900, letterSpacing: '-0.02em', color: '#fff', marginBottom: 14 }}>Start building in minutes</h2>
+          <p style={{ color: 'rgba(255,255,255,0.45)', fontSize: 16, marginBottom: 32, maxWidth: 440, margin: '0 auto 32px' }}>No credit card. No waiting. Your free API key unlocks 2 years of historical data and real reference data instantly.</p>
+          <div style={{ display: 'flex', gap: 12, justifyContent: 'center', flexWrap: 'wrap' }}>
+            <button style={{ padding: '14px 32px', background: 'linear-gradient(135deg,#1B4FFF,#2563EB)', border: 'none', borderRadius: 10, color: '#fff', fontWeight: 800, fontSize: 15, cursor: 'pointer', fontFamily: 'inherit', boxShadow: '0 4px 20px rgba(27,79,255,0.4)' }}>Get free API key →</button>
+            <button style={{ padding: '14px 32px', background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: 10, color: 'rgba(255,255,255,0.7)', fontWeight: 600, fontSize: 15, cursor: 'pointer', fontFamily: 'inherit' }}>Read documentation</button>
           </div>
-        )}
-
-        {/* ── SDKs ── */}
-        {activeTab === 'sdks' && (
-          <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:20 }}>
-            <div style={{ background:'#fff', border:'1px solid #E8EDF4', borderRadius:12, padding:'20px 22px' }}>
-              <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:14 }}>
-                <span style={{ fontSize:20 }}>📦</span>
-                <div>
-                  <div style={{ fontSize:14, fontWeight:800, color:'#0A1628' }}>JavaScript / TypeScript</div>
-                  <code style={{ fontSize:11, color:'#7D8FA9' }}>npm install @finsyt/js</code>
-                </div>
-                <span style={{ marginLeft:'auto', fontSize:11, padding:'2px 8px', borderRadius:5, background:'#EEF3FF', color:'#1B4FFF', fontWeight:700 }}>Coming soon</span>
-              </div>
-              <Code lang="javascript" code={JS_EXAMPLE} />
-            </div>
-            <div style={{ background:'#fff', border:'1px solid #E8EDF4', borderRadius:12, padding:'20px 22px' }}>
-              <div style={{ display:'flex', alignItems:'center', gap:10, marginBottom:14 }}>
-                <span style={{ fontSize:20 }}>🐍</span>
-                <div>
-                  <div style={{ fontSize:14, fontWeight:800, color:'#0A1628' }}>Python</div>
-                  <code style={{ fontSize:11, color:'#7D8FA9' }}>pip install finsyt</code>
-                </div>
-                <span style={{ marginLeft:'auto', fontSize:11, padding:'2px 8px', borderRadius:5, background:'#EEF3FF', color:'#1B4FFF', fontWeight:700 }}>Coming soon</span>
-              </div>
-              <Code lang="python" code={PYTHON_EXAMPLE} />
-            </div>
-            <div style={{ gridColumn:'1/-1', background:'#F0F7F4', border:'1px solid #A7F3D0', borderRadius:12, padding:'16px 20px', display:'flex', alignItems:'center', gap:16 }}>
-              <span style={{ fontSize:24 }}>📬</span>
-              <div>
-                <div style={{ fontSize:13, fontWeight:700, color:'#065F46' }}>Join the SDK waitlist</div>
-                <p style={{ fontSize:12, color:'#047857', margin:0 }}>We are building native SDKs for Python, JS/TS, and a Langchain integration. Sign up to get early access.</p>
-              </div>
-              <button style={{ marginLeft:'auto', padding:'8px 18px', background:'#059669', color:'#fff', border:'none', borderRadius:8, fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'inherit', whiteSpace:'nowrap' }}>Join waitlist</button>
-            </div>
-          </div>
-        )}
-
-        {/* ── API Keys ── */}
-        {activeTab === 'keys' && (
-          <div style={{ maxWidth:700 }}>
-            <div style={{ background:'#fff', border:'1px solid #E8EDF4', borderRadius:12, padding:'20px 22px', marginBottom:16 }}>
-              <div style={{ fontSize:14, fontWeight:800, color:'#0A1628', marginBottom:14 }}>Your API Keys</div>
-              <div style={{ display:'flex', alignItems:'center', gap:10, padding:'12px 14px', background:'#F7F9FC', border:'1.5px solid #E8EDF4', borderRadius:9, marginBottom:8 }}>
-                <div style={{ width:8, height:8, borderRadius:'50%', background:'#059669', flexShrink:0 }} />
-                <div style={{ flex:1, minWidth:0 }}>
-                  <div style={{ fontSize:12, fontWeight:700, color:'#0A1628', marginBottom:2 }}>Production Key</div>
-                  <code style={{ fontSize:12, color:'#7D8FA9', fontFamily:'monospace' }}>{apiKey}</code>
-                </div>
-                <button onClick={() => { navigator.clipboard.writeText('fsy_live_demo_key'); setCopied(true); setTimeout(()=>setCopied(false),1400) }} style={{ padding:'5px 12px', background:copied?'#059669':'#F0F4FA', color:copied?'#fff':'#3D4F6E', border:'1.5px solid #E8EDF4', borderRadius:7, fontSize:11, fontWeight:700, cursor:'pointer', fontFamily:'inherit', transition:'all 0.2s' }}>
-                  {copied ? '✓ Copied' : 'Copy'}
-                </button>
-                <button style={{ padding:'5px 12px', background:'#FEF2F2', color:'#DC2626', border:'1.5px solid #FECACA', borderRadius:7, fontSize:11, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>Revoke</button>
-              </div>
-              <button style={{ display:'flex', alignItems:'center', gap:6, padding:'8px 14px', background:'#1B4FFF', color:'#fff', border:'none', borderRadius:8, fontSize:12, fontWeight:700, cursor:'pointer', fontFamily:'inherit' }}>
-                + Generate new key
-              </button>
-            </div>
-
-            {/* Rate limits */}
-            <div style={{ background:'#fff', border:'1px solid #E8EDF4', borderRadius:12, padding:'20px 22px', marginBottom:16 }}>
-              <div style={{ fontSize:14, fontWeight:800, color:'#0A1628', marginBottom:14 }}>Rate Limits & Quotas</div>
-              {[
-                { plan:'Free',         rpm:10,    monthly:'1,000',   endpoints:'Quote, Search, News' },
-                { plan:'Growth',       rpm:60,    monthly:'50,000',  endpoints:'All REST endpoints' },
-                { plan:'Pro',          rpm:300,   monthly:'500,000', endpoints:'All REST + MCP + AI Research' },
-                { plan:'Enterprise',   rpm:'∞',   monthly:'Custom',  endpoints:'All + Priority + SLA' },
-              ].map((p,i) => (
-                <div key={p.plan} style={{ display:'flex', alignItems:'center', gap:12, padding:'10px 0', borderBottom:i<3?'1px solid #F5F7FB':'none' }}>
-                  <div style={{ flex:1 }}>
-                    <div style={{ fontSize:13, fontWeight:700, color:'#0A1628' }}>{p.plan}</div>
-                    <div style={{ fontSize:11, color:'#B0BCD0' }}>{p.endpoints}</div>
-                  </div>
-                  <div style={{ textAlign:'right' }}>
-                    <div style={{ fontSize:12, fontWeight:700, color:'#0A1628' }}>{p.rpm} req/min</div>
-                    <div style={{ fontSize:11, color:'#B0BCD0' }}>{p.monthly}/mo</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-
-            {/* Usage */}
-            <div style={{ background:'#F0F7F4', border:'1px solid #A7F3D0', borderRadius:12, padding:'14px 18px' }}>
-              <div style={{ fontSize:12, fontWeight:700, color:'#065F46', marginBottom:6 }}>Current Usage — April 2026</div>
-              <div style={{ display:'flex', gap:20 }}>
-                {[{label:'API Calls',val:'3,127',delta:'+135 today'},{label:'Active Keys',val:'1',delta:''},{label:'Avg Latency',val:'112ms',delta:''}].map(s=>(
-                  <div key={s.label}>
-                    <div style={{ fontSize:18, fontWeight:900, color:'#0A1628' }}>{s.val}</div>
-                    <div style={{ fontSize:11, color:'#059669', fontWeight:600 }}>{s.delta||s.label}</div>
-                    {s.delta && <div style={{ fontSize:10, color:'#7D8FA9' }}>{s.label}</div>}
-                  </div>
-                ))}
-              </div>
-            </div>
-          </div>
-        )}
+        </div>
       </div>
     </div>
   )
