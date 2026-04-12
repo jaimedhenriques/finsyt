@@ -9,6 +9,13 @@ export default function Auth() {
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
 
+  const changeMode = (nextMode) => {
+    setMode(nextMode);
+    setSubmitted(false);
+    setError("");
+    setMessage("");
+  };
+
   const update = (k, v) => setForm(prev => ({ ...prev, [k]: v }));
 
   const supabase = useMemo(() => {
@@ -150,7 +157,7 @@ export default function Auth() {
           </h2>
           <div style={{ background: "#131929", border: "1px solid #1e2a42", borderRadius: 14, padding: 24 }}>
             <p style={{ color: "#c8cdd8", lineHeight: 1.7, fontSize: 15, marginBottom: 16 }}>
-              "Finsyt replaced three separate tools. Our macro review now takes 15 minutes instead of 2 hours."
+              &ldquo;Finsyt replaced three separate tools. Our macro review now takes 15 minutes instead of 2 hours.&rdquo;
             </p>
             <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
               <div style={{ width: 36, height: 36, borderRadius: "50%", background: "linear-gradient(135deg, #2563eb, #0d9488)", display: "flex", alignItems: "center", justifyContent: "center", fontWeight: 700 }}>S</div>
@@ -215,7 +222,7 @@ export default function Auth() {
                     <input type="password" placeholder="••••••••" value={form.password} onChange={e => update("password", e.target.value)} required />
                   </div>
                   <div style={{ textAlign: "right", marginTop: -8 }}>
-                    <a onClick={() => setMode("forgot")} style={{ fontSize: 13 }}>Forgot password?</a>
+                    <a onClick={() => changeMode("forgot")} style={{ fontSize: 13 }}>Forgot password?</a>
                   </div>
                   <button type="submit" className="btn-primary" disabled={loading}>{loading ? "Signing in..." : "Sign in →"}</button>
                 </form>
@@ -224,7 +231,7 @@ export default function Auth() {
               {!!error && <p style={{ color: "#f87171", fontSize: 13, marginTop: 14 }}>{error}</p>}
 
               <p style={{ textAlign: "center", fontSize: 14, color: "#8892aa", marginTop: 28 }}>
-                Don't have an account? <a onClick={() => setMode("signup")}>Sign up</a>
+                Don&apos;t have an account? <a onClick={() => changeMode("signup")}>Sign up</a>
               </p>
             </>
           )}
@@ -266,7 +273,7 @@ export default function Auth() {
               {!!error && <p style={{ color: "#f87171", fontSize: 13, marginTop: 14 }}>{error}</p>}
 
               <p style={{ textAlign: "center", fontSize: 14, color: "#8892aa", marginTop: 28 }}>
-                Already have an account? <a onClick={() => setMode("signin")}>Sign in</a>
+                Already have an account? <a onClick={() => changeMode("signin")}>Sign in</a>
               </p>
             </>
           )}
@@ -274,7 +281,7 @@ export default function Auth() {
           {mode === "forgot" && (
             <>
               <h1 style={{ fontSize: 28, fontWeight: 800, letterSpacing: "-0.02em", marginBottom: 8 }}>Reset password</h1>
-              <p style={{ color: "#8892aa", fontSize: 15, marginBottom: 36 }}>Enter your email and we'll send you a reset link.</p>
+              <p style={{ color: "#8892aa", fontSize: 15, marginBottom: 36 }}>Enter your email and we&apos;ll send you a reset link.</p>
 
               {submitted ? (
                 <div style={{ background: "#131929", border: "1px solid #0d9488", borderRadius: 12, padding: 24, textAlign: "center" }}>
@@ -295,7 +302,7 @@ export default function Auth() {
               {!!error && <p style={{ color: "#f87171", fontSize: 13, marginTop: 14 }}>{error}</p>}
 
               <p style={{ textAlign: "center", fontSize: 14, color: "#8892aa", marginTop: 28 }}>
-                <a onClick={() => setMode("signin")}>← Back to sign in</a>
+                <a onClick={() => changeMode("signin")}>← Back to sign in</a>
               </p>
             </>
           )}
