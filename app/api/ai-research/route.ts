@@ -19,10 +19,10 @@ Your responses must:
 3. Always cite the source inline: (FMP), (EDGAR 10-K), (transcript Q4'26), (FRED), (consensus)
 4. Structure as: KEY FACTS → ANALYSIS → RISK FACTORS → SYNTHESIS
 5. Be concise but data-rich — target analysts and sophisticated investors
-6. If asked about a formula or metric, reference the Finsyt metric key (e.g. TOTAL_REV, EBITDA, FCF)
+6. If asked about a formula or metric, reference the Finsyt FQL key (e.g. FX_REV, FX_EBITDA, FX_FCF)
 7. Flag uncertainties — if data is stale or estimated, say so
 
-You have access to: FMP financials (IS/BS/CF/ratios), EODHD fundamentals, Finnhub real-time quotes, FRED macro data, FMP earnings transcripts, FMP/SEC filings, insider trade data, CIQ mnemonic dictionary.`
+You have access to: FMP financials (IS/BS/CF/ratios), EODHD fundamentals, Finnhub real-time quotes, FRED macro data, FMP earnings transcripts, FMP/SEC filings, insider trade data, Finsyt FQL formula dictionary.`
 
 // ── Context builders ──────────────────────────────────────────────────────────
 
@@ -67,14 +67,14 @@ async function getFinancialsContext(symbol: string): Promise<string> {
     const yoy = (cur: any, prev: any) => (cur && prev && prev !== 0) ? `${(((cur-prev)/Math.abs(prev))*100).toFixed(1)}% YoY` : ''
 
     return `FINANCIAL STATEMENTS (${symbol}, FY${i0.calendarYear || new Date().getFullYear() - 1}):
-INCOME STATEMENT (IQ_TOTAL_REV, IQ_EBITDA, IQ_NET_INC):
+INCOME STATEMENT (FX_REV, FX_EBITDA, FX_NET_INC):
   Revenue: ${fmt(i0.revenue)} ${yoy(i0.revenue, i1.revenue)} | Gross Margin: ${fmt(i0.grossProfitRatio, false)} | EBITDA: ${fmt(i0.ebitda)} (${fmt(i0.ebitdaratio, false)})
   EBIT: ${fmt(i0.operatingIncome)} | Net Income: ${fmt(i0.netIncome)} ${yoy(i0.netIncome, i1.netIncome)} | Net Margin: ${fmt(i0.netIncomeRatio, false)}
   EPS Diluted: $${i0.epsdiluted || 'N/A'} | R&D: ${fmt(i0.researchAndDevelopmentExpenses)} | SG&A: ${fmt(i0.sellingGeneralAndAdministrativeExpenses)}
-BALANCE SHEET (IQ_TOTAL_ASSETS, IQ_NET_DEBT, IQ_TOTAL_EQUITY):
+BALANCE SHEET (FX_ASSETS, FX_NET_DEBT, FX_EQUITY):
   Total Assets: ${fmt(b0.totalAssets)} | Cash: ${fmt(b0.cashAndCashEquivalents)} | Total Debt: ${fmt(b0.totalDebt)} | Net Debt: ${fmt(b0.netDebt)}
   Total Equity: ${fmt(b0.totalStockholdersEquity)} | Goodwill: ${fmt(b0.goodwill)} | Book Value/Share: $${b0.bookValuePerShare || 'N/A'}
-CASH FLOW (IQ_FREE_CASH_FLOW, IQ_CAPEX):
+CASH FLOW (FX_FCF, FX_CAPEX):
   Operating CF: ${fmt(c0.operatingCashFlow)} | CapEx: ${fmt(c0.capitalExpenditure)} | FCF: ${fmt(c0.freeCashFlow)} | Buybacks: ${fmt(c0.commonStockRepurchased)}
 KEY RATIOS:
   P/E: ${r0.priceEarningsRatio?.toFixed(1) || 'N/A'}x | EV/EBITDA: ${r0.enterpriseValueMultiple?.toFixed(1) || 'N/A'}x | P/B: ${r0.priceToBookRatio?.toFixed(1) || 'N/A'}x
@@ -96,7 +96,7 @@ async function getEstimatesContext(symbol: string): Promise<string> {
       .map((s: any) => `  ${s.date}: Actual $${s.actualEarningResult} vs Est $${s.estimatedEarning} (${s.actualEarningResult >= s.estimatedEarning ? 'BEAT +' : 'MISS '}${Math.abs(((s.actualEarningResult - s.estimatedEarning)/Math.abs(s.estimatedEarning))*100).toFixed(1)}%)`)
       .join('\n')
 
-    return `ANALYST ESTIMATES (IQ_EPS_AGG_EST, IQ_TOTAL_REV_AGG_EST):
+    return `ANALYST ESTIMATES (FE_EPS_EST, FE_REV_EST):
   NTM EPS Consensus: $${a0.estimatedEpsAvg || 'N/A'} (High: $${a0.estimatedEpsHigh || 'N/A'}, Low: $${a0.estimatedEpsLow || 'N/A'})
   NTM Revenue Consensus: $${a0.estimatedRevenueAvg ? (a0.estimatedRevenueAvg/1e9).toFixed(1)+'B' : 'N/A'}
   NTM EBITDA Consensus: $${a0.estimatedEbitdaAvg ? (a0.estimatedEbitdaAvg/1e9).toFixed(1)+'B' : 'N/A'}
