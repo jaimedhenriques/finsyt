@@ -40,8 +40,8 @@ function Nav() {
         </div>
         {/* Links */}
         <div style={{ display: 'flex', alignItems: 'center', gap: 32 }}>
-          {['Product','Data','Pricing','Company'].map(l => (
-            <a key={l} href="#" style={{ fontSize: 14, fontWeight: 500, color: '#374151', textDecoration: 'none', transition: 'color 0.15s' }}
+          {[{label:'Product',href:'#features'},{label:'Data',href:'#data'},{label:'Pricing',href:'/app/settings'},{label:'Docs',href:'/app/developer'}].map(({label:l,href}) => (
+            <a key={l} href={href} style={{ fontSize: 14, fontWeight: 500, color: '#374151', textDecoration: 'none', transition: 'color 0.15s' }}
               onMouseEnter={e => (e.currentTarget.style.color = '#1A56FF')}
               onMouseLeave={e => (e.currentTarget.style.color = '#374151')}>{l}</a>
           ))}
