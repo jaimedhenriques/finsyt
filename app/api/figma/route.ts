@@ -1,16 +1,24 @@
 import { NextRequest, NextResponse } from "next/server"
 import * as Figma from "figma-api"
 
-function getApi() {
-  const token = process.env.FIGMA_ACCESS_TOKEN
+function getApi(req: NextRequest) {
+  const cookieToken = req.cookies.get("figma_access_token")?.value
+  const envToken = process.env.FIGMA_ACCESS_TOKEN
+  const token = cookieToken || envToken
   if (!token) return null
+  if (cookieToken) {
+    return new Figma.Api({ oAuthToken: token })
+  }
   return new Figma.Api({ personalAccessToken: token })
 }
 
 export async function GET(req: NextRequest) {
-  const api = getApi()
+  const api = getApi(req)
   if (!api) {
-    return NextResponse.json({ error: "FIGMA_ACCESS_TOKEN not configured" }, { status: 503 })
+    return NextResponse.json({
+      error: "Not authenticated. Connect via Figma OAuth or set FIGMA_ACCESS_TOKEN.",
+      needsAuth: true,
+    }, { status: 401 })
   }
 
   const { searchParams } = new URL(req.url)
@@ -97,10 +105,41 @@ export async function GET(req: NextRequest) {
         return NextResponse.json(me)
       }
 
+      case "team-projects": {
+        const teamId = searchParams.get("team_id") || ""
+        if (!teamId) return NextResponse.json({ error: "team_id required" }, { status: 400 })
+        const projects = await api.getTeamProjects({ team_id: teamId })
+        return NextResponse.json(projects)
+      }
+
+      case "project-files": {
+        const projectId = searchParams.get("project_id") || ""
+        if (!projectId) return NextResponse.json({ error: "project_id required" }, { status: 400 })
+        const files = await api.getProjectFiles({ project_id: projectId })
+        return NextResponse.json(files)
+      }
+
+      case "component-sets": {
+        if (!fileKey) return NextResponse.json({ error: "file_key required" }, { status: 400 })
+        const sets = await api.getFileComponentSets({ file_key: fileKey })
+        return NextResponse.json({
+          componentSets: (sets.meta?.component_sets || []).map((cs: any) => ({
+            key: cs.key,
+            name: cs.name,
+            description: cs.description,
+            thumbnailUrl: cs.thumbnail_url,
+          })),
+        })
+      }
+
+      case "status": {
+        return NextResponse.json({ authenticated: true })
+      }
+
       default:
         return NextResponse.json({
           error: `Unknown action: ${action}`,
-          available: ["file", "components", "styles", "images", "nodes", "me"],
+          available: ["file", "components", "component-sets", "styles", "images", "nodes", "me", "team-projects", "project-files", "status"],
         }, { status: 400 })
     }
   } catch (e: any) {

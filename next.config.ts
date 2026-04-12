@@ -19,6 +19,9 @@ const nextConfig: NextConfig = {
     API_KEY_21ST:             process.env.API_KEY_21ST             || process.env._21st_api  || '',
     POSTGRES_URL:             process.env.POSTGRES_URL             || '',
     FIGMA_ACCESS_TOKEN:       process.env.FIGMA_ACCESS_TOKEN       || '',
+    FIGMA_CLIENT_ID:          process.env.FIGMA_CLIENT_ID          || '',
+    FIGMA_CLIENT_SECRET:      process.env.FIGMA_CLIENT_SECRET      || '',
+    NEXT_PUBLIC_FIGMA_CLIENT_ID: process.env.FIGMA_CLIENT_ID       || '',
   },
   async headers() {
     return [{
