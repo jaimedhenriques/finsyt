@@ -1,499 +1,360 @@
-"use client"
-
-import { useState, useEffect, useCallback, useRef } from "react"
+'use client'
+import { useState, useEffect, useCallback } from 'react'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
-interface CIQItem {
-  mne: string
+interface FqlMetric {
+  key: string
   name: string
-  ds: string
-  sg: string
-  gdsp: string
-  ff: string
-  def?: string
-}
-
-interface FormulaItem {
-  finsyt_key: string
-  display: string
   category: string
-  ciq_mnemonic: string
-  ciq_excel: string
-  eodhd_key: string
-  unit: string
-  format: string
-  description?: string
+  unit: 'USD' | '%' | 'x' | 'shares' | 'ratio'
+  periodRequired: boolean
+  fmpField: string
+  description: string
 }
 
-// ── GDSP parameter descriptions ───────────────────────────────────────────────
-const GDSP_PARAMS: Record<string, string> = {
-  PERIODTYPE: "FY = Annual, Q1/Q2/Q3/Q4 = Quarterly, NTM = Next Twelve Months, LTM = Last Twelve Months",
-  ASOFDATE: "Date in MM/DD/YYYY format or 0 for most recent",
-  CURRENCYID: "USD, EUR, GBP, JPY, etc.",
-  RESTATEMENTTYPEID: "0 = As Reported, 1 = Restated",
-  FILINGMODE: "0 = Filed, 1 = Estimated",
-  CONSOLIDATEDFLAG: "0 = Consolidated (default), 1 = Unconsolidated",
-  CURRENCYCONVERSIONMODEID: "0 = Historical Rate, 1 = End of Period",
-  STARTDATE: "Start date MM/DD/YYYY",
-  FREQUENCY: "A = Annual, Q = Quarterly, M = Monthly",
-}
-
-const PERIOD_TYPES = [
-  { label: "Annual (FY)", value: "A", desc: "Full fiscal year" },
-  { label: "Quarterly (Q1)", value: "Q1", desc: "First fiscal quarter" },
-  { label: "Quarterly (Q2)", value: "Q2", desc: "Second fiscal quarter" },
-  { label: "Last Twelve Months", value: "LTM", desc: "Rolling LTM period" },
-  { label: "Next Twelve Months", value: "NTM", desc: "Forward NTM estimate" },
+// ── Period options ─────────────────────────────────────────────────────────────
+const PERIODS = [
+  { label: 'Annual (A)',            value: 'A',   desc: 'Full fiscal year' },
+  { label: 'Quarterly (Q)',         value: 'Q',   desc: 'Most recent quarter' },
+  { label: 'Last Twelve Months',    value: 'LTM', desc: 'Rolling LTM' },
+  { label: 'Next Twelve Months',    value: 'NTM', desc: 'Forward estimate' },
 ]
 
-// ── CIQ Formula Builder ───────────────────────────────────────────────────────
-function FormulaBuilder({ item, onClose }: { item: CIQItem; onClose: () => void }) {
-  const [ticker, setTicker] = useState("AAPL")
-  const [period, setPeriod] = useState("A")
-  const [offset, setOffset] = useState("0")
-  const [currency, setCurrency] = useState("USD")
-  const [copied, setCopied] = useState(false)
+const OFFSETS = [
+  { label: 'Most recent (0)',       value: '0' },
+  { label: '1 period back (-1)',    value: '-1' },
+  { label: '2 periods back (-2)',   value: '-2' },
+  { label: '3 periods back (-3)',   value: '-3' },
+  { label: '4 periods back (-4)',   value: '-4' },
+]
 
-  const gdspParams = (item.gdsp || "").split(",").map(p => p.trim()).filter(Boolean)
-  const needsPeriod = gdspParams.includes("PERIODTYPE")
-  const needsCurrency = gdspParams.includes("CURRENCYID")
-  const needsDate = gdspParams.includes("ASOFDATE")
-  const noParams = item.gdsp === "NO PROPERTIES REQUIRED"
+const CATEGORY_LABELS: Record<string, string> = {
+  income_statement: 'Income Statement',
+  balance_sheet:    'Balance Sheet',
+  cash_flow:        'Cash Flow',
+  valuation:        'Valuation',
+  market:           'Market & Price',
+  growth:           'Growth',
+  estimates:        'Estimates',
+  ratios:           'Ratios',
+  dividends:        'Dividends',
+}
 
-  // Build the actual Excel formula
-  const buildFormula = () => {
-    const tickerRef = ticker || "B1"  // Cell reference or hardcoded
-    if (noParams) {
-      return `=CIQ("${item.mne}", "${tickerRef}")`
+const PREFIX_COLORS: Record<string, string> = {
+  FX: '#1B4FFF',
+  FV: '#7C3AED',
+  FM: '#0891B2',
+  FE: '#D97706',
+  FG: '#059669',
+  FR: '#DC2626',
+  FD: '#DB2777',
+}
+
+function prefixColor(key: string): string {
+  const pfx = key.slice(0, 2)
+  return PREFIX_COLORS[pfx] ?? '#6B7280'
+}
+
+// ── Formula Builder Modal ──────────────────────────────────────────────────────
+function FormulaBuilder({ metric, onClose }: { metric: FqlMetric; onClose: () => void }) {
+  const [ticker, setTicker]   = useState('AAPL')
+  const [period, setPeriod]   = useState('A')
+  const [offset, setOffset]   = useState('0')
+  const [copied, setCopied]   = useState(false)
+
+  const buildExcel = (): string => {
+    if (!metric.periodRequired) {
+      return `=FQL("${metric.key}", "${ticker}")`
     }
-    const params: string[] = []
-    if (needsPeriod) params.push(`"${period}"`)
-    if (needsDate) params.push(offset === "0" ? "0" : `"${offset}"`)
-    if (needsCurrency) params.push(`"${currency}"`)
-    return `=CIQ("${item.mne}", "${tickerRef}", ${params.join(", ")})`
+    return `=FQL("${metric.key}", "${ticker}", "${period}", ${offset})`
   }
 
-  // Build Finsyt API equivalent
-  const buildFinsytCall = () => {
-    const periodMap: Record<string, string> = { A: "annual", Q1: "quarterly", Q2: "quarterly", LTM: "ltm", NTM: "ntm" }
-    return `GET /api/financials?symbol=${ticker}&period=${periodMap[period] || "annual"}&metric=${item.mne.toLowerCase()}`
+  const buildApiUrl = (): string => {
+    const periodMap: Record<string, string> = { A: 'annual', Q: 'quarterly', LTM: 'ltm', NTM: 'ntm' }
+    const base = `/api/financials?symbol=${ticker}&metric=${metric.key}`
+    return metric.periodRequired ? `${base}&period=${periodMap[period] ?? 'annual'}&offset=${offset}` : base
   }
 
-  const formula = buildFormula()
+  const buildPython = (): string => {
+    if (!metric.periodRequired) {
+      return `fql.get("${metric.key}", ticker="${ticker}")`
+    }
+    return `fql.get("${metric.key}", ticker="${ticker}", period="${period}", offset=${offset})`
+  }
 
-  const copyFormula = () => {
-    navigator.clipboard.writeText(formula)
+  const formula = buildExcel()
+
+  const copy = (text: string) => {
+    navigator.clipboard.writeText(text)
     setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+    setTimeout(() => setCopied(false), 1800)
   }
+
+  const color = prefixColor(metric.key)
 
   return (
-    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-50 p-4" onClick={onClose}>
-      <div className="bg-[#0d1526] border border-blue-500/20 rounded-2xl w-full max-w-2xl shadow-2xl" onClick={e => e.stopPropagation()}>
+    <div
+      style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 50, padding: 16 }}
+      onClick={onClose}
+    >
+      <div
+        style={{ background: '#0d1526', border: '1px solid rgba(27,79,255,0.2)', borderRadius: 16, width: '100%', maxWidth: 640, boxShadow: '0 24px 80px rgba(0,0,0,0.6)' }}
+        onClick={e => e.stopPropagation()}
+      >
         {/* Header */}
-        <div className="flex items-start justify-between px-6 py-5 border-b border-blue-500/10">
-          <div>
-            <div className="flex items-center gap-2 mb-1">
-              <span className="px-2 py-0.5 bg-blue-500/15 rounded text-blue-300 text-xs font-mono">{item.mne}</span>
-              <span className="px-2 py-0.5 bg-[#0f1629] rounded text-white/40 text-xs">{item.ds}</span>
+        <div style={{ padding: '22px 24px 18px', borderBottom: '1px solid rgba(255,255,255,0.06)' }}>
+          <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+            <div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 6 }}>
+                <span style={{ fontFamily: 'monospace', fontSize: 14, fontWeight: 700, background: `${color}22`, color, padding: '3px 10px', borderRadius: 6, letterSpacing: '0.03em' }}>{metric.key}</span>
+                <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', background: 'rgba(255,255,255,0.06)', padding: '2px 8px', borderRadius: 5 }}>{CATEGORY_LABELS[metric.category] ?? metric.category}</span>
+              </div>
+              <div style={{ fontSize: 18, fontWeight: 700, color: '#fff' }}>{metric.name}</div>
+              {metric.description && <div style={{ fontSize: 13, color: 'rgba(255,255,255,0.4)', marginTop: 4 }}>{metric.description}</div>}
             </div>
-            <h2 className="text-white font-semibold text-lg">{item.name}</h2>
-            {item.def && <p className="text-white/40 text-sm mt-0.5">{item.def}</p>}
+            <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'rgba(255,255,255,0.3)', fontSize: 20, lineHeight: 1, padding: 4 }}>✕</button>
           </div>
-          <button onClick={onClose} className="text-white/30 hover:text-white/60 text-xl leading-none">✕</button>
         </div>
 
-        <div className="px-6 py-5 space-y-5">
-          {/* Parameters */}
-          <div className="grid grid-cols-2 gap-3">
+        {/* Builder */}
+        <div style={{ padding: '20px 24px', display: 'flex', flexDirection: 'column', gap: 16 }}>
+          <div style={{ display: 'grid', gridTemplateColumns: metric.periodRequired ? '1fr 1fr 1fr' : '1fr', gap: 12 }}>
             <div>
-              <label className="text-white/50 text-xs mb-1.5 block">Ticker / Cell Ref</label>
-              <input value={ticker} onChange={e => setTicker(e.target.value)}
+              <label style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: 6 }}>Ticker / Cell Ref</label>
+              <input
+                value={ticker}
+                onChange={e => setTicker(e.target.value)}
                 placeholder="AAPL or B1"
-                className="w-full bg-[#0a0f1e] border border-blue-500/20 rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-blue-500/50" />
+                style={{ width: '100%', background: '#080e1e', border: '1px solid rgba(27,79,255,0.2)', borderRadius: 8, padding: '8px 12px', color: '#fff', fontSize: 13, outline: 'none', boxSizing: 'border-box' }}
+              />
             </div>
-            {needsPeriod && (
-              <div>
-                <label className="text-white/50 text-xs mb-1.5 block">Period Type</label>
-                <select value={period} onChange={e => setPeriod(e.target.value)}
-                  className="w-full bg-[#0a0f1e] border border-blue-500/20 rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-blue-500/50">
-                  {PERIOD_TYPES.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
-                </select>
-              </div>
+            {metric.periodRequired && (
+              <>
+                <div>
+                  <label style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: 6 }}>Period</label>
+                  <select
+                    value={period}
+                    onChange={e => setPeriod(e.target.value)}
+                    style={{ width: '100%', background: '#080e1e', border: '1px solid rgba(27,79,255,0.2)', borderRadius: 8, padding: '8px 12px', color: '#fff', fontSize: 13, outline: 'none' }}
+                  >
+                    {PERIODS.map(p => <option key={p.value} value={p.value}>{p.label}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.4)', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: 6 }}>Offset</label>
+                  <select
+                    value={offset}
+                    onChange={e => setOffset(e.target.value)}
+                    style={{ width: '100%', background: '#080e1e', border: '1px solid rgba(27,79,255,0.2)', borderRadius: 8, padding: '8px 12px', color: '#fff', fontSize: 13, outline: 'none' }}
+                  >
+                    {OFFSETS.map(o => <option key={o.value} value={o.value}>{o.label}</option>)}
+                  </select>
+                </div>
+              </>
             )}
-            {needsDate && (
-              <div>
-                <label className="text-white/50 text-xs mb-1.5 block">Offset (0 = most recent)</label>
-                <input value={offset} onChange={e => setOffset(e.target.value)}
-                  placeholder="0, -1, -2..."
-                  className="w-full bg-[#0a0f1e] border border-blue-500/20 rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-blue-500/50" />
-              </div>
-            )}
-            {needsCurrency && (
-              <div>
-                <label className="text-white/50 text-xs mb-1.5 block">Currency</label>
-                <select value={currency} onChange={e => setCurrency(e.target.value)}
-                  className="w-full bg-[#0a0f1e] border border-blue-500/20 rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-blue-500/50">
-                  {["USD","EUR","GBP","JPY","CAD","AUD","CHF","HKD","SGD","BRL"].map(c => <option key={c}>{c}</option>)}
-                </select>
-              </div>
-            )}
           </div>
 
-          {/* Generated Formula */}
-          <div>
-            <div className="flex items-center justify-between mb-2">
-              <span className="text-white/50 text-xs">Finsyt Excel Formula</span>
-              <button onClick={copyFormula} className={`text-xs px-3 py-1 rounded-lg transition-all ${copied ? "bg-emerald-500/20 text-emerald-400" : "bg-blue-500/15 text-blue-300 hover:bg-blue-500/25"}`}>
-                {copied ? "✓ Copied" : "Copy"}
-              </button>
-            </div>
-            <div className="bg-[#0a0f1e] border border-blue-500/15 rounded-xl px-4 py-3">
-              <code className="text-blue-300 text-sm font-mono break-all">{formula}</code>
-            </div>
-          </div>
-
-          {/* Finsyt API equivalent */}
-          <div>
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-white/50 text-xs">Finsyt API Equivalent</span>
-              <span className="text-xs px-2 py-0.5 bg-emerald-500/10 border border-emerald-500/20 rounded text-emerald-400">Proprietary</span>
-            </div>
-            <div className="bg-[#0a0f1e] border border-emerald-500/15 rounded-xl px-4 py-3">
-              <code className="text-emerald-300 text-sm font-mono break-all">{buildFinsytCall()}</code>
-            </div>
-          </div>
-
-          {/* Parameters reference */}
-          {gdspParams.length > 0 && !noParams && (
-            <div>
-              <p className="text-white/50 text-xs mb-2">GDSP Parameters</p>
-              <div className="space-y-1.5">
-                {gdspParams.map(param => GDSP_PARAMS[param] && (
-                  <div key={param} className="flex gap-3 text-xs">
-                    <span className="text-blue-300/70 font-mono w-36 flex-shrink-0">{param}</span>
-                    <span className="text-white/40">{GDSP_PARAMS[param]}</span>
-                  </div>
-                ))}
+          {/* Formula outputs */}
+          {[
+            { label: 'Excel / Google Sheets', value: formula },
+            { label: 'REST API', value: buildApiUrl() },
+            { label: 'Python SDK', value: buildPython() },
+          ].map(({ label, value }) => (
+            <div key={label}>
+              <label style={{ fontSize: 11, fontWeight: 600, color: 'rgba(255,255,255,0.35)', textTransform: 'uppercase', letterSpacing: '0.06em', display: 'block', marginBottom: 6 }}>{label}</label>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <code style={{ flex: 1, background: '#060d1a', border: '1px solid rgba(255,255,255,0.08)', borderRadius: 8, padding: '10px 14px', fontSize: 13, color: '#93c5fd', fontFamily: 'monospace', wordBreak: 'break-all' }}>{value}</code>
+                <button
+                  onClick={() => copy(value)}
+                  style={{ flexShrink: 0, background: copied ? 'rgba(52,211,153,0.15)' : 'rgba(27,79,255,0.15)', border: 'none', borderRadius: 8, cursor: 'pointer', padding: '10px 14px', color: copied ? '#34d399' : '#93B4FF', fontSize: 12, fontWeight: 600 }}
+                >
+                  {copied ? '✓' : 'Copy'}
+                </button>
               </div>
             </div>
-          )}
-
-          {/* Identifiers */}
-          <div className="flex items-start gap-2 p-3 bg-[#0a0f1e] rounded-xl border border-white/5">
-            <span className="text-white/30 text-xs">Supported IDs:</span>
-            <span className="text-white/50 text-xs">{item.ff}</span>
-          </div>
+          ))}
         </div>
       </div>
     </div>
   )
 }
 
-// ── Main Page ─────────────────────────────────────────────────────────────────
-const DATASETS = ["All", "CIQ Financials", "CIQ Estimates", "Credit Analytics", "Market, Commodity & Macro Data", "Premium Company Data", "Pricing", "Compustat Financial Statements"]
-const BUCKETS: Record<string, string> = {
-  "All": "",
-  "CIQ Financials": "financials",
-  "Compustat Financial Statements": "financials",
-  "CIQ Estimates": "estimates",
-  "Credit Analytics": "credit",
-  "Market, Commodity & Macro Data": "market_macro",
-  "Pricing": "market_macro",
-  "Premium Company Data": "other",
-}
-
+// ── Main Page ──────────────────────────────────────────────────────────────────
 export default function FormulasPage() {
-  const [items, setItems] = useState<CIQItem[]>([])
-  const [filtered, setFiltered] = useState<CIQItem[]>([])
-  const [search, setSearch] = useState("")
-  const [selectedDS, setSelectedDS] = useState("All")
-  const [selected, setSelected] = useState<CIQItem | null>(null)
-  const [loading, setLoading] = useState(true)
-  const [loadedBuckets, setLoadedBuckets] = useState<Set<string>>(new Set())
-  const [formulaLib, setFormulaLib] = useState<Record<string, FormulaItem>>({})
-  const [activeTab, setActiveTab] = useState<"dictionary" | "library">("dictionary")
-  const [buildTicker, setBuildTicker] = useState("AAPL")
-  const [buildMetrics, setBuildMetrics] = useState<string[]>(["revenue", "ebitda", "net_income", "free_cash_flow"])
+  const [catalog, setCatalog]         = useState<FqlMetric[]>([])
+  const [filtered, setFiltered]       = useState<FqlMetric[]>([])
+  const [loading, setLoading]         = useState(true)
+  const [search, setSearch]           = useState('')
+  const [activeCategory, setCategory] = useState('All')
+  const [selected, setSelected]       = useState<FqlMetric | null>(null)
+  const [buildTicker, setBuildTicker] = useState('AAPL')
 
-  const searchRef = useRef<HTMLInputElement>(null)
-
-  // Load formula library
   useEffect(() => {
-    fetch("/data/formula_library.json").then(r => r.json()).then(setFormulaLib).catch(() => {})
-  }, [])
-
-  // Load initial data (top 500)
-  useEffect(() => {
-    setLoading(true)
-    fetch("/data/ciq_top500.json")
-      .then(r => r.json())
-      .then((data: CIQItem[]) => { setItems(data); setFiltered(data); setLoading(false) })
+    fetch('/api/financials/metrics')
+      .then(r => r.ok ? r.json() : null)
+      .then(d => {
+        if (d?.flat) {
+          setCatalog(d.flat)
+          setFiltered(d.flat)
+        }
+        setLoading(false)
+      })
       .catch(() => setLoading(false))
   }, [])
 
-  // Load full bucket when needed
-  const loadBucket = useCallback(async (ds: string) => {
-    const bucket = BUCKETS[ds]
-    if (!bucket || loadedBuckets.has(bucket)) return
-    setLoadedBuckets(prev => new Set([...prev, bucket]))
-    try {
-      const res = await fetch(`/data/ciq_${bucket}.json`)
-      const data: CIQItem[] = await res.json()
-      setItems(prev => {
-        const existing = new Set(prev.map(i => i.mne))
-        const newItems = data.filter(i => !existing.has(i.mne))
-        return [...prev, ...newItems]
-      })
-    } catch {}
-  }, [loadedBuckets])
-
-  // Filter logic
-  useEffect(() => {
-    let src = items
-    if (selectedDS !== "All") src = src.filter(i => i.ds === selectedDS || i.sg.includes(selectedDS))
-    if (search.length > 1) {
+  const filter = useCallback(() => {
+    let list = catalog
+    if (activeCategory !== 'All') list = list.filter(m => m.category === activeCategory)
+    if (search.trim()) {
       const q = search.toLowerCase()
-      src = src.filter(i =>
-        i.mne.toLowerCase().includes(q) ||
-        i.name.toLowerCase().includes(q) ||
-        (i.def || "").toLowerCase().includes(q) ||
-        i.sg.toLowerCase().includes(q)
-      )
+      list = list.filter(m => m.key.toLowerCase().includes(q) || m.name.toLowerCase().includes(q) || m.description.toLowerCase().includes(q))
     }
-    setFiltered(src.slice(0, 200))
-  }, [items, search, selectedDS])
+    setFiltered(list)
+  }, [catalog, search, activeCategory])
 
-  const handleDSChange = (ds: string) => {
-    setSelectedDS(ds)
-    loadBucket(ds)
-  }
+  useEffect(() => { filter() }, [filter])
 
-  const handleSearch = (val: string) => {
-    setSearch(val)
-    if (val.length > 1 && selectedDS === "All") {
-      // Load all buckets for full search
-      Object.values(BUCKETS).filter(Boolean).forEach(b => {
-        if (!loadedBuckets.has(b)) loadBucket(Object.keys(BUCKETS).find(k => BUCKETS[k] === b)!)
-      })
-    }
-  }
+  const categories = ['All', ...Array.from(new Set(catalog.map(m => m.category)))]
 
-  // Build Excel model from selected metrics
-  const buildExcelModel = () => {
-    const header = `Finsyt Formula Model — Generated by Finsyt\n` +
-      `Ticker in cell B1\n\n` +
-      `Metric\tFormula (FY0)\tFormula (FY-1)\tFormula (FY-2)\n`
-    const rows = buildMetrics.map(key => {
-      const m = formulaLib[key]
-      if (!m) return ""
-      const base = `=CIQ("${m.ciq_mnemonic}", $B$1`
-      return `${m.display}\t${base}, "A", 0, "USD")\t${base}, "A", -1, "USD")\t${base}, "A", -2, "USD")`
-    }).filter(Boolean).join("\n")
-    return header + rows
-  }
-
-  const downloadModel = () => {
-    const content = buildExcelModel()
-    const blob = new Blob([content], { type: "text/plain" })
-    const url = URL.createObjectURL(blob)
-    const a = document.createElement("a")
-    a.href = url; a.download = `finsyt_ciq_model_${buildTicker}.txt`
+  const exportModel = () => {
+    const header = `FQL Formula Model — ${buildTicker}\nGenerated by Finsyt | finsyt.io\n\n`
+    const rows = filtered.map(m => {
+      const base = `=FQL("${m.key}", "${buildTicker}"`
+      if (!m.periodRequired) return `${m.name}\t${base})`
+      return `${m.name}\t${base}, "A", 0)\t${base}, "A", -1)\t${base}, "A", -2)\t${base}, "A", -3)`
+    }).join('\n')
+    const blob = new Blob([header + rows], { type: 'text/plain' })
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(blob)
+    a.download = `finsyt_fql_model_${buildTicker}.txt`
     a.click()
   }
 
-  const CATEGORY_METRICS = Object.entries(formulaLib).reduce((acc, [key, val]) => {
-    if (!acc[val.category]) acc[val.category] = []
-    acc[val.category].push({ key, ...val })
-    return acc
-  }, {} as Record<string, any[]>)
-
   return (
-    <div className="flex flex-col h-screen bg-[#080d1a] text-white overflow-hidden">
+    <div className="page-content">
       {/* Header */}
-      <div className="px-6 py-4 border-b border-blue-500/10 flex items-center gap-4 flex-shrink-0">
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
         <div>
-          <h1 className="text-white font-semibold text-base">Formula Engine</h1>
-          <p className="text-white/30 text-xs">22 built-in metrics · Finsyt proprietary API · Excel formula builder</p>
+          <h1 className="page-title">FQL Formula Engine</h1>
+          <p style={{ fontSize: 13, color: '#7D8FA9', marginTop: 4 }}>
+            Finsyt Query Language — {catalog.length} proprietary mnemonics across financials, valuation, estimates, and market data
+          </p>
         </div>
-        <div className="ml-auto flex gap-2">
-          <button onClick={() => setActiveTab("dictionary")} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${activeTab === "dictionary" ? "bg-blue-500/20 text-blue-300" : "text-white/30 hover:text-white/60"}`}>
-            📖 Dictionary
-          </button>
-          <button onClick={() => setActiveTab("library")} className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-all ${activeTab === "library" ? "bg-blue-500/20 text-blue-300" : "text-white/30 hover:text-white/60"}`}>
-            🔧 Formula Builder
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{ fontSize: 12, color: 'rgba(255,255,255,0.4)', background: 'rgba(27,79,255,0.1)', border: '1px solid rgba(27,79,255,0.2)', padding: '4px 12px', borderRadius: 6, fontFamily: 'monospace' }}>
+            =FQL( )
+          </span>
+          <input
+            value={buildTicker}
+            onChange={e => setBuildTicker(e.target.value.toUpperCase())}
+            placeholder="Ticker for export"
+            style={{ background: 'rgba(255,255,255,0.05)', border: '1px solid rgba(255,255,255,0.12)', borderRadius: 8, padding: '7px 12px', color: '#fff', fontSize: 13, outline: 'none', width: 120 }}
+          />
+          <button onClick={exportModel} style={{ background: '#1B4FFF', border: 'none', borderRadius: 8, cursor: 'pointer', padding: '8px 16px', color: '#fff', fontSize: 13, fontWeight: 600 }}>
+            ↓ Export model
           </button>
         </div>
       </div>
 
-      {activeTab === "dictionary" ? (
-        <div className="flex flex-1 min-h-0">
-          {/* Left: filters */}
-          <div className="w-48 flex-shrink-0 border-r border-blue-500/10 overflow-y-auto py-3 px-2">
-            <p className="text-white/30 text-xs px-2 mb-2 uppercase tracking-wider">Data Set</p>
-            {DATASETS.map(ds => (
-              <button key={ds} onClick={() => handleDSChange(ds)}
-                className={`w-full text-left px-3 py-2 rounded-lg text-xs transition-all mb-0.5 ${selectedDS === ds ? "bg-blue-500/20 text-blue-300" : "text-white/40 hover:text-white/70 hover:bg-blue-500/5"}`}>
-                {ds}
-              </button>
-            ))}
+      {/* Prefix legend */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 8, marginBottom: 20 }}>
+        {Object.entries(PREFIX_COLORS).map(([pfx, color]) => (
+          <div key={pfx} style={{ display: 'flex', alignItems: 'center', gap: 5, background: `${color}12`, border: `1px solid ${color}33`, borderRadius: 6, padding: '3px 10px' }}>
+            <span style={{ fontFamily: 'monospace', fontSize: 11, fontWeight: 800, color }}>{pfx}_</span>
+            <span style={{ fontSize: 11, color: 'rgba(255,255,255,0.45)' }}>
+              {{ FX: 'Financials', FV: 'Valuation', FM: 'Market', FE: 'Estimates', FG: 'Growth', FR: 'Ratios', FD: 'Dividends' }[pfx]}
+            </span>
           </div>
+        ))}
+      </div>
 
-          {/* Main: search + results */}
-          <div className="flex-1 flex flex-col min-w-0">
-            {/* Search bar */}
-            <div className="px-4 py-3 border-b border-blue-500/10">
-              <div className="relative">
-                <input
-                  ref={searchRef}
-                  value={search}
-                  onChange={e => handleSearch(e.target.value)}
-                  placeholder="Search mnemonics, names, definitions... (e.g. IQ_EBITDA, revenue, EPS)"
-                  className="w-full bg-[#0f1629] border border-blue-500/15 hover:border-blue-500/30 focus:border-blue-500/50 rounded-xl pl-10 pr-4 py-2.5 text-sm text-white placeholder-white/20 outline-none transition-colors"
-                />
-                <svg className="absolute left-3 top-3 w-4 h-4 text-white/20" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                </svg>
-                {search && <button onClick={() => setSearch("")} className="absolute right-3 top-3 text-white/20 hover:text-white/50 text-sm">✕</button>}
-              </div>
-              <div className="flex items-center gap-3 mt-2">
-                <span className="text-white/25 text-xs">{filtered.length.toLocaleString()} results</span>
-                {search.length > 1 && filtered.length === 200 && <span className="text-white/20 text-xs">(showing first 200)</span>}
-                <span className="text-white/20 text-xs ml-auto">Click any row to build the Excel formula →</span>
-              </div>
-            </div>
+      {/* Search + category filter */}
+      <div style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap' }}>
+        <input
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Search mnemonics, names, definitions... (e.g. FX_EBITDA, revenue, margin)"
+          style={{ flex: 1, minWidth: 280, background: '#fff', border: '1.5px solid #E2E8F2', borderRadius: 9, padding: '9px 14px', fontSize: 13, color: '#0A1628', outline: 'none' }}
+        />
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap' }}>
+          {categories.map(cat => (
+            <button
+              key={cat}
+              onClick={() => setCategory(cat)}
+              style={{
+                padding: '7px 14px', borderRadius: 7, border: 'none', cursor: 'pointer', fontSize: 12, fontWeight: 600,
+                background: activeCategory === cat ? '#1B4FFF' : 'rgba(255,255,255,0.06)',
+                color: activeCategory === cat ? '#fff' : 'rgba(255,255,255,0.5)',
+              }}
+            >
+              {cat === 'All' ? 'All' : (CATEGORY_LABELS[cat] ?? cat)}
+            </button>
+          ))}
+        </div>
+      </div>
 
-            {/* Table */}
-            <div className="flex-1 overflow-y-auto">
-              {loading ? (
-                <div className="flex items-center justify-center h-32">
-                  <div className="text-white/30 text-sm animate-pulse">Loading dictionary...</div>
-                </div>
-              ) : (
-                <table className="w-full text-xs">
-                  <thead className="sticky top-0 bg-[#080d1a] border-b border-blue-500/10">
-                    <tr>
-                      <th className="text-left px-4 py-2.5 text-white/30 font-medium w-48">Mnemonic</th>
-                      <th className="text-left px-4 py-2.5 text-white/30 font-medium">Name</th>
-                      <th className="text-left px-4 py-2.5 text-white/30 font-medium w-48">Data Set</th>
-                      <th className="text-left px-4 py-2.5 text-white/30 font-medium w-24">Params</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {filtered.map((item, i) => (
-                      <tr key={item.mne + i}
-                        className="border-b border-blue-500/5 hover:bg-blue-500/5 cursor-pointer transition-colors group"
-                        onClick={() => setSelected(item)}>
-                        <td className="px-4 py-2.5">
-                          <code className="text-blue-300/80 group-hover:text-blue-300 font-mono text-xs">{item.mne}</code>
-                        </td>
-                        <td className="px-4 py-2.5 text-white/70 group-hover:text-white/90">{item.name}</td>
-                        <td className="px-4 py-2.5 text-white/30">{item.ds}</td>
-                        <td className="px-4 py-2.5">
-                          {item.gdsp && item.gdsp !== "NO PROPERTIES REQUIRED"
-                            ? <span className="text-yellow-400/50 text-xs">GDSP</span>
-                            : <span className="text-emerald-400/40 text-xs">simple</span>}
-                        </td>
-                      </tr>
-                    ))}
-                  </tbody>
-                </table>
-              )}
-            </div>
-          </div>
+      {/* Results count */}
+      <div style={{ fontSize: 12, color: 'rgba(255,255,255,0.3)', marginBottom: 14 }}>
+        {loading ? 'Loading catalog…' : `${filtered.length} of ${catalog.length} metrics`}
+      </div>
+
+      {/* Grid */}
+      {loading ? (
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 10 }}>
+          {Array.from({ length: 12 }).map((_, i) => (
+            <div key={i} style={{ height: 80, background: 'rgba(255,255,255,0.03)', borderRadius: 10, animation: 'pulse 1.5s ease-in-out infinite' }} />
+          ))}
         </div>
       ) : (
-        /* ── Formula Builder tab ── */
-        <div className="flex-1 overflow-y-auto px-6 py-6">
-          <div className="max-w-4xl mx-auto space-y-6">
-            {/* Ticker input */}
-            <div className="bg-[#0f1629] border border-blue-500/10 rounded-2xl p-5">
-              <h3 className="text-white/80 font-medium mb-3">Build Excel Model</h3>
-              <div className="flex items-center gap-3">
-                <div>
-                  <label className="text-white/40 text-xs block mb-1.5">Ticker</label>
-                  <input value={buildTicker} onChange={e => setBuildTicker(e.target.value.toUpperCase())}
-                    className="bg-[#0a0f1e] border border-blue-500/20 rounded-lg px-3 py-2 text-white text-sm outline-none focus:border-blue-500/50 w-32" />
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 10 }}>
+          {filtered.map(metric => {
+            const color = prefixColor(metric.key)
+            return (
+              <button
+                key={metric.key}
+                onClick={() => setSelected(metric)}
+                style={{
+                  display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 6,
+                  padding: '14px 16px', background: 'rgba(255,255,255,0.02)',
+                  border: '1px solid rgba(255,255,255,0.06)', borderRadius: 10,
+                  cursor: 'pointer', textAlign: 'left', transition: 'all 0.12s',
+                }}
+                onMouseEnter={e => { e.currentTarget.style.background = 'rgba(27,79,255,0.07)'; e.currentTarget.style.borderColor = 'rgba(27,79,255,0.25)' }}
+                onMouseLeave={e => { e.currentTarget.style.background = 'rgba(255,255,255,0.02)'; e.currentTarget.style.borderColor = 'rgba(255,255,255,0.06)' }}
+              >
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', width: '100%' }}>
+                  <span style={{ fontFamily: 'monospace', fontSize: 12, fontWeight: 700, color, letterSpacing: '0.03em' }}>{metric.key}</span>
+                  <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.3)', background: 'rgba(255,255,255,0.06)', padding: '2px 7px', borderRadius: 4 }}>{metric.unit}</span>
                 </div>
-                <div className="flex-1">
-                  <label className="text-white/40 text-xs block mb-1.5">Selected Metrics ({buildMetrics.length})</label>
-                  <div className="flex flex-wrap gap-1.5">
-                    {buildMetrics.map(key => (
-                      <span key={key} className="flex items-center gap-1 px-2.5 py-1 bg-blue-500/15 border border-blue-500/20 rounded-lg text-blue-300 text-xs">
-                        {formulaLib[key]?.display || key}
-                        <button onClick={() => setBuildMetrics(p => p.filter(k => k !== key))} className="text-blue-300/50 hover:text-red-400">✕</button>
-                      </span>
-                    ))}
-                  </div>
-                </div>
-                <button onClick={downloadModel} className="px-4 py-2 bg-emerald-500/20 hover:bg-emerald-500/30 border border-emerald-500/25 rounded-xl text-emerald-300 text-sm font-medium transition-all flex-shrink-0">
-                  ↓ Download Model
-                </button>
-              </div>
-            </div>
-
-            {/* Metric picker by category */}
-            {Object.entries(CATEGORY_METRICS).map(([cat, metrics]) => (
-              <div key={cat} className="bg-[#0f1629] border border-blue-500/10 rounded-2xl p-5">
-                <h3 className="text-white/60 font-medium text-xs uppercase tracking-widest mb-3 capitalize">{cat.replace(/_/g, " ")}</h3>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
-                  {metrics.map((m: any) => {
-                    const selected = buildMetrics.includes(m.key)
-                    return (
-                      <button key={m.key}
-                        onClick={() => setBuildMetrics(p => selected ? p.filter(k => k !== m.key) : [...p, m.key])}
-                        className={`text-left px-3 py-2.5 rounded-xl border transition-all text-xs ${selected ? "bg-blue-500/20 border-blue-500/40 text-blue-200" : "bg-[#0a0f1e] border-blue-500/10 text-white/50 hover:border-blue-500/30 hover:text-white/70"}`}>
-                        <div className="font-medium mb-0.5">{m.display}</div>
-                        <div className="font-mono text-white/30 text-xs">{m.ciq_mnemonic}</div>
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
-            ))}
-
-            {/* Live preview */}
-            {buildMetrics.length > 0 && (
-              <div className="bg-[#0f1629] border border-blue-500/10 rounded-2xl p-5">
-                <div className="flex items-center justify-between mb-3">
-                  <h3 className="text-white/80 font-medium">Excel Formula Preview</h3>
-                  <button onClick={() => navigator.clipboard.writeText(buildExcelModel())} className="text-xs text-blue-400/60 hover:text-blue-400">Copy all</button>
-                </div>
-                <div className="bg-[#0a0f1e] rounded-xl p-4 overflow-x-auto">
-                  <table className="text-xs font-mono w-full">
-                    <thead>
-                      <tr className="text-white/30 border-b border-white/5">
-                        <th className="text-left py-1.5 pr-6">Metric</th>
-                        <th className="text-left py-1.5 pr-6">FY0 (Current)</th>
-                        <th className="text-left py-1.5 pr-6">FY-1</th>
-                        <th className="text-left py-1.5">FY-2</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {buildMetrics.map(key => {
-                        const m = formulaLib[key]
-                        if (!m) return null
-                        const base = `=CIQ("${m.ciq_mnemonic}", "${buildTicker || "$B$1"}"`
-                        return (
-                          <tr key={key} className="border-b border-white/5">
-                            <td className="py-1.5 pr-6 text-white/60">{m.display}</td>
-                            <td className="py-1.5 pr-6 text-blue-300/80">{base}, "A", 0, "USD")</td>
-                            <td className="py-1.5 pr-6 text-blue-300/60">{base}, "A", -1, "USD")</td>
-                            <td className="py-1.5 text-blue-300/40">{base}, "A", -2, "USD")</td>
-                          </tr>
-                        )
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-            )}
-          </div>
+                <div style={{ fontSize: 13, fontWeight: 600, color: '#fff' }}>{metric.name}</div>
+                {metric.description && <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.35)', lineHeight: 1.5 }}>{metric.description}</div>}
+              </button>
+            )
+          })}
         </div>
       )}
 
-      {/* Formula Builder Modal */}
-      {selected && <FormulaBuilder item={selected} onClose={() => setSelected(null)} />}
+      {/* FQL Quick Reference */}
+      <div style={{ marginTop: 40, background: 'rgba(27,79,255,0.05)', border: '1px solid rgba(27,79,255,0.15)', borderRadius: 12, padding: 24 }}>
+        <div style={{ fontSize: 13, fontWeight: 700, color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: '0.08em', marginBottom: 16 }}>FQL Quick Reference</div>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 10 }}>
+          {[
+            { label: 'Revenue (Annual, most recent)', formula: '=FQL("FX_REV", "AAPL", "A", 0)' },
+            { label: 'EBITDA Margin (Quarterly, last Q)', formula: '=FQL("FX_EBITDA_M", "NVDA", "Q", -1)' },
+            { label: 'EV/EBITDA (no period needed)', formula: '=FQL("FV_EV_EBITDA", "MSFT")' },
+            { label: 'EPS Estimate (NTM)', formula: '=FQL("FE_EPS_EST", "TSLA", "NTM", 0)' },
+            { label: 'Free Cash Flow (LTM)', formula: '=FQL("FX_FCF", "AMZN", "LTM", 0)' },
+            { label: 'Price Target (consensus)', formula: '=FQL("FE_PT", "GOOGL")' },
+          ].map(ex => (
+            <div key={ex.label} style={{ background: '#060d1a', borderRadius: 8, padding: '12px 14px' }}>
+              <div style={{ fontSize: 11, color: 'rgba(255,255,255,0.4)', marginBottom: 6 }}>{ex.label}</div>
+              <code style={{ fontSize: 12, color: '#93c5fd', fontFamily: 'monospace' }}>{ex.formula}</code>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {selected && <FormulaBuilder metric={selected} onClose={() => setSelected(null)} />}
     </div>
   )
 }
