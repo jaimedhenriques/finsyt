@@ -18,6 +18,17 @@ const nextConfig: NextConfig = {
     EODHD_API_KEY:            process.env.EODHD_API_KEY            || process.env.eodhd_api || '',
     API_KEY_21ST:             process.env.API_KEY_21ST             || process.env._21st_api  || '',
     POSTGRES_URL:             process.env.POSTGRES_URL             || '',
+    SUPABASE_URL:             process.env.SUPABASE_URL             || process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.finsyt_SUPABASE_URL || process.env.NEXT_PUBLIC_finsyt_finsytSUPABASE_URL || '',
+    SUPABASE_SERVICE_ROLE_KEY:process.env.SUPABASE_SERVICE_ROLE_KEY|| process.env.finsyt_SUPABASE_SERVICE_ROLE_KEY || process.env.finsyt_SUPABASE_SECRET_KEY || '',
+    SUPABASE_ANON_KEY:        process.env.SUPABASE_ANON_KEY        || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.finsyt_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_finsyt_finsytSUPABASE_ANON_KEY || '',
+    NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_finsyt_finsytSUPABASE_URL || '',
+    NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_finsyt_finsytSUPABASE_ANON_KEY || '',
+    POSTGRES_DATABASE:        process.env.POSTGRES_DATABASE        || process.env.finsyt_POSTGRES_DATABASE || '',
+    POSTGRES_HOST:            process.env.POSTGRES_HOST            || process.env.finsyt_POSTGRES_HOST || '',
+    POSTGRES_USER:            process.env.POSTGRES_USER            || process.env.finsyt_POSTGRES_USER || '',
+    POSTGRES_PASSWORD:        process.env.POSTGRES_PASSWORD        || process.env.finsyt_POSTGRES_PASSWORD || '',
+    POSTGRES_PRISMA_URL:      process.env.POSTGRES_PRISMA_URL      || process.env.finsyt_POSTGRES_PRISMA_URL || '',
+    POSTGRES_URL_NON_POOLING: process.env.POSTGRES_URL_NON_POOLING || process.env.finsyt_POSTGRES_URL_NON_POOLING || '',
   },
   async headers() {
     return [{
