@@ -1,5 +1,14 @@
 # Finsyt — Agent Coordination Guide
 
+## ⚠️ HARD RULES — Both Agents Must Follow
+
+1. **NO competitor name-drops** anywhere in the codebase or copy. Banned names: Capital IQ, Bloomberg Terminal, FactSet, Refinitiv, AlphaSense, Rogo, Compustat, Morningstar, Daloopa, Quartr, Hebbia. Use "institutional-grade" or describe Finsyt's own capabilities instead.
+2. **NO Capital IQ mnemonics (IQ_ prefix).** Use FQL exclusively: FX_, FV_, FM_, FE_, FG_, FR_, FD_ prefixes.
+3. **Coordinate via GitHub Issues.** If Base44 agent closes an issue, Cursor must not open a conflicting PR.
+
+---
+
+
 > PR #23 merged — `finsyt-platform/` and `pages/` are gone. Everyone edits under these paths only:
 
 ## Repo Structure (Single Source of Truth)
@@ -97,3 +106,4 @@ app/app/layout.tsx   ← wrap children with SessionProvider (or pass user server
 
 - **Base44:** direct push to `main` (scoped commits, no PRs)
 - **Cursor:** `cursor/<task>-<hash>` → PR → merge into `main`
+
