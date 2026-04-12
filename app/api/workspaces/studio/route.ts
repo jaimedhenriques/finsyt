@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
 import { generateText } from "ai"
 import { createAnthropic } from "@ai-sdk/anthropic"
-import { STORE } from "../ingest/route"
+import { getSourcesWithChunks } from "../store"
 
 const anthropic = createAnthropic({ apiKey: process.env.ANTHROPIC_API_KEY || "" })
 
@@ -47,15 +47,12 @@ Then add a 2-3 sentence interpretation of what the numbers indicate about busine
 
 export async function POST(req: NextRequest) {
   try {
-    const { type, sourceIds, sourceNames } = await req.json()
+    const { type, sourceIds } = await req.json()
 
     // Gather all chunks from selected sources
-    const allText = sourceIds
-      .map((id: string) => {
-        const source = STORE.get(id)
-        if (!source) return ""
-        return `=== ${source.name} ===\n${source.chunks.join("\n\n")}`
-      })
+    const sources = await getSourcesWithChunks(sourceIds || [])
+    const allText = sources
+      .map(source => `=== ${source.name} ===\n${source.chunks.join("\n\n")}`)
       .filter(Boolean)
       .join("\n\n")
 
