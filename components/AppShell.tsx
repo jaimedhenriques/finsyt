@@ -104,10 +104,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
   // Group nav by section
   const NAV_SECTIONS = [
-    { key: null, ids: ['overview', 'watchlist', 'alerts'] },
-    { key: 'research', ids: ['workspaces', 'formulas', 'research', 'screener', 'news', 'filings'] },
-    { key: 'data', ids: ['markets', 'deals', 'macro', 'private', 'discovery'] },
-    { key: 'developer', ids: ['widgets', 'developer'] },
+    { key: null, ids: ['research'] },
+    { key: 'markets', ids: ['watchlist', 'screener', 'news', 'filings', 'markets'] },
+    { key: 'intelligence', ids: ['private', 'discovery', 'macro', 'deals'] },
+    { key: 'tools', ids: ['formulas', 'workspaces', 'alerts', 'widgets', 'developer'] },
   ]
 
   return (

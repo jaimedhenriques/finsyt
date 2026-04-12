@@ -53,20 +53,19 @@ export interface NavItem {
 }
 
 export const DEFAULT_NAV: NavItem[] = [
-  { id:'overview',   href:'/app',           labelKey:'overview',    iconKey:'overview',    visible:true,  pinned:true },
+  { id:'research',   href:'/app/research',  labelKey:'ai_research', iconKey:'ai_research', visible:true, pinned:true },
   { id:'watchlist',  href:'/app/watchlist', labelKey:'watchlist',   iconKey:'watchlist',   visible:true },
-  { id:'alerts',     href:'/app/alerts',    labelKey:'alerts',      iconKey:'alerts',      badge:'3', visible:true },
-  { id:'workspaces', href:'/app/workspaces', labelKey:'workspaces', iconKey:'workspaces', visible:true },
-  { id:'formulas',    href:'/app/formulas',    labelKey:'formulas',    iconKey:'formulas',    visible:true },
-  { id:'research',   href:'/app/research',  labelKey:'ai_research', iconKey:'ai_research', visible:true },
   { id:'screener',   href:'/app/screener',  labelKey:'screener',    iconKey:'screener',    visible:true },
   { id:'news',       href:'/app/news',      labelKey:'news_signals',iconKey:'news_signals',visible:true },
   { id:'filings',    href:'/app/filings',   labelKey:'filings',     iconKey:'filings',     visible:true },
   { id:'markets',    href:'/app/markets',   labelKey:'markets',     iconKey:'markets',     visible:true },
-  { id:'deals',      href:'/app/deals',     labelKey:'deals',       iconKey:'deals',       visible:false },
   { id:'private',    href:'/app/private',   labelKey:'private',     iconKey:'private',     visible:true },
   { id:'discovery',  href:'/app/discovery', labelKey:'discovery',   iconKey:'discovery',   visible:true },
   { id:'macro',      href:'/app/macro',     labelKey:'macro',       iconKey:'macro',       visible:true },
+  { id:'deals',      href:'/app/deals',     labelKey:'deals',       iconKey:'deals',       visible:false },
+  { id:'formulas',    href:'/app/formulas',    labelKey:'formulas',    iconKey:'formulas',    visible:true },
+  { id:'workspaces', href:'/app/workspaces', labelKey:'workspaces', iconKey:'workspaces', visible:true },
+  { id:'alerts',     href:'/app/alerts',    labelKey:'alerts',      iconKey:'alerts',      badge:'3', visible:true },
   { id:'widgets',    href:'/app/widgets',   labelKey:'widgets',     iconKey:'widgets',     visible:true },
   { id:'developer',  href:'/app/developer', labelKey:'developer',   iconKey:'developer',   visible:true },
 ]

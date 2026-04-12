@@ -30,6 +30,8 @@ export const T: Record<Locale, Record<string, string>> = {
     developer: 'Developer API',
     settings: 'Settings',
     research: 'Research',
+    intelligence: 'Intelligence',
+    tools: 'Tools',
     company: 'Company',
     data: 'Data',
     // Home page
