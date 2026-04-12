@@ -64,6 +64,7 @@ export const DEFAULT_NAV: NavItem[] = [
   { id:'filings',    href:'/app/filings',   labelKey:'filings',     iconKey:'filings',     visible:true },
   { id:'markets',    href:'/app/markets',   labelKey:'markets',     iconKey:'markets',     visible:true },
   { id:'deals',      href:'/app/deals',     labelKey:'deals',       iconKey:'deals',       visible:false },
+  { id:'private',    href:'/app/private',   labelKey:'private',     iconKey:'private',     visible:true },
   { id:'macro',      href:'/app/macro',     labelKey:'macro',       iconKey:'macro',       visible:true },
   { id:'widgets',    href:'/app/widgets',   labelKey:'widgets',     iconKey:'widgets',     visible:true },
   { id:'developer',  href:'/app/developer', labelKey:'developer',   iconKey:'developer',   visible:true },
