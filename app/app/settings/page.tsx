@@ -5,10 +5,33 @@ export default function SettingsPage() {
   const [openaiKey, setOpenaiKey] = useState('')
   const [polygonKey, setPolygonKey] = useState('')
   const [saved, setSaved] = useState(false)
+  const [upgradeLoading, setUpgradeLoading] = useState(false)
+  const [upgradeError, setUpgradeError] = useState<string | null>(null)
 
   function save() {
     setSaved(true)
     setTimeout(() => setSaved(false), 2000)
+  }
+
+  async function startUpgradeCheckout(priceId: string) {
+    setUpgradeError(null)
+    setUpgradeLoading(true)
+    try {
+      const response = await fetch('/api/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ priceId }),
+      })
+      const payload = await response.json()
+      if (!response.ok || !payload?.url) {
+        throw new Error(payload?.error ?? 'Unable to start checkout session.')
+      }
+      window.location.href = payload.url as string
+    } catch (error) {
+      setUpgradeError(error instanceof Error ? error.message : 'Unexpected error starting checkout.')
+    } finally {
+      setUpgradeLoading(false)
+    }
   }
 
   return (
@@ -59,6 +82,49 @@ export default function SettingsPage() {
           <p>AI Engine: GPT-4o (when OpenAI key is connected)</p>
           <p>Built for founders, operators, and analysts who need institutional-quality intelligence without the institutional price tag.</p>
         </div>
+      </div>
+
+      <div className="card p-6 mt-5">
+        <div className="section-title">Plan & Billing</div>
+        <p className="text-sm mb-5" style={{ color: '#7D8FA9' }}>
+          Upgrade to Pro to unlock advanced workflows and premium intelligence.
+        </p>
+
+        <div className="grid gap-3 md:grid-cols-2">
+          <div className="rounded-xl border p-4" style={{ borderColor: '#D8E2F2', background: '#F9FBFF' }}>
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold" style={{ color: '#1C2B4A' }}>Free</h3>
+              <span className="badge badge-green">Current</span>
+            </div>
+            <p className="text-xs mt-2" style={{ color: '#7D8FA9' }}>
+              Core data feeds, watchlist, and basic research assistant access.
+            </p>
+          </div>
+
+          <div className="rounded-xl border p-4" style={{ borderColor: '#C7D7FF', background: '#EEF4FF' }}>
+            <div className="flex items-center justify-between">
+              <h3 className="text-sm font-semibold" style={{ color: '#1C2B4A' }}>Pro</h3>
+              <span className="badge">Recommended</span>
+            </div>
+            <p className="text-xs mt-2 mb-4" style={{ color: '#5B6F94' }}>
+              Pro-grade insights, deeper analysis workflows, and priority features.
+            </p>
+            <button
+              type="button"
+              className="btn btn-primary"
+              disabled={upgradeLoading}
+              onClick={() => startUpgradeCheckout('')}
+            >
+              {upgradeLoading ? 'Redirecting…' : 'Upgrade to Pro →'}
+            </button>
+          </div>
+        </div>
+
+        {upgradeError ? (
+          <p className="text-xs mt-3" style={{ color: '#D14343' }}>
+            {upgradeError}
+          </p>
+        ) : null}
       </div>
     </div>
   )
