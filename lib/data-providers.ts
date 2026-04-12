@@ -431,113 +431,171 @@ export function toEODSymbol(symbol: string): string {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// OpenWebNinja Real-Time Finance Data API
+// OpenWebNinja Real-Time Finance Data API  (Google Finance source)
 // ─────────────────────────────────────────────────────────────────────────────
-// Auth: X-Api-Key header on api.openwebninja.com
-// Symbol format: TICKER:EXCHANGE  e.g. AAPL:NASDAQ  TSLA:NASDAQ  HSBA:LSE
-// Includes: Google Finance real-time quotes, time series, forex, news,
-//           fundamentals (income stmt, balance sheet, cash flow, earnings)
-// FREE tier: 100 req/month  |  Paid from $9/month
+// Docs: https://www.openwebninja.com/api/real-time-finance-data/docs
+// Base: https://api.openwebninja.com/realtime-finance-data
+// Auth: x-api-key header (lowercase, as specified in OAS 3.0.3 docs)
+//
+// Symbol format: TICKER:EXCHANGE   e.g. AAPL:NASDAQ  TSLA:NASDAQ  HSBA:LON
+// Exchange codes from Google Finance: NASDAQ NYSE LON ETR EPA AMS TYO HKEX TSX ASX
+//
+// Endpoints (confirmed from OAS 3.0.3 docs):
+//   GET /search?query=                             → stocks, ETFs, indices, forex, crypto
+//   GET /market-trends?trend_type=                 → MARKET_INDEXES|MOST_ACTIVE|GAINERS|LOSERS|CRYPTO|CURRENCIES|CLIMATE_LEADERS
+//   GET /stock-quote?symbol=                       → real-time price + pre/post market
+//   GET /stock-time-series?symbol=&period=         → chart bars + key events (1D|5D|1M|6M|YTD|1Y|5Y|MAX)
+//   GET /stock-news?symbol=                        → related news articles
+//   GET /stock-overview?symbol=                    → company overview / fundamentals
+//   GET /stock-income-statement?symbol=            → quarterly + annual P&L
+//   GET /stock-balance-sheet?symbol=               → quarterly + annual balance sheet
+//   GET /stock-cash-flow?symbol=                   → quarterly + annual cash flow
+//   GET /currency-exchange-rate?from_symbol=&to_symbol=  → forex rate
+//   GET /currency-time-series?from_symbol=&to_symbol=&period=
+//   GET /currency-news?from_symbol=&to_symbol=
+//   GET /stock-quote-yahoo?symbol=                 → Yahoo Finance quote (no :EXCHANGE needed)
+//   GET /stock-time-series-yahoo?symbol=&period=   → Yahoo Finance chart
 // ─────────────────────────────────────────────────────────────────────────────
 
 const OWN_BASE = 'https://api.openwebninja.com/realtime-finance-data'
 
+/** Convert bare ticker to TICKER:EXCHANGE format for OWN API */
 export function ownSymbol(symbol: string, exchange?: string): string {
-  // If already formatted (contains :) return as-is
-  if (symbol.includes(':')) return symbol
-  // Auto-detect exchange suffix for international symbols
-  if (symbol.endsWith('.L'))  return `${symbol.replace('.L','  ')}:LSE`
-  if (symbol.endsWith('.TO')) return `${symbol.replace('.TO','')}:TSX`
-  if (symbol.endsWith('.AX')) return `${symbol.replace('.AX','')}:ASX`
-  if (symbol.endsWith('.PA')) return `${symbol.replace('.PA','')}:EPA`
-  if (symbol.endsWith('.AS')) return `${symbol.replace('.AS','')}:AMS`
-  if (symbol.endsWith('.DE')) return `${symbol.replace('.DE','')}:FRA`
-  if (symbol.endsWith('.HK')) return `${symbol.replace('.HK','')}:HKEX`
-  if (symbol.endsWith('.T'))  return `${symbol.replace('.T', '')}:TYO`
-  // Default to NASDAQ for bare US tickers (most common)
-  return exchange ? `${symbol}:${exchange}` : `${symbol}:NASDAQ`
+  if (symbol.includes(':')) return symbol  // already formatted
+
+  // Common Google Finance exchange codes by suffix
+  const suffixMap: Record<string, string> = {
+    '.L':   'LON',   // London Stock Exchange
+    '.TO':  'TSX',   // Toronto Stock Exchange
+    '.AX':  'ASX',   // Australian Securities Exchange
+    '.PA':  'EPA',   // Euronext Paris
+    '.AS':  'AMS',   // Euronext Amsterdam
+    '.DE':  'ETR',   // Deutsche Börse (Xetra)
+    '.MI':  'BIT',   // Borsa Italiana
+    '.MC':  'BME',   // Bolsa de Madrid
+    '.HK':  'HKEX',  // Hong Kong Exchange
+    '.T':   'TYO',   // Tokyo Stock Exchange
+    '.NS':  'NSE',   // National Stock Exchange India
+    '.BO':  'BSE',   // Bombay Stock Exchange
+    '.SS':  'SHA',   // Shanghai Stock Exchange
+    '.SZ':  'SHE',   // Shenzhen Stock Exchange
+    '.SW':  'VTX',   // SIX Swiss Exchange
+    '.BR':  'EBR',   // Euronext Brussels
+    '.LS':  'ELI',   // Euronext Lisbon
+    '.MX':  'BMV',   // Bolsa Mexicana de Valores
+    '.SA':  'BVMF',  // B3 Brazil
+    '.NZ':  'NZX',   // New Zealand Exchange
+  }
+
+  for (const [suffix, exch] of Object.entries(suffixMap)) {
+    if (symbol.toUpperCase().endsWith(suffix.toUpperCase())) {
+      const ticker = symbol.slice(0, -suffix.length)
+      return `${ticker.toUpperCase()}:${exch}`
+    }
+  }
+
+  // Default: assume NASDAQ for bare US tickers, override with exchange param
+  return `${symbol.toUpperCase()}:${exchange || 'NASDAQ'}`
 }
 
+/** Core fetcher — x-api-key (lowercase) as per OAS 3.0.3 docs */
 export async function ownFetch(endpoint: string, params: Record<string, string> = {}) {
   if (!PROVIDERS.own) return null
   const url = new URL(`${OWN_BASE}/${endpoint}`)
   Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v))
-  url.searchParams.set('language', 'en')
+  if (!params.language) url.searchParams.set('language', 'en')
   const res = await fetch(url.toString(), {
-    headers: { 'X-Api-Key': PROVIDERS.own },
+    headers: { 'x-api-key': PROVIDERS.own },
     next: { revalidate: 60 },
   })
-  if (!res.ok) throw new Error(`OWN ${endpoint} HTTP ${res.status}`)
-  return res.json()
+  if (!res.ok) throw new Error(`OWN /${endpoint} HTTP ${res.status}`)
+  const data = await res.json()
+  if (data?.message === 'Unauthorized') throw new Error('OWN: Unauthorized — check OPENWEBNINJA_API_KEY')
+  return data
 }
 
-/** Real-time quote — Google Finance sourced */
+// ─── Quote ───────────────────────────────────────────────────────────────────
+
+/** Real-time stock/index/ETF/crypto quote — Google Finance source */
 export async function ownQuote(symbol: string, exchange?: string) {
   const data = await ownFetch('stock-quote', { symbol: ownSymbol(symbol, exchange) })
-  if (!data?.price) return null
+  const q = data?.data
+  if (!q?.price) return null
   return {
-    symbol:                  data.symbol,
-    price:                   data.price,
-    open:                    data.open,
-    high:                    data.high,
-    low:                     data.low,
-    prevClose:               data.previous_close,
-    change:                  data.change,
-    changePct:               data.change_percent,
-    prePostMarket:           data.pre_or_post_market,
-    prePostMarketChange:     data.pre_or_post_market_change,
-    prePostMarketChangePct:  data.pre_or_post_market_change_percent,
-    volume:                  data.volume,
-    name:                    data.name,
-    type:                    data.type,
-    lastUpdate:              data.last_update_utc,
-    source:                  'openwebninja',
+    symbol:                 q.symbol,
+    name:                   q.name,
+    type:                   q.type,
+    price:                  q.price,
+    open:                   q.open,
+    high:                   q.high,
+    low:                    q.low,
+    volume:                 q.volume,
+    prevClose:              q.previous_close,
+    change:                 q.change,
+    changePct:              q.change_percent,
+    prePostMarket:          q.pre_or_post_market,
+    prePostMarketChange:    q.pre_or_post_market_change,
+    prePostMarketChangePct: q.pre_or_post_market_change_percent,
+    currency:               q.currency,
+    exchange:               q.exchange,
+    exchangeOpen:           q.exchange_open,
+    exchangeClose:          q.exchange_close,
+    timezone:               q.timezone,
+    countryCode:            q.country_code,
+    lastUpdate:             q.last_update_utc,
+    googleMid:              q.google_mid,
+    source:                 'openwebninja',
   }
 }
 
-/** Time series / chart data — returns time_series + key_events */
+/** Yahoo Finance quote — use for symbols where :EXCHANGE is unknown */
+export async function ownQuoteYahoo(symbol: string) {
+  // No :EXCHANGE needed — Yahoo uses bare tickers (AAPL, TSLA, etc.)
+  const data = await ownFetch('stock-quote-yahoo', { symbol: symbol.toUpperCase() })
+  const q = data?.data
+  if (!q?.price) return null
+  return { ...q, source: 'openwebninja-yahoo' }
+}
+
+// ─── Time Series / Chart ──────────────────────────────────────────────────────
+
+/** Chart bars with key events overlay */
 export async function ownTimeSeries(symbol: string, period = '1M', exchange?: string) {
-  // period: 1D | 5D | 1M | 6M | YTD | 1Y | 5Y | MAX
   const data = await ownFetch('stock-time-series', {
     symbol: ownSymbol(symbol, exchange),
-    period,
+    period,  // 1D | 5D | 1M | 6M | YTD | 1Y | 5Y | MAX
   })
-  if (!data?.time_series) return null
-  const bars = Object.entries(data.time_series).map(([ts, v]: [string, any]) => ({
-    t: new Date(ts).getTime(), c: v.price, ch: v.change, chPct: v.change_percent, v: v.volume,
+  const d = data?.data
+  if (!d?.time_series) return null
+  const bars = Object.entries(d.time_series).map(([ts, v]: [string, any]) => ({
+    t: new Date(ts).getTime(), c: v.price, ch: v.change, chPct: v.change_percent, v: v.volume ?? null,
   })).sort((a, b) => a.t - b.t)
   return {
-    symbol:     data.symbol,
-    price:      data.price,
-    prevClose:  data.previous_close,
-    change:     data.change,
-    changePct:  data.change_percent,
-    period:     data.period,
-    interval:   data.interval_sec,
-    bars,
-    keyEvents:  data.key_events || [],
-    source:     'openwebninja',
+    symbol:    d.symbol, price: d.price, prevClose: d.previous_close,
+    change:    d.change, changePct: d.change_percent,
+    period:    d.period, intervalSec: d.interval_sec,
+    bars,      keyEvents: d.key_events || [],
+    source:    'openwebninja',
   }
 }
 
-/** Forex currency exchange rate */
-export async function ownForex(from: string, to: string) {
-  const data = await ownFetch('currency-exchange-rate', { from_symbol: from, to_symbol: to })
-  if (!data?.exchange_rate) return null
-  return {
-    from:       data.from_symbol,
-    to:         data.to_symbol,
-    rate:       data.exchange_rate,
-    prevClose:  data.previous_close,
-    lastUpdate: data.last_update_utc,
-    source:     'openwebninja',
-  }
+/** Yahoo Finance time series (bare tickers, no :EXCHANGE) */
+export async function ownTimeSeriesYahoo(symbol: string, period = '1M') {
+  const data = await ownFetch('stock-time-series-yahoo', { symbol: symbol.toUpperCase(), period })
+  const d = data?.data
+  if (!d?.time_series) return null
+  const bars = Object.entries(d.time_series).map(([ts, v]: [string, any]) => ({
+    t: new Date(ts).getTime(), c: v.price, ch: v.change, chPct: v.change_percent, v: v.volume ?? null,
+  })).sort((a, b) => a.t - b.t)
+  return { ...d, bars, source: 'openwebninja-yahoo' }
 }
 
-/** Related news articles */
+// ─── News ─────────────────────────────────────────────────────────────────────
+
 export async function ownNews(symbol: string, exchange?: string) {
   const data = await ownFetch('stock-news', { symbol: ownSymbol(symbol, exchange) })
-  return Array.isArray(data) ? data.map((a: any) => ({
+  const articles = data?.data
+  return Array.isArray(articles) ? articles.map((a: any) => ({
     title:       a.article_title,
     url:         a.article_url,
     image:       a.article_photo_url,
@@ -547,32 +605,88 @@ export async function ownNews(symbol: string, exchange?: string) {
   })) : null
 }
 
-/** Market trends (gainers, losers, most active) */
-export async function ownMarketTrends(trend_type: 'GAINERS' | 'LOSERS' | 'MOST_ACTIVE' = 'GAINERS', country = 'us') {
-  const data = await ownFetch('market-trends', { trend_type, country })
-  return data?.trends || data || null
+// ─── Fundamentals ─────────────────────────────────────────────────────────────
+
+export async function ownOverview(symbol: string, exchange?: string) {
+  const data = await ownFetch('stock-overview', { symbol: ownSymbol(symbol, exchange) })
+  return data?.data || null
 }
 
-/** Income statement (quarterly + annual) */
 export async function ownIncomeStatement(symbol: string, exchange?: string) {
   const data = await ownFetch('stock-income-statement', { symbol: ownSymbol(symbol, exchange) })
-  return Array.isArray(data) ? data : null
+  return Array.isArray(data?.data) ? data.data : null
 }
 
-/** Balance sheet */
 export async function ownBalanceSheet(symbol: string, exchange?: string) {
   const data = await ownFetch('stock-balance-sheet', { symbol: ownSymbol(symbol, exchange) })
-  return Array.isArray(data) ? data : null
+  return Array.isArray(data?.data) ? data.data : null
 }
 
-/** Cash flow statement */
 export async function ownCashFlow(symbol: string, exchange?: string) {
   const data = await ownFetch('stock-cash-flow', { symbol: ownSymbol(symbol, exchange) })
-  return Array.isArray(data) ? data : null
+  return Array.isArray(data?.data) ? data.data : null
 }
 
-/** Earnings history + estimates */
-export async function ownEarnings(symbol: string, exchange?: string) {
-  const data = await ownFetch('stock-earnings', { symbol: ownSymbol(symbol, exchange) })
-  return Array.isArray(data) ? data : null
+// ─── Market Trends ────────────────────────────────────────────────────────────
+
+export type OwnTrendType = 'MARKET_INDEXES' | 'MOST_ACTIVE' | 'GAINERS' | 'LOSERS' | 'CRYPTO' | 'CURRENCIES' | 'CLIMATE_LEADERS'
+
+export async function ownMarketTrends(trend_type: OwnTrendType = 'GAINERS', country = 'us') {
+  const data = await ownFetch('market-trends', { trend_type, country })
+  return data?.data?.trends || null
+}
+
+// ─── Forex / Currency ─────────────────────────────────────────────────────────
+
+export async function ownForex(from: string, to: string) {
+  const data = await ownFetch('currency-exchange-rate', { from_symbol: from, to_symbol: to })
+  const d = data?.data
+  if (!d?.exchange_rate) return null
+  return {
+    from:       d.from_symbol,
+    to:         d.to_symbol,
+    rate:       d.exchange_rate,
+    prevClose:  d.previous_close,
+    lastUpdate: d.last_update_utc,
+    source:     'openwebninja',
+  }
+}
+
+export async function ownForexTimeSeries(from: string, to: string, period = '1M') {
+  const data = await ownFetch('currency-time-series', { from_symbol: from, to_symbol: to, period })
+  return data?.data || null
+}
+
+export async function ownCurrencyNews(from: string, to: string) {
+  const data = await ownFetch('currency-news', { from_symbol: from, to_symbol: to })
+  return data?.data || null
+}
+
+// ─── Search ───────────────────────────────────────────────────────────────────
+
+export async function ownSearch(query: string) {
+  const data = await ownFetch('search', { query })
+  const d = data?.data
+  if (!d) return null
+  // Flatten all asset types into a single array
+  const all = [
+    ...(d.stock        || []),
+    ...(d.ETF          || []),
+    ...(d.index        || []),
+    ...(d.mutual_fund  || []),
+    ...(d.currency     || []),
+    ...(d.futures      || []),
+  ]
+  return all.map((r: any) => ({
+    symbol:    r.symbol,
+    name:      r.name,
+    type:      r.type,
+    price:     r.price,
+    change:    r.change,
+    changePct: r.change_percent,
+    exchange:  r.exchange || '',
+    currency:  r.currency || '',
+    country:   r.country_code || '',
+    source:    'openwebninja',
+  }))
 }
