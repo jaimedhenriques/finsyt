@@ -1,21 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { PROVIDERS, massiveNews } from '@/lib/data-providers'
 
-const EODHD   = process.env.EODHD_API_KEY || process.env.eodhd_api
-const FINNHUB = process.env.FINNHUB_API_KEY
-const FMP     = process.env.FMP_API_KEY
+const FMP     = PROVIDERS.fmp
+const EODHD   = PROVIDERS.eodhd
+const FINNHUB = PROVIDERS.finnhub
 
 function normalise(item: any, source: string) {
   return {
-    id:          item.id || item.url || item.link,
+    id:          item.id || item.url || item.link || item.article_url,
     title:       item.title || item.headline || '',
-    summary:     (item.content || item.summary || item.text || '').slice(0, 400),
-    url:         item.link || item.url || '',
-    source:      item.source || item.site || source,
-    publishedAt: item.date || item.publishedDate || item.datetime || '',
-    sentiment:   item.sentiment || null,
-    tickers:     item.symbols || item.tickers || (item.symbol ? [item.symbol] : []),
-    tags:        item.tags || item.category ? [item.category] : [],
-    image:       item.image || item.img || null,
+    summary:     (item.description || item.content || item.summary || item.text || '').slice(0, 500),
+    url:         item.article_url || item.link || item.url || '',
+    source:      item.publisher?.name || item.source || item.site || source,
+    publishedAt: item.published_utc || item.publishedDate || item.date || item.datetime || '',
+    sentiment:   item.insights?.[0]?.sentiment || item.sentiment || null,
+    tickers:     item.tickers || item.symbols || (item.symbol ? [item.symbol] : []),
+    tags:        item.keywords || item.tags || (item.category ? [item.category] : []),
+    image:       item.image_url || item.image || item.img || null,
     dataSource:  source,
   }
 }
@@ -29,7 +30,18 @@ export async function GET(req: NextRequest) {
   const allArticles: any[] = []
   const seen = new Set<string>()
 
-  // ── Source 1: FMP (company-specific or general) ───────────────────────────
+  // ── Source 1: Massive (Polygon) — best quality, includes publisher, tickers, keywords ──
+  if (PROVIDERS.massive) {
+    try {
+      const results = await massiveNews(symbol, Math.ceil(limit * 1.2))
+      ;(Array.isArray(results) ? results : []).forEach((item: any) => {
+        const key = item.article_url || item.title
+        if (!seen.has(key)) { seen.add(key); allArticles.push(normalise(item, 'massive')) }
+      })
+    } catch (e) { console.warn('[news] Massive failed:', (e as Error).message) }
+  }
+
+  // ── Source 2: FMP ─────────────────────────────────────────────────────────
   if (FMP) {
     try {
       const url = symbol
@@ -41,27 +53,26 @@ export async function GET(req: NextRequest) {
         const key = item.url || item.title
         if (!seen.has(key)) { seen.add(key); allArticles.push(normalise(item, 'fmp')) }
       })
-    } catch (e) { console.error('FMP news failed:', e) }
+    } catch (e) { console.warn('[news] FMP failed:', (e as Error).message) }
   }
 
-  // ── Source 2: EODHD (strong sentiment scoring) ───────────────────────────
+  // ── Source 3: EODHD (strong sentiment scoring) ────────────────────────────
   if (EODHD) {
     try {
       const eodSymbol = symbol ? (symbol.includes('.') ? symbol : `${symbol}.US`) : ''
       const params = new URLSearchParams({ api_token: EODHD, limit: String(Math.min(limit, 50)), fmt: 'json' })
       if (eodSymbol) params.set('s', eodSymbol)
-      if (from) params.set('from', from)
-      if (to)   params.set('to', to)
+      if (from) params.set('from', from); if (to) params.set('to', to)
       const res  = await fetch(`https://eodhd.com/api/news?${params}`, { next: { revalidate: 300 } })
       const data = await res.json()
       ;(Array.isArray(data) ? data : []).forEach((item: any) => {
         const key = item.link || item.title
         if (!seen.has(key)) { seen.add(key); allArticles.push(normalise(item, 'eodhd')) }
       })
-    } catch (e) { console.error('EODHD news failed:', e) }
+    } catch (e) { console.warn('[news] EODHD failed:', (e as Error).message) }
   }
 
-  // ── Source 3: Finnhub (company news, good coverage) ──────────────────────
+  // ── Source 4: Finnhub ─────────────────────────────────────────────────────
   if (FINNHUB && symbol) {
     try {
       const res  = await fetch(`https://finnhub.io/api/v1/company-news?symbol=${symbol}&from=${from}&to=${to}&token=${FINNHUB}`)
@@ -70,14 +81,14 @@ export async function GET(req: NextRequest) {
         const key = item.url || item.headline
         if (!seen.has(key)) { seen.add(key); allArticles.push(normalise({ ...item, title: item.headline }, 'finnhub')) }
       })
-    } catch (e) { console.error('Finnhub news failed:', e) }
+    } catch (e) { console.warn('[news] Finnhub failed:', (e as Error).message) }
   }
 
-  // Sort by date descending, dedupe, return
   const sorted = allArticles
     .filter(a => a.title)
     .sort((a, b) => new Date(b.publishedAt || 0).getTime() - new Date(a.publishedAt || 0).getTime())
     .slice(0, limit)
 
-  return NextResponse.json(sorted)
+  const sources = [...new Set(sorted.map(a => a.dataSource))]
+  return NextResponse.json({ articles: sorted, total: sorted.length, sources })
 }
