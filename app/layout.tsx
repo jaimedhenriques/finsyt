@@ -1,5 +1,6 @@
 import type { Metadata } from 'next'
 import './globals.css'
+import '@21st-sdk/react/styles.css'
 import { MagicChatBubble } from '@/components/MagicChatBubble'
 
 export const metadata: Metadata = {

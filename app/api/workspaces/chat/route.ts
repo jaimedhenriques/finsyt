@@ -55,8 +55,8 @@ Today's date: ${new Date().toLocaleDateString()}`
     model: anthropic("claude-3-5-sonnet-20241022"),
     system: systemPrompt,
     messages,
-    maxTokens: 2048,
+    maxOutputTokens: 2048,
   })
 
-  return result.toDataStreamResponse()
+  return result.toUIMessageStreamResponse()
 }

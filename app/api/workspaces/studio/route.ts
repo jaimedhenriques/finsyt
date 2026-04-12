@@ -70,7 +70,7 @@ export async function POST(req: NextRequest) {
       model: anthropic("claude-3-5-sonnet-20241022"),
       system: `You are an elite financial analyst. Analyse ONLY the provided source documents. Be precise and professional.\n\nSOURCES:\n${allText.slice(0, 40000)}`,
       prompt,
-      maxTokens: 1500,
+      maxOutputTokens: 1500,
     })
 
     return NextResponse.json({ content: text })
