@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import {
   PROVIDERS, isInternationalSymbol, toEODSymbol,
+  ownQuote,
   massiveQuote, massiveTickerDetails,
   yahooQuote, yahooSummary,
   alphaQuote, alphaOverview,
@@ -17,7 +18,15 @@ export async function GET(req: NextRequest) {
 
   const isIntl = isInternationalSymbol(symbol)
 
-  // For international symbols go Yahoo/EODHD first (better global coverage)
+  // ── 0. OpenWebNinja (Google Finance source — real-time, global, pre/post market) ──
+  if (PROVIDERS.own) {
+    try {
+      const q = await ownQuote(symbol)
+      if (q?.price) return NextResponse.json(q)
+    } catch (e) { console.warn('[quote] OpenWebNinja failed:', (e as Error).message) }
+  }
+
+    // For international symbols go Yahoo/EODHD first (better global coverage)
   if (isIntl) {
     // ── Intl-1: Yahoo Finance ───────────────────────────────────────────────
     if (PROVIDERS.yahoo) {

@@ -23,6 +23,7 @@ export const PROVIDERS = {
   alphav:      process.env.ALPHA_VANTAGE_API_KEY || '',
   marketstack: process.env.MARKETSTACK_API_KEY   || '',
   yahoo:       process.env.YAHOO_FINANCE_API_KEY || process.env.RAPIDAPI_KEY      || '',  // RapidAPI key
+  own:         process.env.OPENWEBNINJA_API_KEY   || '',  // OpenWebNinja native key
   sec:         process.env.SEC_API_KEY           || '',
   coresignal:  process.env.CORESIGNAL_API_KEY    || '',
   openai:      process.env.OPENAI_API_KEY        || '',
@@ -427,4 +428,151 @@ export function isInternationalSymbol(symbol: string): boolean {
 /** Normalise symbol for EODHD (adds .US if bare US ticker) */
 export function toEODSymbol(symbol: string): string {
   return symbol.includes('.') || symbol.includes(':') ? symbol : `${symbol}.US`
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
+// OpenWebNinja Real-Time Finance Data API
+// ─────────────────────────────────────────────────────────────────────────────
+// Auth: X-Api-Key header on api.openwebninja.com
+// Symbol format: TICKER:EXCHANGE  e.g. AAPL:NASDAQ  TSLA:NASDAQ  HSBA:LSE
+// Includes: Google Finance real-time quotes, time series, forex, news,
+//           fundamentals (income stmt, balance sheet, cash flow, earnings)
+// FREE tier: 100 req/month  |  Paid from $9/month
+// ─────────────────────────────────────────────────────────────────────────────
+
+const OWN_BASE = 'https://api.openwebninja.com/realtime-finance-data'
+
+export function ownSymbol(symbol: string, exchange?: string): string {
+  // If already formatted (contains :) return as-is
+  if (symbol.includes(':')) return symbol
+  // Auto-detect exchange suffix for international symbols
+  if (symbol.endsWith('.L'))  return `${symbol.replace('.L','  ')}:LSE`
+  if (symbol.endsWith('.TO')) return `${symbol.replace('.TO','')}:TSX`
+  if (symbol.endsWith('.AX')) return `${symbol.replace('.AX','')}:ASX`
+  if (symbol.endsWith('.PA')) return `${symbol.replace('.PA','')}:EPA`
+  if (symbol.endsWith('.AS')) return `${symbol.replace('.AS','')}:AMS`
+  if (symbol.endsWith('.DE')) return `${symbol.replace('.DE','')}:FRA`
+  if (symbol.endsWith('.HK')) return `${symbol.replace('.HK','')}:HKEX`
+  if (symbol.endsWith('.T'))  return `${symbol.replace('.T', '')}:TYO`
+  // Default to NASDAQ for bare US tickers (most common)
+  return exchange ? `${symbol}:${exchange}` : `${symbol}:NASDAQ`
+}
+
+export async function ownFetch(endpoint: string, params: Record<string, string> = {}) {
+  if (!PROVIDERS.own) return null
+  const url = new URL(`${OWN_BASE}/${endpoint}`)
+  Object.entries(params).forEach(([k, v]) => url.searchParams.set(k, v))
+  url.searchParams.set('language', 'en')
+  const res = await fetch(url.toString(), {
+    headers: { 'X-Api-Key': PROVIDERS.own },
+    next: { revalidate: 60 },
+  })
+  if (!res.ok) throw new Error(`OWN ${endpoint} HTTP ${res.status}`)
+  return res.json()
+}
+
+/** Real-time quote — Google Finance sourced */
+export async function ownQuote(symbol: string, exchange?: string) {
+  const data = await ownFetch('stock-quote', { symbol: ownSymbol(symbol, exchange) })
+  if (!data?.price) return null
+  return {
+    symbol:                  data.symbol,
+    price:                   data.price,
+    open:                    data.open,
+    high:                    data.high,
+    low:                     data.low,
+    prevClose:               data.previous_close,
+    change:                  data.change,
+    changePct:               data.change_percent,
+    prePostMarket:           data.pre_or_post_market,
+    prePostMarketChange:     data.pre_or_post_market_change,
+    prePostMarketChangePct:  data.pre_or_post_market_change_percent,
+    volume:                  data.volume,
+    name:                    data.name,
+    type:                    data.type,
+    lastUpdate:              data.last_update_utc,
+    source:                  'openwebninja',
+  }
+}
+
+/** Time series / chart data — returns time_series + key_events */
+export async function ownTimeSeries(symbol: string, period = '1M', exchange?: string) {
+  // period: 1D | 5D | 1M | 6M | YTD | 1Y | 5Y | MAX
+  const data = await ownFetch('stock-time-series', {
+    symbol: ownSymbol(symbol, exchange),
+    period,
+  })
+  if (!data?.time_series) return null
+  const bars = Object.entries(data.time_series).map(([ts, v]: [string, any]) => ({
+    t: new Date(ts).getTime(), c: v.price, ch: v.change, chPct: v.change_percent, v: v.volume,
+  })).sort((a, b) => a.t - b.t)
+  return {
+    symbol:     data.symbol,
+    price:      data.price,
+    prevClose:  data.previous_close,
+    change:     data.change,
+    changePct:  data.change_percent,
+    period:     data.period,
+    interval:   data.interval_sec,
+    bars,
+    keyEvents:  data.key_events || [],
+    source:     'openwebninja',
+  }
+}
+
+/** Forex currency exchange rate */
+export async function ownForex(from: string, to: string) {
+  const data = await ownFetch('currency-exchange-rate', { from_symbol: from, to_symbol: to })
+  if (!data?.exchange_rate) return null
+  return {
+    from:       data.from_symbol,
+    to:         data.to_symbol,
+    rate:       data.exchange_rate,
+    prevClose:  data.previous_close,
+    lastUpdate: data.last_update_utc,
+    source:     'openwebninja',
+  }
+}
+
+/** Related news articles */
+export async function ownNews(symbol: string, exchange?: string) {
+  const data = await ownFetch('stock-news', { symbol: ownSymbol(symbol, exchange) })
+  return Array.isArray(data) ? data.map((a: any) => ({
+    title:       a.article_title,
+    url:         a.article_url,
+    image:       a.article_photo_url,
+    source:      a.source,
+    publishedAt: a.post_time_utc,
+    dataSource:  'openwebninja',
+  })) : null
+}
+
+/** Market trends (gainers, losers, most active) */
+export async function ownMarketTrends(trend_type: 'GAINERS' | 'LOSERS' | 'MOST_ACTIVE' = 'GAINERS', country = 'us') {
+  const data = await ownFetch('market-trends', { trend_type, country })
+  return data?.trends || data || null
+}
+
+/** Income statement (quarterly + annual) */
+export async function ownIncomeStatement(symbol: string, exchange?: string) {
+  const data = await ownFetch('stock-income-statement', { symbol: ownSymbol(symbol, exchange) })
+  return Array.isArray(data) ? data : null
+}
+
+/** Balance sheet */
+export async function ownBalanceSheet(symbol: string, exchange?: string) {
+  const data = await ownFetch('stock-balance-sheet', { symbol: ownSymbol(symbol, exchange) })
+  return Array.isArray(data) ? data : null
+}
+
+/** Cash flow statement */
+export async function ownCashFlow(symbol: string, exchange?: string) {
+  const data = await ownFetch('stock-cash-flow', { symbol: ownSymbol(symbol, exchange) })
+  return Array.isArray(data) ? data : null
+}
+
+/** Earnings history + estimates */
+export async function ownEarnings(symbol: string, exchange?: string) {
+  const data = await ownFetch('stock-earnings', { symbol: ownSymbol(symbol, exchange) })
+  return Array.isArray(data) ? data : null
 }

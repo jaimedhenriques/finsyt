@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { PROVIDERS, massiveNews } from '@/lib/data-providers'
+import { PROVIDERS, massiveNews, ownNews } from '@/lib/data-providers'
 
 const FMP     = PROVIDERS.fmp
 const EODHD   = PROVIDERS.eodhd
@@ -30,7 +30,18 @@ export async function GET(req: NextRequest) {
   const allArticles: any[] = []
   const seen = new Set<string>()
 
-  // ── Source 1: Massive (Polygon) — best quality, includes publisher, tickers, keywords ──
+  // ── Source 0: OpenWebNinja (Google Finance — curated, clean) ───────────────
+  if (PROVIDERS.own && symbol) {
+    try {
+      const results = await ownNews(symbol)
+      ;(Array.isArray(results) ? results : []).forEach((item: any) => {
+        const key = item.url || item.title
+        if (!seen.has(key)) { seen.add(key); allArticles.push(item) }
+      })
+    } catch (e) { console.warn('[news] OpenWebNinja failed:', (e as Error).message) }
+  }
+
+    // ── Source 1: Massive (Polygon) — best quality, includes publisher, tickers, keywords ──
   if (PROVIDERS.massive) {
     try {
       const results = await massiveNews(symbol, Math.ceil(limit * 1.2))

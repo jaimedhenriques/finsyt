@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { PROVIDERS, providerStatus, massiveFetch, yahooFetch, alphaFetch, marketstackFetch } from '@/lib/data-providers'
+import { PROVIDERS, providerStatus, massiveFetch, yahooFetch, alphaFetch, marketstackFetch, ownFetch } from '@/lib/data-providers'
 
 async function testProvider(name: string, fn: () => Promise<any>) {
   if (!PROVIDERS[name as keyof typeof PROVIDERS]) return { ok: false, detail: 'not configured' }
@@ -13,7 +13,7 @@ async function testProvider(name: string, fn: () => Promise<any>) {
 }
 
 export async function GET() {
-  const [massive, fmp, eodhd, finnhub, alphav, marketstack, yahoo] = await Promise.all([
+  const [massive, fmp, eodhd, finnhub, alphav, marketstack, yahoo, own] = await Promise.all([
     testProvider('massive', () => massiveFetch('/v1/marketstatus/now')),
     testProvider('fmp', async () => {
       const r = await fetch(`https://financialmodelingprep.com/stable/quote?symbol=AAPL&apikey=${PROVIDERS.fmp}`, { next: { revalidate: 0 } })
@@ -33,9 +33,10 @@ export async function GET() {
     testProvider('alphav', () => alphaFetch({ function: 'GLOBAL_QUOTE', symbol: 'AAPL' })),
     testProvider('marketstack', () => marketstackFetch('/eod/latest', { symbols: 'AAPL', limit: '1' })),
     testProvider('yahoo', () => yahooFetch('/api/stock/get-quote', { symbol: 'AAPL', region: 'US', lang: 'en-US' })),
+    testProvider('own', () => ownFetch('stock-quote', { symbol: 'AAPL:NASDAQ' })),
   ])
 
-  const liveTests = { massive, fmp, eodhd, finnhub, alphav, marketstack, yahoo }
+  const liveTests = { openwebninja: own, massive, fmp, eodhd, finnhub, alphav, marketstack, yahoo }
   const providers = providerStatus()
   const configured = providers.filter(p => p.active).length
   const passing    = Object.values(liveTests).filter(t => t.ok).length
@@ -46,7 +47,7 @@ export async function GET() {
     providers,
     liveTests,
     dataWaterfall: {
-      realTimeQuotes:  ['massive','fmp','yahoo','eodhd','finnhub','alphav'],
+      realTimeQuotes:  ['openwebninja','massive','fmp','yahoo','eodhd','finnhub','alphav'],
       historicalBars:  ['massive','fmp','eodhd','marketstack','alphav','yahoo'],
       fundamentals:    ['fmp','massive','eodhd','alphav'],
       news:            ['massive','fmp','eodhd','finnhub'],
