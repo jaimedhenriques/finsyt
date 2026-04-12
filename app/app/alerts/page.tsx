@@ -1,5 +1,5 @@
 'use client'
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 
 type Alert = {
   id: number
@@ -12,6 +12,9 @@ type Alert = {
   currentPrice?: number
   note?: string
 }
+
+type AlertFilter = 'all' | 'active' | 'triggered'
+type AlertType = Alert['type']
 
 const TYPE_LABELS: Record<string, string> = {
   price_above:  'Price rises above',
@@ -33,10 +36,10 @@ const SAMPLE: Alert[] = [
 export default function AlertsPage() {
   const [alerts, setAlerts]   = useState<Alert[]>(SAMPLE)
   const [symbol, setSymbol]   = useState('')
-  const [type, setType]       = useState<Alert['type']>('price_above')
+  const [type, setType]       = useState<AlertType>('price_above')
   const [threshold, setTh]    = useState('')
   const [note, setNote]       = useState('')
-  const [filter, setFilter]   = useState<'all'|'active'|'triggered'>('all')
+  const [filter, setFilter]   = useState<AlertFilter>('all')
   const [showForm, setShowForm] = useState(false)
 
   const triggered = alerts.filter(a => a.triggered)
@@ -67,6 +70,17 @@ export default function AlertsPage() {
   }
 
   const needsThreshold = !['news'].includes(type)
+
+  const filterTabs: Array<{ value: AlertFilter; label: string }> = [
+    { value: 'all', label: 'All' },
+    { value: 'active', label: 'Active' },
+    { value: 'triggered', label: 'Triggered' },
+  ]
+
+  const typeOptions = Object.entries(TYPE_LABELS).map(([value, label]) => ({
+    value: value as AlertType,
+    label,
+  }))
 
   return (
     <div className="page-content">
@@ -124,8 +138,13 @@ export default function AlertsPage() {
             </div>
             <div>
               <label className="label mb-1 block">Condition *</label>
-              <select className="input" style={{ width:180 }} value={type} onChange={e => setType(e.target.value as any)}>
-                {Object.entries(TYPE_LABELS).map(([k,v]) => <option key={k} value={k}>{v}</option>)}
+              <select
+                className="input"
+                style={{ width:180 }}
+                value={type}
+                onChange={e => setType(e.target.value as AlertType)}
+              >
+                {typeOptions.map((option) => <option key={option.value} value={option.value}>{option.label}</option>)}
               </select>
             </div>
             {needsThreshold && (
@@ -149,9 +168,9 @@ export default function AlertsPage() {
 
       {/* Filter tabs */}
       <div className="tab-bar mb-4">
-        {[['all','All'], ['active','Active'], ['triggered','Triggered']].map(([v,l]) => (
-          <button key={v} className={`tab-btn ${filter===v?'active':''}`} onClick={() => setFilter(v as any)}>
-            {l} {v==='triggered'&&triggered.length>0 && <span style={{ marginLeft:4, background:'#EF4444', color:'#fff', borderRadius:10, padding:'0 5px', fontSize:10 }}>{triggered.length}</span>}
+        {filterTabs.map((tab) => (
+          <button key={tab.value} className={`tab-btn ${filter===tab.value?'active':''}`} onClick={() => setFilter(tab.value)}>
+            {tab.label} {tab.value==='triggered'&&triggered.length>0 && <span style={{ marginLeft:4, background:'#EF4444', color:'#fff', borderRadius:10, padding:'0 5px', fontSize:10 }}>{triggered.length}</span>}
           </button>
         ))}
       </div>
@@ -210,7 +229,7 @@ export default function AlertsPage() {
             {filtered.length === 0 && (
               <tr>
                 <td colSpan={7} style={{ textAlign:'center', padding:'48px 0', color:'#7D8FA9' }}>
-                  No {filter === 'all' ? '' : filter} alerts. {filter === 'all' && <span>Click "+ New Alert" to create one.</span>}
+                  No {filter === 'all' ? '' : filter} alerts. {filter === 'all' && <span>Click &quot;+ New Alert&quot; to create one.</span>}
                 </td>
               </tr>
             )}

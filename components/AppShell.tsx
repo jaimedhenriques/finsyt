@@ -17,6 +17,14 @@ type SearchResult = {
   name: string
 }
 
+type CommandEntry = {
+  id: string
+  title: string
+  subtitle: string
+  href: string
+  hotkey?: string
+}
+
 const MARKET_TICKERS = [
   { label: 'S&P 500', value: '5,241.6', change: '+0.58%' },
   { label: 'NASDAQ', value: '16,434.2', change: '+0.76%' },
@@ -283,6 +291,25 @@ function TopTickerStrip() {
   )
 }
 
+function ShortcutChip({ text }: { text: string }) {
+  return (
+    <span
+      style={{
+        borderRadius: 6,
+        border: '1px solid #D8E2F0',
+        background: '#F7FAFF',
+        color: '#496089',
+        fontSize: 10.5,
+        fontWeight: 700,
+        padding: '2px 6px',
+        lineHeight: 1.35,
+      }}
+    >
+      {text}
+    </span>
+  )
+}
+
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const router = useRouter()
@@ -296,7 +323,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   })
   const [search, setSearch] = useState('')
   const [searchResults, setSearchResults] = useState<SearchResult[]>([])
+  const [paletteOpen, setPaletteOpen] = useState(false)
+  const [paletteQuery, setPaletteQuery] = useState('')
+  const [paletteIndex, setPaletteIndex] = useState(0)
   const [showNavCustomiser, setShowNavCustomiser] = useState(false)
+  const paletteInputRef = useRef<HTMLInputElement>(null)
 
   const sidebarW = collapsed ? SIDEBAR_COLLAPSED_W : SIDEBAR_W
   const visibleNav = nav.filter((item) => item.visible || item.pinned)
@@ -337,6 +368,72 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       setSearchResults([])
     }
   }
+
+  const commands = useMemo<CommandEntry[]>(
+    () => [
+      { id: 'cmd-research', title: 'Open AI Research', subtitle: 'Ask grounded questions across sources', href: '/app/research', hotkey: 'R' },
+      { id: 'cmd-workspaces', title: 'Open Workspaces', subtitle: 'Source management and Studio outputs', href: '/app/workspaces', hotkey: 'W' },
+      { id: 'cmd-watchlist', title: 'Open Watchlist', subtitle: 'Track live symbols and key metrics', href: '/app/watchlist', hotkey: 'L' },
+      { id: 'cmd-alerts', title: 'Open Alerts', subtitle: 'Price and signal alert monitoring', href: '/app/alerts', hotkey: 'A' },
+      { id: 'cmd-screener', title: 'Open Screener', subtitle: 'Filter investable opportunities', href: '/app/screener', hotkey: 'S' },
+      { id: 'cmd-news', title: 'Open News & Signals', subtitle: 'Track market-moving developments', href: '/app/news', hotkey: 'N' },
+      { id: 'cmd-private', title: 'Open Private Markets', subtitle: 'Private company intelligence and trends', href: '/app/private', hotkey: 'P' },
+      { id: 'cmd-settings', title: 'Open Settings', subtitle: 'Workspace controls and preferences', href: '/app/settings', hotkey: ',' },
+    ],
+    [],
+  )
+
+  const filteredCommands = useMemo(() => {
+    const query = paletteQuery.trim().toLowerCase()
+    if (!query) return commands
+    return commands.filter((command) =>
+      `${command.title} ${command.subtitle} ${command.href}`.toLowerCase().includes(query),
+    )
+  }, [commands, paletteQuery])
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      const isModK = (event.metaKey || event.ctrlKey) && event.key.toLowerCase() === 'k'
+      if (isModK) {
+        event.preventDefault()
+        setPaletteOpen((prev) => {
+          const next = !prev
+          if (next) {
+            setPaletteIndex(0)
+            setPaletteQuery('')
+          }
+          return next
+        })
+        return
+      }
+      if (!paletteOpen) return
+      if (event.key === 'Escape') {
+        setPaletteOpen(false)
+        return
+      }
+      if (event.key === 'ArrowDown') {
+        event.preventDefault()
+        setPaletteIndex((prev) => Math.min(prev + 1, Math.max(filteredCommands.length - 1, 0)))
+        return
+      }
+      if (event.key === 'ArrowUp') {
+        event.preventDefault()
+        setPaletteIndex((prev) => Math.max(prev - 1, 0))
+        return
+      }
+      if (event.key === 'Enter' && filteredCommands.length > 0) {
+        event.preventDefault()
+        const target = filteredCommands[Math.min(paletteIndex, filteredCommands.length - 1)]
+        if (target) {
+          router.push(target.href)
+          setPaletteOpen(false)
+          setPaletteQuery('')
+        }
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [filteredCommands, paletteIndex, paletteOpen, router])
 
   return (
     <div style={{ display: 'flex', minHeight: '100vh', background: '#EEF2F9' }}>
@@ -678,6 +775,36 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             </div>
           )}
 
+          <button
+            onClick={() => {
+              setPaletteIndex(0)
+              setPaletteQuery('')
+              setPaletteOpen(true)
+              window.setTimeout(() => {
+                paletteInputRef.current?.focus()
+                paletteInputRef.current?.select()
+              }, 30)
+            }}
+            style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: 8,
+              borderRadius: 10,
+              border: '1px solid #D9E3F1',
+              background: '#fff',
+              color: '#5A7095',
+              padding: '6px 10px',
+              fontFamily: 'inherit',
+              fontSize: 11.5,
+              fontWeight: 700,
+              cursor: 'pointer',
+              whiteSpace: 'nowrap',
+            }}
+          >
+            Quick actions
+            <span style={{ color: '#8AA0C5', fontWeight: 700 }}>⌘/Ctrl + K</span>
+          </button>
+
           {topbar.find((item) => item.id === 'indices')?.visible !== false && <TopTickerStrip />}
 
           <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -805,6 +932,119 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
       {showNavCustomiser && <NavCustomiser onClose={() => setShowNavCustomiser(false)} />}
       <WidgetPicker />
+      {paletteOpen && (
+        <div
+          onClick={() => {
+            setPaletteOpen(false)
+            setPaletteQuery('')
+          }}
+          style={{
+            position: 'fixed',
+            inset: 0,
+            background: 'rgba(8,18,40,0.34)',
+            backdropFilter: 'blur(4px)',
+            zIndex: 120,
+            display: 'flex',
+            justifyContent: 'center',
+            alignItems: 'flex-start',
+            paddingTop: '10vh',
+          }}
+        >
+          <div
+            onClick={(event) => event.stopPropagation()}
+            style={{
+              width: 'min(680px, 92vw)',
+              borderRadius: 16,
+              border: '1px solid #D6E0F1',
+              background: '#fff',
+              boxShadow: '0 30px 60px rgba(16,35,71,0.3)',
+              overflow: 'hidden',
+            }}
+          >
+            <div style={{ padding: '12px 14px', borderBottom: '1px solid #E5ECF7' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                <input
+                  ref={paletteInputRef}
+                  value={paletteQuery}
+                  onChange={(event) => setPaletteQuery(event.target.value)}
+                  placeholder="Search pages, actions, and destinations..."
+                  style={{
+                    flex: 1,
+                    border: 'none',
+                    outline: 'none',
+                    fontFamily: 'inherit',
+                    fontSize: 14,
+                    color: '#1F3358',
+                  }}
+                />
+                <ShortcutChip text="Esc" />
+              </div>
+            </div>
+            <div style={{ maxHeight: 370, overflowY: 'auto', padding: 8 }}>
+              {filteredCommands.length ? (
+                filteredCommands.map((command, index) => {
+                  const active = index === paletteIndex
+                  return (
+                    <button
+                      key={command.id}
+                      onMouseEnter={() => setPaletteIndex(index)}
+                      onClick={() => {
+                        router.push(command.href)
+                        setPaletteOpen(false)
+                        setPaletteQuery('')
+                      }}
+                      style={{
+                        width: '100%',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'space-between',
+                        gap: 10,
+                        border: 'none',
+                        cursor: 'pointer',
+                        borderRadius: 10,
+                        background: active ? '#EDF3FF' : '#fff',
+                        padding: '10px 11px',
+                        textAlign: 'left',
+                      }}
+                    >
+                      <div>
+                        <div style={{ color: '#1E335A', fontWeight: 700, fontSize: 13 }}>{command.title}</div>
+                        <div style={{ color: '#6A7FA2', fontSize: 11.5 }}>{command.subtitle}</div>
+                      </div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <span style={{ color: '#87A0C8', fontSize: 11.5 }}>{command.href}</span>
+                        {command.hotkey ? <ShortcutChip text={command.hotkey} /> : null}
+                      </div>
+                    </button>
+                  )
+                })
+              ) : (
+                <div style={{ padding: '26px 14px', textAlign: 'center', color: '#7A8EAE', fontSize: 12.5 }}>
+                  No matching actions. Try “research”, “watchlist”, or “alerts”.
+                </div>
+              )}
+            </div>
+            <div
+              style={{
+                borderTop: '1px solid #E5ECF7',
+                background: '#FAFCFF',
+                padding: '9px 12px',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                color: '#7188AD',
+                fontSize: 11.5,
+              }}
+            >
+              <span>Navigate faster with keyboard-first actions.</span>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 6 }}>
+                <ShortcutChip text="↑ ↓" />
+                <ShortcutChip text="Enter" />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
