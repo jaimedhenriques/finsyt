@@ -1,4 +1,7 @@
 import { NextRequest, NextResponse } from "next/server"
+import pdfParse from "pdf-parse"
+
+export const runtime = "nodejs"
 
 // In-memory store (swap for Supabase pgvector in production)
 // Structure: sourceId -> { chunks: string[], metadata: object }
@@ -32,6 +35,24 @@ async function fetchUrlText(url: string): Promise<string> {
   }
 }
 
+function normaliseText(text: string, maxLength = 50000): string {
+  return text
+    .replace(/[^\x20-\x7E\n\r\t]/g, " ")
+    .replace(/\s+/g, " ")
+    .trim()
+    .slice(0, maxLength)
+}
+
+async function extractPdfText(file: File): Promise<string> {
+  try {
+    const buffer = Buffer.from(await file.arrayBuffer())
+    const parsed = await pdfParse(buffer)
+    return normaliseText(parsed.text || "")
+  } catch {
+    return ""
+  }
+}
+
 export async function POST(req: NextRequest) {
   try {
     const formData = await req.formData()
@@ -51,13 +72,16 @@ export async function POST(req: NextRequest) {
       const file = formData.get("file") as File
       if (file) {
         size = `${(file.size / 1024 / 1024).toFixed(1)}MB`
-        // Read as text (works for txt/md; PDF needs server-side parser)
-        try {
-          rawText = await file.text()
-          // Basic PDF text extraction — strip binary, keep readable chars
-          rawText = rawText.replace(/[^\x20-\x7E\n\r\t]/g, " ").replace(/\s+/g, " ").trim()
-        } catch {
-          rawText = `[File: ${file.name} — binary content, unable to extract text in this environment]`
+        rawText = await extractPdfText(file)
+        if (!rawText) {
+          try {
+            rawText = normaliseText(await file.text())
+          } catch {
+            rawText = ""
+          }
+        }
+        if (!rawText) {
+          rawText = `[File: ${file.name} — unable to extract readable text from PDF]`
         }
       }
     }
