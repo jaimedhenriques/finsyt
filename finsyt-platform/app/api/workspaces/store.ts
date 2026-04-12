@@ -24,11 +24,21 @@ let supabaseClient: SupabaseClient | null = null
 function getSupabaseClient(): SupabaseClient | null {
   if (supabaseClient) return supabaseClient
 
-  const supabaseUrl = process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_SUPABASE_URL || ""
+  const supabaseUrl =
+    process.env.SUPABASE_URL ||
+    process.env.finsyt_SUPABASE_URL ||
+    process.env.NEXT_PUBLIC_SUPABASE_URL ||
+    process.env.NEXT_PUBLIC_finsyt_finsytSUPABASE_URL ||
+    ""
   const serviceRoleKey =
     process.env.SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.finsyt_SUPABASE_SERVICE_ROLE_KEY ||
+    process.env.finsyt_SUPABASE_SECRET_KEY ||
     process.env.SUPABASE_ANON_KEY ||
+    process.env.finsyt_SUPABASE_ANON_KEY ||
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+    process.env.NEXT_PUBLIC_finsyt_finsytSUPABASE_ANON_KEY ||
+    process.env.NEXT_PUBLIC_finsyt_finsytSUPABASE_PUBLISHABLE_KEY ||
     ""
 
   if (!supabaseUrl || !serviceRoleKey) return null
