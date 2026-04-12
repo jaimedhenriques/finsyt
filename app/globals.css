@@ -4,8 +4,8 @@
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html { scroll-behavior: smooth; }
-html, body { background: #ffffff !important; }
-body { font-family: 'Inter', system-ui, -apple-system, sans-serif; background: #F5F7FB; color: #0A1628; -webkit-font-smoothing: antialiased; }
+/* Landing page: white. Platform pages: background set inline on AppShell main div */
+body { font-family: 'Inter', system-ui, -apple-system, sans-serif; background: #ffffff; color: #0A1628; -webkit-font-smoothing: antialiased; }
 
 .app-shell { display: flex; min-height: 100vh; }
 .sidebar { width: 220px; background: #0A1628; position: fixed; top: 0; left: 0; bottom: 0; z-index: 40; display: flex; flex-direction: column; overflow-y: auto; }
