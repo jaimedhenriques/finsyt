@@ -15,6 +15,10 @@ const nextConfig: NextConfig = {
     ALPHA_VANTAGE_API_KEY: process.env.ALPHA_VANTAGE_API_KEY || '',
     FINNHUB_API_KEY:       process.env.FINNHUB_API_KEY       || '',
     SEC_API_KEY:           process.env.SEC_API_KEY           || '',
+    SUPABASE_URL:          process.env.SUPABASE_URL          || process.env.NEXT_PUBLIC_SUPABASE_URL || '',
+    SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY || '',
+    NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || '',
+    NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || '',
   },
   async headers() {
     return [

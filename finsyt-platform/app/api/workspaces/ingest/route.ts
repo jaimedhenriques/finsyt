@@ -1,12 +1,8 @@
 import { NextRequest, NextResponse } from "next/server"
 import pdfParse from "pdf-parse"
+import { saveSource } from "../store"
 
 export const runtime = "nodejs"
-
-// In-memory store (swap for Supabase pgvector in production)
-// Structure: sourceId -> { chunks: string[], metadata: object }
-const STORE = new Map<string, { chunks: string[]; name: string; type: string }>()
-export { STORE }
 
 function chunkText(text: string, size = 800, overlap = 100): string[] {
   const chunks: string[] = []
@@ -91,7 +87,7 @@ export async function POST(req: NextRequest) {
     }
 
     const chunks = chunkText(rawText)
-    STORE.set(sourceId, { chunks, name, type })
+    await saveSource(sourceId, name, type, chunks)
 
     return NextResponse.json({
       success: true,
