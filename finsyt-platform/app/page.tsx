@@ -73,8 +73,8 @@ export default function LandingPage() {
           <p style={{
             fontSize: 18, lineHeight: 1.6, color: '#7D8FA9', maxWidth: 600, margin: '0 auto 36px',
           }}>
-            Real-time data. Agentic research. Institutional-grade tools.<br />
-            Built for founders, analysts, and operators.
+            Stop context-switching between Bloomberg, ChatGPT, and spreadsheets.<br />
+            Finsyt gives analysts and operators one workspace to research, screen, and act — powered by live market data.
           </p>
           <div style={{ display: 'flex', gap: 14, justifyContent: 'center', flexWrap: 'wrap' }}>
             <Link href="/app" style={{
@@ -109,8 +109,9 @@ export default function LandingPage() {
           marginTop: 60, borderRadius: 16, overflow: 'hidden',
           border: '1px solid rgba(27,79,255,0.15)',
           background: 'linear-gradient(145deg, #0D1E3A 0%, #0A1628 100%)',
-          padding: 24, maxWidth: 800, margin: '60px auto 0',
+          padding: 24,           maxWidth: 800, margin: '60px auto 0',
           boxShadow: '0 8px 48px rgba(0,0,0,0.4)',
+          pointerEvents: 'none',
         }}>
           <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
             {[{ s: 'SPY', v: '5,254', c: '+0.42%', up: true }, { s: 'QQQ', v: '18,391', c: '+0.61%', up: true }, { s: 'DIA', v: '39,150', c: '+0.18%', up: true }, { s: 'GLD', v: '2,374', c: '+0.8%', up: true }].map(d => (
@@ -152,10 +153,9 @@ export default function LandingPage() {
         background: '#0D1E3A', padding: '20px 32px',
         borderTop: '1px solid rgba(27,79,255,0.08)', borderBottom: '1px solid rgba(27,79,255,0.08)',
       }}>
-        <div style={{ maxWidth: 900, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 24, flexWrap: 'wrap' }}>
-          <span style={{ fontSize: 12, color: '#4A6080', fontWeight: 600 }}>Used by analysts at</span>
-          {['Hedge Funds', 'PE Firms', 'Family Offices', 'Startups', 'Research Desks'].map(c => (
-            <span key={c} style={{ fontSize: 13, color: '#3D5578', fontWeight: 500 }}>{c}</span>
+        <div style={{ maxWidth: 900, margin: '0 auto', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 32, flexWrap: 'wrap' }}>
+          {['20+ data sources', 'Sub-500ms quotes', '10K+ SEC filings indexed', 'Built in public'].map(m => (
+            <span key={m} style={{ fontSize: 13, color: '#4A7FBD', fontWeight: 600, letterSpacing: '-0.01em' }}>{m}</span>
           ))}
         </div>
       </section>
@@ -270,7 +270,6 @@ export default function LandingPage() {
           {[
             { label: 'Product', href: '/app' },
             { label: 'Pricing', href: '#' },
-            { label: 'Docs', href: '/app/developer' },
           ].map(l => (
             <Link key={l.label} href={l.href} style={{ color: '#4A6080', textDecoration: 'none', fontWeight: 500 }}>{l.label}</Link>
           ))}
