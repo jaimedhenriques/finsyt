@@ -1,7 +1,8 @@
 "use client"
 
-import { useState, useRef, useCallback } from "react"
+import { useState, useRef, useCallback, useMemo } from "react"
 import { useChat } from "@ai-sdk/react"
+import { DefaultChatTransport } from "ai"
 
 interface Source {
   id: string
@@ -92,11 +93,16 @@ export default function WorkspacesPage() {
   const chatEndRef = useRef<HTMLDivElement>(null)
 
   const activeSources = workspace.sources.filter(s => selectedSources.has(s.id) && s.status === "ready")
+  const activeSourceIds = activeSources.map(s => s.id)
+
+  const transport = useMemo(() => new DefaultChatTransport({
+    api: "/api/workspaces/chat",
+    body: { sourceIds: activeSourceIds },
+  }), [activeSourceIds.join(",")])
 
   const { messages, input, handleInputChange, handleSubmit, status, setInput } = useChat({
-    api: "/api/workspaces/chat",
-    body: { sourceIds: activeSources.map(s => s.id) },
-    onFinish: () => setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100),
+    transport,
+    onError: () => setTimeout(() => chatEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100),
   })
 
   const addSource = useCallback(async (type: Source["type"], data: { name: string; url?: string; text?: string; file?: File; size?: string }) => {
@@ -259,14 +265,16 @@ export default function WorkspacesPage() {
                     ))}
                   </div>
                 </div>
-              ) : messages.map(msg => (
+              ) : messages.map(msg => {
+                const text = msg.parts?.filter((p: any) => p.type === "text").map((p: any) => p.text).join("") ?? ""
+                return (
                 <div key={msg.id} className={`flex gap-3 ${msg.role === "user" ? "justify-end" : "justify-start"}`}>
                   {msg.role === "assistant" && <div className="w-6 h-6 rounded-lg bg-blue-500/20 flex items-center justify-center flex-shrink-0 mt-0.5 text-xs font-bold text-blue-300">F</div>}
                   <div className={`max-w-[80%] px-4 py-3 rounded-2xl text-sm leading-relaxed ${msg.role === "user" ? "bg-blue-500/20 text-white/90 rounded-br-sm" : "bg-[#0f1629] border border-blue-500/10 text-white/80 rounded-bl-sm"}`}>
-                    <p className="whitespace-pre-wrap">{msg.content}</p>
+                    <p className="whitespace-pre-wrap">{text}</p>
                   </div>
                 </div>
-              ))}
+              )})}
               {status === "streaming" && (
                 <div className="flex gap-3">
                   <div className="w-6 h-6 rounded-lg bg-blue-500/20 flex items-center justify-center text-xs font-bold text-blue-300">F</div>
@@ -284,7 +292,7 @@ export default function WorkspacesPage() {
                   placeholder={activeSources.length > 0 ? `Ask about ${activeSources.slice(0,2).map(s => s.name.split("—")[0].trim()).join(", ")}...` : "Add and select sources first..."}
                   disabled={activeSources.length === 0 || status === "streaming"}
                   className="flex-1 bg-[#0f1629] border border-blue-500/15 hover:border-blue-500/30 focus:border-blue-500/50 rounded-xl px-4 py-3 text-sm text-white placeholder-white/20 outline-none transition-colors disabled:opacity-40" />
-                <button type="submit" disabled={!input.trim() || activeSources.length === 0 || status === "streaming"}
+                <button type="submit" disabled={!(input ?? "").trim() || activeSources.length === 0 || status === "streaming"}
                   className="px-4 py-3 bg-blue-500/20 hover:bg-blue-500/30 disabled:opacity-30 border border-blue-500/20 rounded-xl text-blue-300 transition-all">
                   <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 19l9 2-9-18-9 18 9-2zm0 0v-8" /></svg>
                 </button>

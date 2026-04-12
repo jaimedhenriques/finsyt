@@ -19,7 +19,7 @@
     "@dnd-kit/sortable": "^10.0.0",
     "@dnd-kit/utilities": "^3.2.2",
     "@supabase/supabase-js": "^2.103.0",
-    "ai": "^4.3.19",
+    "ai": "^6.0.158",
     "lucide-react": "^1.8.0",
     "next": "^15.3.0",
     "pdf-parse": "^1.1.1",
