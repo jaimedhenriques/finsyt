@@ -1,15 +1,117 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
+import { createClient } from "@supabase/supabase-js";
 
 export default function Auth() {
   const [mode, setMode] = useState("signin"); // signin | signup | forgot
   const [form, setForm] = useState({ email: "", password: "", name: "", confirmPassword: "" });
   const [submitted, setSubmitted] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
+  const [message, setMessage] = useState("");
 
   const update = (k, v) => setForm(prev => ({ ...prev, [k]: v }));
 
-  const handleSubmit = (e) => {
+  const supabase = useMemo(() => {
+    const supabaseUrl =
+      process.env.NEXT_PUBLIC_SUPABASE_URL ||
+      process.env.NEXT_PUBLIC_finsyt_finsytSUPABASE_URL ||
+      "";
+    const supabaseAnonKey =
+      process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ||
+      process.env.NEXT_PUBLIC_finsyt_finsytSUPABASE_ANON_KEY ||
+      process.env.NEXT_PUBLIC_finsyt_finsytSUPABASE_PUBLISHABLE_KEY ||
+      "";
+
+    if (!supabaseUrl || !supabaseAnonKey) return null;
+    return createClient(supabaseUrl, supabaseAnonKey);
+  }, []);
+
+  const resetFeedback = () => {
+    setError("");
+    setMessage("");
+  };
+
+  const handleSubmit = async (e) => {
     e.preventDefault();
-    setSubmitted(true);
+    resetFeedback();
+    setLoading(true);
+
+    try {
+      if (!supabase) {
+        throw new Error("Supabase auth is not configured. Add NEXT_PUBLIC_* Supabase env vars in Vercel.");
+      }
+
+      if (mode === "signin") {
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+          email: form.email,
+          password: form.password,
+        });
+        if (signInError) throw signInError;
+        setSubmitted(true);
+        setMessage("Signed in successfully. Redirecting...");
+        return;
+      }
+
+      if (mode === "signup") {
+        if (form.password !== form.confirmPassword) {
+          throw new Error("Passwords do not match.");
+        }
+
+        const { error: signUpError } = await supabase.auth.signUp({
+          email: form.email,
+          password: form.password,
+          options: {
+            data: { full_name: form.name || undefined },
+          },
+        });
+        if (signUpError) throw signUpError;
+        setSubmitted(true);
+        setMessage("Account created. Check your email to verify your account.");
+        return;
+      }
+
+      if (mode === "forgot") {
+        const redirectTo =
+          typeof window !== "undefined"
+            ? `${window.location.origin}/auth/reset-password`
+            : undefined;
+
+        const { error: resetError } = await supabase.auth.resetPasswordForEmail(form.email, {
+          redirectTo,
+        });
+        if (resetError) throw resetError;
+        setSubmitted(true);
+        setMessage(`We sent a reset link to ${form.email}.`);
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Authentication failed.";
+      setError(msg);
+      setSubmitted(false);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleOAuth = async (provider) => {
+    resetFeedback();
+    setLoading(true);
+    try {
+      if (!supabase) {
+        throw new Error("Supabase auth is not configured. Add NEXT_PUBLIC_* Supabase env vars in Vercel.");
+      }
+
+      const redirectTo = typeof window !== "undefined" ? window.location.origin : undefined;
+      const { error: oauthError } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: redirectTo ? { redirectTo } : undefined,
+      });
+      if (oauthError) throw oauthError;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "OAuth sign in failed.";
+      setError(msg);
+    } finally {
+      setLoading(false);
+    }
   };
 
   return (
@@ -82,10 +184,10 @@ export default function Auth() {
 
               {/* Social logins */}
               <div style={{ display: "flex", flexDirection: "column", gap: 10, marginBottom: 28 }}>
-                <button className="btn-social">
+                <button className="btn-social" onClick={() => handleOAuth("google")} disabled={loading}>
                   <span style={{ fontSize: 18 }}>G</span> Continue with Google
                 </button>
-                <button className="btn-social">
+                <button className="btn-social" onClick={() => handleOAuth("linkedin_oidc")} disabled={loading}>
                   <span style={{ fontSize: 18 }}>in</span> Continue with LinkedIn
                 </button>
               </div>
@@ -115,9 +217,11 @@ export default function Auth() {
                   <div style={{ textAlign: "right", marginTop: -8 }}>
                     <a onClick={() => setMode("forgot")} style={{ fontSize: 13 }}>Forgot password?</a>
                   </div>
-                  <button type="submit" className="btn-primary">Sign in →</button>
+                  <button type="submit" className="btn-primary" disabled={loading}>{loading ? "Signing in..." : "Sign in →"}</button>
                 </form>
               )}
+              {!!message && <p style={{ color: "#14b8a6", fontSize: 13, marginTop: 14 }}>{message}</p>}
+              {!!error && <p style={{ color: "#f87171", fontSize: 13, marginTop: 14 }}>{error}</p>}
 
               <p style={{ textAlign: "center", fontSize: 14, color: "#8892aa", marginTop: 28 }}>
                 Don't have an account? <a onClick={() => setMode("signup")}>Sign up</a>
@@ -154,10 +258,12 @@ export default function Auth() {
                     <label>Confirm password</label>
                     <input type="password" placeholder="••••••••" value={form.confirmPassword} onChange={e => update("confirmPassword", e.target.value)} required />
                   </div>
-                  <button type="submit" className="btn-primary">Create account →</button>
+                  <button type="submit" className="btn-primary" disabled={loading}>{loading ? "Creating account..." : "Create account →"}</button>
                   <p style={{ fontSize: 12, color: "#4a5568", textAlign: "center" }}>By signing up you agree to our Terms and Privacy Policy.</p>
                 </form>
               )}
+              {!!message && <p style={{ color: "#14b8a6", fontSize: 13, marginTop: 14 }}>{message}</p>}
+              {!!error && <p style={{ color: "#f87171", fontSize: 13, marginTop: 14 }}>{error}</p>}
 
               <p style={{ textAlign: "center", fontSize: 14, color: "#8892aa", marginTop: 28 }}>
                 Already have an account? <a onClick={() => setMode("signin")}>Sign in</a>
@@ -182,9 +288,11 @@ export default function Auth() {
                     <label>Email</label>
                     <input type="email" placeholder="you@company.com" value={form.email} onChange={e => update("email", e.target.value)} required />
                   </div>
-                  <button type="submit" className="btn-primary">Send reset link →</button>
+                  <button type="submit" className="btn-primary" disabled={loading}>{loading ? "Sending..." : "Send reset link →"}</button>
                 </form>
               )}
+              {!!message && <p style={{ color: "#14b8a6", fontSize: 13, marginTop: 14 }}>{message}</p>}
+              {!!error && <p style={{ color: "#f87171", fontSize: 13, marginTop: 14 }}>{error}</p>}
 
               <p style={{ textAlign: "center", fontSize: 14, color: "#8892aa", marginTop: 28 }}>
                 <a onClick={() => setMode("signin")}>← Back to sign in</a>
