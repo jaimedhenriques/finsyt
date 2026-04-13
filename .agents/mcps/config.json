@@ -6,6 +6,13 @@
       "env": {
         "API_KEY": "41f8ea7138271fecc0ac762cc3fa9eddf936113cf9a8fca9b00c3b812dd7b4c0"
       }
+    },
+    "figma": {
+      "command": "npx",
+      "args": ["-y", "@figmcp/mcp-server"],
+      "env": {
+        "FIGMA_API_KEY": "${FIGMA_API_KEY}"
+      }
     }
   }
 }
