@@ -1,4 +1,5 @@
 'use client'
+import NPSWidget from '@/components/NPSWidget'
 import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
@@ -191,6 +192,8 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </div>
 
+        {/* AutoPMF NPS */}
+        <NPSWidget minSessionSeconds={120} />
         {/* Page content */}
         <div style={{flex:1,overflowY:'auto',background:'#080E1A'}}>
           {children}
