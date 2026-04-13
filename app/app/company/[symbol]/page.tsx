@@ -1,267 +1,425 @@
 'use client'
-import { useState, useEffect, useRef } from 'react'
-import { AreaChart, Area, BarChart, Bar, LineChart, Line, ResponsiveContainer, XAxis, YAxis, Tooltip, CartesianGrid } from 'recharts'
+import { useEffect, useState, use } from 'react'
 import Link from 'next/link'
-import { useParams } from 'next/navigation'
+import { AreaChart, Area, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, ReferenceLine } from 'recharts'
+import { fmtLarge, fmtPct, fmt, fmtNum, changeClass, formatDate } from '@/lib/utils'
 
-type Tab = 'overview'|'financials'|'news'|'insider'|'filings'|'estimates'|'transcripts'|'ownership'|'dcf'
+const RANGES = ['1W','1M','3M','6M','1Y','5Y']
 
-// ── Sparkline ─────────────────────────────────────────────────────────────────
-function Spark({ data, color }: { data: number[]; color: string }) {
-  const pts = data.map((v, i) => ({ v }))
-  return (
-    <ResponsiveContainer width="100%" height={40}>
-      <AreaChart data={pts} margin={{ top: 2, right: 0, left: 0, bottom: 0 }}>
-        <defs>
-          <linearGradient id={`sg-${color}`} x1="0" y1="0" x2="0" y2="1">
-            <stop offset="5%" stopColor={color} stopOpacity={0.2} />
-            <stop offset="95%" stopColor={color} stopOpacity={0} />
-          </linearGradient>
-        </defs>
-        <Area type="monotone" dataKey="v" stroke={color} strokeWidth={1.5} fill={`url(#sg-${color})`} dot={false} />
-      </AreaChart>
-    </ResponsiveContainer>
-  )
-}
+export default function CompanyPage({ params }: { params: Promise<{ symbol: string }> }) {
+  const { symbol } = use(params)
+  const SYM = symbol?.toUpperCase()
 
-// ── Live Overview Tab ─────────────────────────────────────────────────────────
-function OverviewTab({ symbol, profile }: { symbol: string; profile: any }) {
-  const [chart, setChart] = useState<any[]>([])
+  const [quote, setQuote] = useState<any>(null)
+  const [financials, setFinancials] = useState<any>(null)
+  const [news, setNews] = useState<any[]>([])
+  const [earnings, setEarnings] = useState<any>(null)
+  const [tab, setTab] = useState<'overview'|'financials'|'comps'|'news'|'filings'>('overview')
+  const [finTab, setFinTab] = useState<'income'|'balance'|'cashflow'|'earnings'>('income')
+  const [period, setPeriod] = useState<'annual'|'quarterly'>('annual')
+  const [range, setRange] = useState('1Y')
   const [loading, setLoading] = useState(true)
-  const [period, setPeriod] = useState<'1M'|'3M'|'1Y'|'5Y'>('1Y')
+  const [chartData, setChartData] = useState<any[]>([])
+
+  // Generate simulated chart data
+  function genChart(price: number, rangeKey: string) {
+    const points: Record<string,number> = {'1W':7,'1M':30,'3M':90,'6M':180,'1Y':252,'5Y':1260}
+    const n = points[rangeKey] || 252
+    const data = []
+    let p = price * (0.7 + Math.random()*0.3)
+    const trend = (price - p) / n
+    for (let i = 0; i < n; i++) {
+      p += trend + (Math.random()-0.46)*price*0.018
+      const vol = Math.floor(Math.random()*30000000+5000000)
+      const d = new Date(); d.setDate(d.getDate() - (n - i))
+      data.push({ date: d.toLocaleDateString('en-GB',{month:'short',day:'numeric'}), price: parseFloat(p.toFixed(2)), volume: vol })
+    }
+    data[data.length-1].price = price
+    return data
+  }
 
   useEffect(() => {
-    const ranges: Record<string, { from: string; to: string }> = {
-      '1M': { from: new Date(Date.now()-30*864e5).toISOString().slice(0,10), to: new Date().toISOString().slice(0,10) },
-      '3M': { from: new Date(Date.now()-90*864e5).toISOString().slice(0,10), to: new Date().toISOString().slice(0,10) },
-      '1Y': { from: new Date(Date.now()-365*864e5).toISOString().slice(0,10), to: new Date().toISOString().slice(0,10) },
-      '5Y': { from: new Date(Date.now()-1825*864e5).toISOString().slice(0,10), to: new Date().toISOString().slice(0,10) },
-    }
-    const { from, to } = ranges[period]
     setLoading(true)
-    fetch(`/api/aggs?symbol=${symbol}&from=${from}&to=${to}&timespan=day`)
-      .then(r => r.ok ? r.json() : null)
-      .then(d => {
-        if (d?.results) setChart(d.results.map((x: any) => ({ date: new Date(x.t).toLocaleDateString('en-US',{month:'short',day:'numeric'}), close: x.c, volume: x.v })))
-        setLoading(false)
-      }).catch(() => setLoading(false))
-  }, [symbol, period])
+    async function load() {
+      try {
+        const qres = await fetch(`/api/quote?symbol=${SYM}`)
+        const q = await qres.json()
+        if (!q.error) { setQuote(q); setChartData(genChart(q.price, range)) }
+      } catch {}
+      try {
+        const fres = await fetch(`/api/financials?symbol=${SYM}&type=income`)
+        const f = await fres.json()
+        setFinancials(f)
+      } catch {}
+      try {
+        const eres = await fetch(`/api/financials?symbol=${SYM}&type=earnings`)
+        const e = await eres.json()
+        setEarnings(e)
+      } catch {}
+      try {
+        const nres = await fetch(`/api/news?symbol=${SYM}&limit=8`)
+        const n = await nres.json()
+        setNews(n.articles || [])
+      } catch {}
+      setLoading(false)
+    }
+    load()
+  }, [SYM])
 
-  const p = profile
-  if (!p) return <div style={{ padding: 40, color: 'rgba(255,255,255,0.4)', textAlign: 'center' }}>Loading...</div>
+  useEffect(() => {
+    if (quote?.price) setChartData(genChart(quote.price, range))
+  }, [range])
 
-  const pos = (p.changesPercentage ?? p.changePct ?? 0) >= 0
-  const pct = Math.abs(p.changesPercentage ?? p.changePct ?? 0).toFixed(2)
-  const price = (p.price ?? 0).toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+  const sc = (s:string) => s?.includes('Bullish') ? '#059669' : s?.includes('Bearish') ? '#DC2626' : '#D97706'
 
-  const kpis = [
-    { label: 'Market Cap', value: p.mktCap ? `$${(p.mktCap/1e9).toFixed(1)}B` : (p.marketCap ? `$${p.marketCap}B` : '—') },
-    { label: 'P/E Ratio',  value: p.pe ? p.pe.toFixed(1) : (p.peRatio?.toFixed(1) ?? '—') },
-    { label: 'EPS (TTM)',  value: p.eps ? `$${p.eps.toFixed(2)}` : '—' },
-    { label: 'Revenue',    value: p.revenue ? `$${(p.revenue/1e9).toFixed(1)}B` : (profile.revenue ? `$${profile.revenue}B` : '—') },
-    { label: '52W High',   value: p.yearHigh ? `$${p.yearHigh.toFixed(2)}` : '—' },
-    { label: '52W Low',    value: p.yearLow ? `$${p.yearLow.toFixed(2)}` : '—' },
-    { label: 'Avg Volume', value: p.volAvg ? `${(p.volAvg/1e6).toFixed(1)}M` : '—' },
-    { label: 'Beta',       value: p.beta ? p.beta.toFixed(2) : '—' },
-  ]
+  // Peer comps data
+  const PEERS: Record<string, any[]> = {
+    AAPL: [{s:'AAPL',n:'Apple',mc:3.1e12,pe:33,ps:8.2,pb:48.2,roe:160,gm:44.5,ebitda:35.2,rev:385e9,growth:2.3,debt:1.1,div:0.5},{s:'MSFT',n:'Microsoft',mc:3.1e12,pe:34,ps:13.1,pb:12.8,roe:38.7,gm:70.1,ebitda:42.3,rev:228e9,growth:17.6,debt:0.3,div:0.7},{s:'GOOGL',n:'Alphabet',mc:2.2e12,pe:22,ps:6.4,pb:6.8,roe:28.4,gm:56.9,ebitda:31.2,rev:340e9,growth:14.1,debt:0.1,div:0},{s:'META',n:'Meta',mc:1.3e12,pe:27,ps:9.1,pb:8.3,roe:32.1,gm:81.5,ebitda:38.7,rev:147e9,growth:22.4,debt:0.1,div:0},{s:'NVDA',n:'NVIDIA',mc:2.9e12,pe:52,ps:26.4,pb:42.1,roe:124.5,gm:74.3,ebitda:57.4,rev:110e9,growth:122,debt:0.2,div:0.1}],
+  }
+  const peers = PEERS[SYM] || PEERS['AAPL']
+
+  if (loading) return (
+    <div className="page-content">
+      <div style={{display:'flex',alignItems:'center',gap:16,marginBottom:24}}>
+        <Link href="/app" className="btn btn-ghost btn-sm">← Back</Link>
+        <div className="skeleton" style={{height:32,width:200}} />
+      </div>
+      <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:16,marginBottom:20}}>
+        {[1,2,3].map(i=><div key={i} className="metric-card"><div className="skeleton" style={{height:60}} /></div>)}
+      </div>
+      <div className="card" style={{height:320}}><div className="skeleton" style={{height:'100%',borderRadius:12}} /></div>
+    </div>
+  )
+
+  if (!quote) return (
+    <div className="page-content">
+      <Link href="/app" className="btn btn-ghost btn-sm" style={{marginBottom:16}}>← Back</Link>
+      <div className="card" style={{padding:64,textAlign:'center'}}>
+        <p style={{fontSize:18,fontWeight:700,color:'#0A1628',marginBottom:8}}>Symbol not found: {SYM}</p>
+        <p style={{color:'#7D8FA9'}}>Try AAPL, MSFT, NVDA, GOOGL, AMZN, META, TSLA, JPM</p>
+        <Link href="/app/screener" className="btn btn-primary" style={{marginTop:16}}>Browse Screener</Link>
+      </div>
+    </div>
+  )
+
+  const pricePos = quote.changePct >= 0
+  const chartColor = pricePos ? '#059669' : '#DC2626'
 
   return (
-    <div>
-      {/* Price header */}
-      <div style={{ display:'flex', alignItems:'baseline', gap:16, marginBottom:8 }}>
-        <span style={{ fontSize:40, fontWeight:800, color:'#fff', letterSpacing:'-0.03em' }}>${price}</span>
-        <span style={{ fontSize:16, fontWeight:600, color: pos ? '#34d399' : '#f87171' }}>
-          {pos?'+':'-'}{pct}%
-        </span>
-        <span style={{ fontSize:13, color:'rgba(255,255,255,0.3)', marginLeft:'auto' }}>{p.exchangeShortName ?? p.exchange}</span>
-      </div>
-
-      {/* Chart */}
-      <div style={{ background:'rgba(255,255,255,0.02)', borderRadius:12, padding:'16px 8px 8px', marginBottom:24, border:'1px solid rgba(255,255,255,0.06)' }}>
-        <div style={{ display:'flex', gap:8, marginBottom:16, paddingLeft:8 }}>
-          {(['1M','3M','1Y','5Y'] as const).map(p => (
-            <button key={p} onClick={()=>setPeriod(p)} style={{ padding:'4px 12px', borderRadius:6, border:'none', cursor:'pointer', fontSize:12, fontWeight:600, background: period===p ? '#1B4FFF' : 'rgba(255,255,255,0.06)', color: period===p ? '#fff' : 'rgba(255,255,255,0.5)' }}>{p}</button>
-          ))}
-        </div>
-        {loading ? (
-          <div style={{ height:180, display:'flex', alignItems:'center', justifyContent:'center', color:'rgba(255,255,255,0.2)', fontSize:13 }}>Loading chart...</div>
-        ) : chart.length > 0 ? (
-          <ResponsiveContainer width="100%" height={180}>
-            <AreaChart data={chart} margin={{ top:0, right:8, left:-20, bottom:0 }}>
-              <defs>
-                <linearGradient id="priceGrad" x1="0" y1="0" x2="0" y2="1">
-                  <stop offset="5%" stopColor="#1B4FFF" stopOpacity={0.3}/>
-                  <stop offset="95%" stopColor="#1B4FFF" stopOpacity={0}/>
-                </linearGradient>
-              </defs>
-              <XAxis dataKey="date" tick={{ fill:'rgba(255,255,255,0.25)', fontSize:10 }} tickLine={false} axisLine={false} interval="preserveStartEnd" />
-              <YAxis tick={{ fill:'rgba(255,255,255,0.25)', fontSize:10 }} tickLine={false} axisLine={false} domain={['auto','auto']} tickFormatter={(v:number)=>`$${v.toFixed(0)}`} />
-              <Tooltip contentStyle={{ background:'#0d1b32', border:'1px solid rgba(27,79,255,0.25)', borderRadius:8, fontSize:12 }} labelStyle={{ color:'rgba(255,255,255,0.6)' }} itemStyle={{ color:'#93c5fd' }} formatter={(v:any)=>[`$${Number(v).toFixed(2)}`,'Price']} />
-              <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.04)" />
-              <Area type="monotone" dataKey="close" stroke="#1B4FFF" strokeWidth={2} fill="url(#priceGrad)" dot={false} />
-            </AreaChart>
-          </ResponsiveContainer>
-        ) : (
-          <div style={{ height:180, display:'flex', alignItems:'center', justifyContent:'center', color:'rgba(255,255,255,0.2)', fontSize:13 }}>No chart data</div>
-        )}
-      </div>
-
-      {/* KPI grid */}
-      <div style={{ display:'grid', gridTemplateColumns:'repeat(4,1fr)', gap:12, marginBottom:24 }}>
-        {kpis.map(k => (
-          <div key={k.label} style={{ background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.07)', borderRadius:10, padding:'14px 16px' }}>
-            <div style={{ fontSize:11, fontWeight:600, color:'rgba(255,255,255,0.35)', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:6 }}>{k.label}</div>
-            <div style={{ fontSize:18, fontWeight:700, color:'#fff' }}>{k.value}</div>
+    <div className="page-content">
+      {/* Header */}
+      <div style={{display:'flex',alignItems:'flex-start',gap:16,marginBottom:24,flexWrap:'wrap'}}>
+        <Link href="/app" className="btn btn-ghost btn-sm" style={{marginTop:4}}>← Back</Link>
+        <div style={{display:'flex',alignItems:'center',gap:16,flex:1}}>
+          <div style={{width:48,height:48,borderRadius:12,background:'linear-gradient(135deg,#1B4FFF,#0D9FE8)',display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontWeight:900,fontSize:18,flexShrink:0}}>{SYM[0]}</div>
+          <div>
+            <div style={{display:'flex',alignItems:'center',gap:12,flexWrap:'wrap'}}>
+              <h1 style={{fontSize:'1.5rem',fontWeight:900,color:'#0A1628',letterSpacing:'-0.025em'}}>{quote.name}</h1>
+              <span className="badge badge-gray">{SYM}</span>
+              <span className="badge badge-gray">{quote.exchange}</span>
+            </div>
+            <p style={{fontSize:13,color:'#7D8FA9',marginTop:2}}>{quote.sector} · {quote.industry}</p>
           </div>
+        </div>
+        <div style={{textAlign:'right'}}>
+          <div style={{fontSize:'2rem',fontWeight:900,color:'#0A1628',letterSpacing:'-0.03em'}}>${fmt(quote.price)}</div>
+          <div style={{display:'flex',alignItems:'center',gap:8,justifyContent:'flex-end'}}>
+            <span style={{fontSize:14,fontWeight:700,color:chartColor}}>{pricePos?'+':''}{fmt(quote.change)}</span>
+            <span className={`badge ${pricePos?'badge-green':'badge-red'}`}>{fmtPct(quote.changePct)}</span>
+          </div>
+        </div>
+      </div>
+
+      {/* Tabs */}
+      <div className="tab-bar" style={{marginBottom:20}}>
+        {['overview','financials','comps','news','filings'].map(t=>(
+          <button key={t} className={`tab-btn ${tab===t?'active':''}`} onClick={()=>setTab(t as any)} style={{textTransform:'capitalize'}}>{t}</button>
         ))}
       </div>
 
-      {/* Description */}
-      {p.description && (
-        <div style={{ background:'rgba(255,255,255,0.02)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:12, padding:20 }}>
-          <div style={{ fontSize:12, fontWeight:700, color:'rgba(255,255,255,0.3)', textTransform:'uppercase', letterSpacing:'0.08em', marginBottom:10 }}>Company Overview</div>
-          <p style={{ fontSize:13.5, color:'rgba(255,255,255,0.65)', lineHeight:1.75 }}>{p.description.slice(0,600)}{p.description.length>600?'…':''}</p>
+      {tab==='overview' && (
+        <div>
+          {/* Key metrics */}
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(140px,1fr))',gap:12,marginBottom:20}}>
+            {[
+              {l:'Market Cap',v:fmtLarge(quote.marketCap)},{l:'P/E Ratio',v:quote.pe>0?`${fmt(quote.pe)}x`:'—'},
+              {l:'EPS (TTM)',v:quote.eps>0?`$${fmt(quote.eps)}`:'—'},{l:'52W High',v:`$${fmt(quote.week52High)}`},
+              {l:'52W Low',v:`$${fmt(quote.week52Low)}`},{l:'Div Yield',v:quote.dividendYield>0?fmtPct(quote.dividendYield*100):'—'},
+              {l:'Beta',v:quote.beta>0?fmt(quote.beta,2):'—'},{l:'Analyst Target',v:quote.analystTarget>0?`$${fmt(quote.analystTarget)}`:'—'},
+              {l:'Fwd P/E',v:quote.forwardPE>0?`${fmt(quote.forwardPE)}x`:'—'},{l:'P/B Ratio',v:quote.priceToBook>0?`${fmt(quote.priceToBook)}x`:'—'},
+              {l:'ROE',v:quote.returnOnEquity>0?fmtPct(quote.returnOnEquity*100):'—'},{l:'Profit Margin',v:quote.profitMargin>0?fmtPct(quote.profitMargin*100):'—'},
+            ].map(m=>(
+              <div key={m.l} className="metric-card" style={{padding:'12px 16px'}}>
+                <div className="label" style={{marginBottom:6}}>{m.l}</div>
+                <div style={{fontWeight:800,fontSize:'1rem',color:'#0A1628',letterSpacing:'-0.01em'}}>{m.v}</div>
+              </div>
+            ))}
+          </div>
+
+          {/* Chart */}
+          <div className="card" style={{padding:20,marginBottom:20}}>
+            <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:16,flexWrap:'wrap',gap:12}}>
+              <div>
+                <span style={{fontWeight:700,fontSize:15,color:'#0A1628'}}>{SYM} Price Chart</span>
+                <span style={{marginLeft:12,fontSize:13,fontWeight:700,color:chartColor}}>{pricePos?'+':''}{fmt(quote.change)} ({fmtPct(quote.changePct)})</span>
+              </div>
+              <div style={{display:'flex',gap:4}}>
+                {RANGES.map(r=>(
+                  <button key={r} onClick={()=>setRange(r)}
+                    style={{padding:'4px 10px',borderRadius:6,fontSize:12,fontWeight:600,cursor:'pointer',border:'1.5px solid',
+                      borderColor:range===r?'#1B4FFF':'#E2E8F2',background:range===r?'#EEF3FF':'transparent',color:range===r?'#1B4FFF':'#7D8FA9'}}>
+                    {r}
+                  </button>
+                ))}
+              </div>
+            </div>
+            <div style={{height:280}}>
+              <ResponsiveContainer width="100%" height="100%">
+                <AreaChart data={chartData} margin={{top:4,right:0,bottom:0,left:0}}>
+                  <defs>
+                    <linearGradient id="priceGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="5%" stopColor={chartColor} stopOpacity={0.15}/>
+                      <stop offset="95%" stopColor={chartColor} stopOpacity={0}/>
+                    </linearGradient>
+                  </defs>
+                  <CartesianGrid strokeDasharray="3 3" stroke="#F0F4FA"/>
+                  <XAxis dataKey="date" tick={{fontSize:10,fill:'#B0BCD0'}} interval={Math.floor(chartData.length/6)} />
+                  <YAxis tick={{fontSize:10,fill:'#B0BCD0'}} tickFormatter={v=>`$${v}`} domain={['auto','auto']} width={60}/>
+                  <Tooltip formatter={(v:any)=>[`$${fmt(v)}`,SYM]} contentStyle={{fontSize:12,borderRadius:8,border:'1px solid #E2E8F2'}}/>
+                  <Area type="monotone" dataKey="price" stroke={chartColor} strokeWidth={2} fill="url(#priceGrad)" dot={false}/>
+                </AreaChart>
+              </ResponsiveContainer>
+            </div>
+            {/* Volume */}
+            <div style={{height:60,marginTop:4}}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={chartData} margin={{top:0,right:0,bottom:0,left:0}}>
+                  <XAxis dataKey="date" hide/>
+                  <YAxis hide/>
+                  <Bar dataKey="volume" fill="#E2E8F2" radius={[1,1,0,0]}/>
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+
+          {/* Description + earnings preview */}
+          <div style={{display:'grid',gridTemplateColumns:'2fr 1fr',gap:16}}>
+            <div className="card" style={{padding:20}}>
+              <div className="section-title">About {quote.name}</div>
+              <p style={{fontSize:13,color:'#3D4F6E',lineHeight:1.7}}>{quote.description||'No description available.'}</p>
+            </div>
+            {earnings?.quarterly?.length>0 && (
+              <div className="card" style={{padding:20}}>
+                <div className="section-title">EPS vs Estimate</div>
+                <div style={{height:160}}>
+                  <ResponsiveContainer width="100%" height="100%">
+                    <BarChart data={earnings.quarterly.slice(0,4).reverse()} margin={{top:4,right:0,bottom:0,left:0}}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#F0F4FA"/>
+                      <XAxis dataKey="date" tick={{fontSize:10,fill:'#B0BCD0'}} tickFormatter={v=>v?.slice(0,7)}/>
+                      <YAxis tick={{fontSize:10,fill:'#B0BCD0'}} width={30}/>
+                      <Tooltip contentStyle={{fontSize:12,borderRadius:8}}/>
+                      <Bar dataKey="reportedEPS" name="Reported EPS" fill="#1B4FFF" radius={[3,3,0,0]}/>
+                      <Bar dataKey="estimatedEPS" name="Estimated EPS" fill="#E2E8F2" radius={[3,3,0,0]}/>
+                    </BarChart>
+                  </ResponsiveContainer>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       )}
-    </div>
-  )
-}
 
-// ── Live News Tab ─────────────────────────────────────────────────────────────
-function NewsTab({ symbol }: { symbol: string }) {
-  const [news, setNews] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
-  useEffect(() => {
-    fetch(`/api/news?symbol=${symbol}&limit=20`)
-      .then(r => r.ok ? r.json() : null)
-      .then(d => { if (Array.isArray(d)) setNews(d); else if (d?.news) setNews(d.news); setLoading(false) })
-      .catch(() => setLoading(false))
-  }, [symbol])
-
-  if (loading) return <div style={{ padding:40, textAlign:'center', color:'rgba(255,255,255,0.3)' }}>Loading news...</div>
-  if (!news.length) return <div style={{ padding:40, textAlign:'center', color:'rgba(255,255,255,0.3)' }}>No news found</div>
-
-  return (
-    <div style={{ display:'flex', flexDirection:'column', gap:12 }}>
-      {news.slice(0,15).map((n: any, i: number) => (
-        <a key={i} href={n.url || n.link || '#'} target="_blank" rel="noopener noreferrer" style={{ display:'block', background:'rgba(255,255,255,0.02)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:10, padding:'16px 18px', textDecoration:'none', transition:'border-color 0.15s' }}
-          onMouseEnter={e=>(e.currentTarget.style.borderColor='rgba(27,79,255,0.3)')}
-          onMouseLeave={e=>(e.currentTarget.style.borderColor='rgba(255,255,255,0.06)')}>
-          <div style={{ display:'flex', justifyContent:'space-between', alignItems:'flex-start', gap:16, marginBottom:8 }}>
-            <span style={{ fontSize:14, fontWeight:600, color:'#fff', lineHeight:1.45, flex:1 }}>{n.title}</span>
-            <span style={{ fontSize:11, color:'rgba(255,255,255,0.3)', whiteSpace:'nowrap' }}>{n.publishedDate ? new Date(n.publishedDate).toLocaleDateString('en-GB',{day:'numeric',month:'short'}) : ''}</span>
-          </div>
-          {n.text && <p style={{ fontSize:12.5, color:'rgba(255,255,255,0.45)', lineHeight:1.6, margin:0 }}>{n.text.slice(0,160)}…</p>}
-          <div style={{ marginTop:8, fontSize:11, color:'rgba(255,255,255,0.25)' }}>{n.site || n.publisher || ''}</div>
-        </a>
-      ))}
-    </div>
-  )
-}
-
-// ── Live Insider Tab ──────────────────────────────────────────────────────────
-function InsiderTab({ symbol }: { symbol: string }) {
-  const [data, setData] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
-  useEffect(() => {
-    fetch(`/api/insider?symbol=${symbol}`)
-      .then(r => r.ok ? r.json() : null)
-      .then(d => { if (Array.isArray(d)) setData(d); else if (d?.data) setData(d.data); setLoading(false) })
-      .catch(() => setLoading(false))
-  }, [symbol])
-
-  const buys = data.filter((x:any) => ['P','A','M'].includes(x.transactionType ?? x.acquistionOrDisposition ?? ''))
-  const sells = data.filter((x:any) => ['S','D'].includes(x.transactionType ?? x.acquistionOrDisposition ?? ''))
-
-  if (loading) return <div style={{ padding:40, textAlign:'center', color:'rgba(255,255,255,0.3)' }}>Loading insider data...</div>
-
-  return (
-    <div>
-      {/* Summary */}
-      <div style={{ display:'grid', gridTemplateColumns:'1fr 1fr', gap:12, marginBottom:24 }}>
-        <div style={{ background:'rgba(52,211,153,0.06)', border:'1px solid rgba(52,211,153,0.15)', borderRadius:10, padding:16 }}>
-          <div style={{ fontSize:11, fontWeight:700, color:'rgba(52,211,153,0.7)', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:8 }}>Buys (last 90d)</div>
-          <div style={{ fontSize:28, fontWeight:800, color:'#34d399' }}>{buys.length}</div>
-          <div style={{ fontSize:12, color:'rgba(255,255,255,0.4)', marginTop:4 }}>transactions</div>
-        </div>
-        <div style={{ background:'rgba(248,113,113,0.06)', border:'1px solid rgba(248,113,113,0.15)', borderRadius:10, padding:16 }}>
-          <div style={{ fontSize:11, fontWeight:700, color:'rgba(248,113,113,0.7)', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:8 }}>Sells (last 90d)</div>
-          <div style={{ fontSize:28, fontWeight:800, color:'#f87171' }}>{sells.length}</div>
-          <div style={{ fontSize:12, color:'rgba(255,255,255,0.4)', marginTop:4 }}>transactions</div>
-        </div>
-      </div>
-      {/* Table */}
-      <div style={{ overflowX:'auto' }}>
-        <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12 }}>
-          <thead>
-            <tr style={{ borderBottom:'1px solid rgba(255,255,255,0.08)' }}>
-              {['Date','Insider','Title','Type','Shares','Value','Price'].map(h => (
-                <th key={h} style={{ padding:'8px 12px', textAlign:'left', color:'rgba(255,255,255,0.35)', fontWeight:700, fontSize:10, textTransform:'uppercase', letterSpacing:'0.06em' }}>{h}</th>
+      {tab==='financials' && (
+        <div>
+          <div style={{display:'flex',alignItems:'center',gap:12,marginBottom:16,flexWrap:'wrap'}}>
+            <div className="tab-bar" style={{marginBottom:0,borderBottom:'none'}}>
+              {['income','balance','cashflow','earnings'].map(t=>(
+                <button key={t} className={`tab-btn ${finTab===t?'active':''}`} onClick={()=>setFinTab(t as any)} style={{textTransform:'capitalize',fontSize:13}}>{t==='cashflow'?'Cash Flow':t==='earnings'?'Earnings':t==='income'?'Income Stmt':'Balance Sheet'}</button>
               ))}
-            </tr>
-          </thead>
+            </div>
+            <div style={{marginLeft:'auto',display:'flex',gap:4}}>
+              {(['annual','quarterly'] as const).map(p=>(
+                <button key={p} onClick={()=>setPeriod(p)} style={{padding:'4px 12px',borderRadius:6,fontSize:12,fontWeight:600,cursor:'pointer',border:'1.5px solid',borderColor:period===p?'#1B4FFF':'#E2E8F2',background:period===p?'#EEF3FF':'transparent',color:period===p?'#1B4FFF':'#7D8FA9'}}>{p==='annual'?'Annual':'Quarterly'}</button>
+              ))}
+            </div>
+          </div>
+
+          <FinancialsTable symbol={SYM} type={finTab} period={period} />
+        </div>
+      )}
+
+      {tab==='comps' && (
+        <div>
+          <div style={{marginBottom:16}}>
+            <h2 style={{fontSize:'1rem',fontWeight:700,color:'#0A1628'}}>Peer Comparison — {SYM} vs Industry</h2>
+            <p style={{fontSize:13,color:'#7D8FA9',marginTop:4}}>Benchmarked across valuation, profitability, and growth metrics</p>
+          </div>
+          <div className="card" style={{overflowX:'auto'}}>
+            <table className="data-table">
+              <thead><tr>
+                <th>Company</th><th className="right">Mkt Cap</th><th className="right">P/E</th>
+                <th className="right">P/S</th><th className="right">P/B</th><th className="right">ROE %</th>
+                <th className="right">Gross Margin</th><th className="right">EBITDA Margin</th>
+                <th className="right">Revenue</th><th className="right">Rev Growth</th><th className="right">Debt/Eq</th>
+              </tr></thead>
+              <tbody>
+                {peers.map((p:any,i:number)=>(
+                  <tr key={i} style={{background:p.s===SYM?'#F0F4FF':''}}>
+                    <td>
+                      <div style={{display:'flex',alignItems:'center',gap:8}}>
+                        <div style={{width:28,height:28,borderRadius:7,background:p.s===SYM?'linear-gradient(135deg,#1B4FFF,#0D9FE8)':'#F0F4FA',display:'flex',alignItems:'center',justifyContent:'center',color:p.s===SYM?'#fff':'#7D8FA9',fontSize:11,fontWeight:900}}>{p.s[0]}</div>
+                        <div>
+                          <span style={{fontWeight:p.s===SYM?800:600,fontSize:13,color:p.s===SYM?'#1B4FFF':'#0A1628'}}>{p.s}</span>
+                          {p.s===SYM&&<span className="badge badge-blue" style={{marginLeft:6,fontSize:10}}>Selected</span>}
+                          <div style={{fontSize:11,color:'#B0BCD0'}}>{p.n}</div>
+                        </div>
+                      </div>
+                    </td>
+                    <td className="right" style={{fontSize:13,fontWeight:600}}>{fmtLarge(p.mc)}</td>
+                    <td className="right" style={{fontSize:13}}>{p.pe}x</td>
+                    <td className="right" style={{fontSize:13}}>{p.ps}x</td>
+                    <td className="right" style={{fontSize:13}}>{p.pb}x</td>
+                    <td className="right" style={{fontSize:13,color:p.roe>30?'#059669':'#3D4F6E',fontWeight:p.roe>30?700:400}}>{p.roe}%</td>
+                    <td className="right" style={{fontSize:13,color:p.gm>60?'#059669':'#3D4F6E',fontWeight:p.gm>60?700:400}}>{p.gm}%</td>
+                    <td className="right" style={{fontSize:13,color:p.ebitda>35?'#059669':'#3D4F6E'}}>{p.ebitda}%</td>
+                    <td className="right" style={{fontSize:13}}>{fmtLarge(p.rev)}</td>
+                    <td className={`right ${changeClass(p.growth)}`} style={{fontSize:13,fontWeight:600}}>{fmtPct(p.growth)}</td>
+                    <td className="right" style={{fontSize:13,color:p.debt<0.5?'#059669':p.debt>1?'#DC2626':'#3D4F6E'}}>{p.debt}x</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
+          {/* Industry KPIs */}
+          <div className="card" style={{marginTop:16,padding:20}}>
+            <div className="section-title">Industry-Specific KPIs</div>
+            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(180px,1fr))',gap:12}}>
+              {[
+                {l:'Rule of 40',v:'92',note:'Revenue growth + EBITDA margin',good:true},
+                {l:'Net Dollar Retention',v:'125%',note:'Customer expansion signal',good:true},
+                {l:'R&D / Revenue',v:'8.2%',note:'vs 12.1% sector avg',good:true},
+                {l:'CapEx / Revenue',v:'3.1%',note:'Asset-light model',good:true},
+                {l:'FCF Yield',v:'3.8%',note:'Based on market cap',good:true},
+                {l:'Cash Conversion',v:'107%',note:'Net income to FCF',good:true},
+              ].map(k=>(
+                <div key={k.l} style={{background:'#F8FAFD',borderRadius:10,padding:'12px 16px',border:'1px solid #E2E8F2'}}>
+                  <div style={{fontSize:11,fontWeight:700,color:'#7D8FA9',textTransform:'uppercase',letterSpacing:'0.06em',marginBottom:6}}>{k.l}</div>
+                  <div style={{fontWeight:900,fontSize:'1.25rem',color:k.good?'#059669':'#DC2626',letterSpacing:'-0.02em'}}>{k.v}</div>
+                  <div style={{fontSize:11,color:'#B0BCD0',marginTop:4}}>{k.note}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {tab==='news' && (
+        <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(360px,1fr))',gap:16}}>
+          {news.map((n,i)=>(
+            <a key={i} href={n.url} target="_blank" rel="noopener noreferrer" className="card"
+              style={{display:'block',padding:20,textDecoration:'none'}}>
+              <div style={{display:'flex',gap:8,marginBottom:8,flexWrap:'wrap'}}>
+                <span style={{fontWeight:700,fontSize:12,color:'#1B4FFF'}}>{n.source}</span>
+                <span style={{fontSize:11,color:'#B0BCD0'}}>{n.publishedAt?.slice(0,10)}</span>
+                <span style={{color:sc(n.sentiment),fontSize:11,fontWeight:700,marginLeft:'auto'}}>{n.sentiment?.replace(/_/g,' ')}</span>
+              </div>
+              <h3 style={{fontSize:13,fontWeight:600,color:'#0A1628',lineHeight:1.5,marginBottom:8}}>{n.title}</h3>
+              <p style={{fontSize:12,color:'#7D8FA9',lineHeight:1.6}}>{n.summary?.slice(0,140)}...</p>
+            </a>
+          ))}
+          {news.length===0&&<div className="card" style={{padding:48,textAlign:'center',gridColumn:'1/-1'}}>
+            <p style={{color:'#7D8FA9'}}>No news available for {SYM}</p>
+          </div>}
+        </div>
+      )}
+
+      {tab==='filings' && <FilingsTab symbol={SYM} />}
+    </div>
+  )
+}
+
+function FinancialsTable({ symbol, type, period }: { symbol:string, type:string, period:string }) {
+  const [data, setData] = useState<any>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    setLoading(true)
+    fetch(`/api/financials?symbol=${symbol}&type=${type}`)
+      .then(r=>r.json()).then(d=>{setData(d);setLoading(false)}).catch(()=>setLoading(false))
+  }, [symbol,type])
+
+  if (loading) return <div className="card" style={{padding:40,textAlign:'center'}}><div className="skeleton" style={{height:200}} /></div>
+  if (!data) return <div className="card" style={{padding:40,textAlign:'center'}}><p style={{color:'#7D8FA9'}}>No data</p></div>
+
+  if (type==='earnings') {
+    const rows = data[period] || []
+    return (
+      <div className="card" style={{overflowX:'auto'}}>
+        <table className="data-table">
+          <thead><tr><th>Period</th>{period==='quarterly'&&<th>Reported</th>}<th className="right">Reported EPS</th><th className="right">Estimated EPS</th><th className="right">Surprise</th><th className="right">Surprise %</th></tr></thead>
           <tbody>
-            {data.slice(0,30).map((row: any, i: number) => {
-              const isBuy = ['P','A','M'].includes(row.transactionType ?? row.acquistionOrDisposition ?? '')
-              return (
-                <tr key={i} style={{ borderBottom:'1px solid rgba(255,255,255,0.04)' }}>
-                  <td style={{ padding:'10px 12px', color:'rgba(255,255,255,0.5)' }}>{row.transactionDate?.slice(0,10) ?? '—'}</td>
-                  <td style={{ padding:'10px 12px', color:'#fff', fontWeight:600 }}>{row.reportingName ?? row.insiderName ?? '—'}</td>
-                  <td style={{ padding:'10px 12px', color:'rgba(255,255,255,0.4)', maxWidth:140, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{row.typeOfOwner ?? row.title ?? '—'}</td>
-                  <td style={{ padding:'10px 12px' }}><span style={{ fontSize:11, fontWeight:700, padding:'2px 8px', borderRadius:4, background: isBuy?'rgba(52,211,153,0.12)':'rgba(248,113,113,0.12)', color: isBuy?'#34d399':'#f87171' }}>{isBuy?'BUY':'SELL'}</span></td>
-                  <td style={{ padding:'10px 12px', color:'rgba(255,255,255,0.7)' }}>{row.securitiesTransacted?.toLocaleString() ?? row.shares?.toLocaleString() ?? '—'}</td>
-                  <td style={{ padding:'10px 12px', color:'rgba(255,255,255,0.7)' }}>{row.securitiesTransacted && row.price ? `$${(row.securitiesTransacted*row.price/1e6).toFixed(2)}M` : '—'}</td>
-                  <td style={{ padding:'10px 12px', color:'rgba(255,255,255,0.5)' }}>{row.price ? `$${Number(row.price).toFixed(2)}` : '—'}</td>
-                </tr>
-              )
-            })}
+            {rows.map((r:any,i:number)=>(
+              <tr key={i}>
+                <td style={{fontWeight:600}}>{r.date}</td>
+                {period==='quarterly'&&<td style={{fontSize:12,color:'#7D8FA9'}}>{r.reportedDate}</td>}
+                <td className="right" style={{fontWeight:700}}>{r.reportedEPS!=null?`$${fmt(r.reportedEPS)}`:'—'}</td>
+                <td className="right" style={{color:'#7D8FA9'}}>{r.estimatedEPS!=null?`$${fmt(r.estimatedEPS)}`:'—'}</td>
+                <td className={`right ${r.surprise>0?'pos':r.surprise<0?'neg':''}`}>{r.surprise!=null?`$${fmt(r.surprise)}`:'—'}</td>
+                <td className={`right ${r.surprisePct>0?'pos':r.surprisePct<0?'neg':''}`}>{r.surprisePct!=null?fmtPct(r.surprisePct):'—'}</td>
+              </tr>
+            ))}
           </tbody>
         </table>
       </div>
-    </div>
-  )
-}
+    )
+  }
 
-// ── Live Ownership Tab ────────────────────────────────────────────────────────
-function OwnershipTab({ symbol }: { symbol: string }) {
-  const [data, setData] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
-  useEffect(() => {
-    fetch(`https://financialmodelingprep.com/stable/institutional-ownership/symbol-ownership?symbol=${symbol}&apikey=${process.env.NEXT_PUBLIC_FMP_API_KEY || ''}`)
-      .then(r => r.ok ? r.json() : null)
-      .then(d => { if (Array.isArray(d)) setData(d.slice(0,20)); setLoading(false) })
-      .catch(() => setLoading(false))
-  }, [symbol])
+  const rows = data[period] || []
+  if (!rows.length) return <div className="card" style={{padding:40,textAlign:'center'}}><p style={{color:'#7D8FA9'}}>No {period} data available for this symbol</p></div>
 
-  if (loading) return <div style={{ padding:40, textAlign:'center', color:'rgba(255,255,255,0.3)' }}>Loading ownership data...</div>
-  if (!data.length) return <div style={{ padding:40, textAlign:'center', color:'rgba(255,255,255,0.3)' }}>No ownership data available</div>
-
-  const total = data.reduce((acc: number, x: any) => acc + (x.shares ?? 0), 0)
+  const INCOME_KEYS = [
+    {k:'totalRevenue',l:'Revenue',pct:false},{k:'grossProfit',l:'Gross Profit',pct:false},{k:'ebitda',l:'EBITDA',pct:false},
+    {k:'operatingIncome',l:'Operating Income',pct:false},{k:'netIncome',l:'Net Income',pct:false},
+    {k:'costOfRevenue',l:'Cost of Revenue',pct:false},{k:'researchAndDevelopment',l:'R&D',pct:false},
+    {k:'sellingGeneralAndAdministrative',l:'SG&A',pct:false},
+  ]
+  const BALANCE_KEYS = [
+    {k:'totalAssets',l:'Total Assets',pct:false},{k:'totalCurrentAssets',l:'Current Assets',pct:false},
+    {k:'cashAndCashEquivalentsAtCarryingValue',l:'Cash & Equivalents',pct:false},
+    {k:'totalLiabilities',l:'Total Liabilities',pct:false},{k:'totalCurrentLiabilities',l:'Current Liabilities',pct:false},
+    {k:'longTermDebt',l:'Long-term Debt',pct:false},{k:'totalShareholderEquity',l:'Shareholder Equity',pct:false},
+  ]
+  const CF_KEYS = [
+    {k:'operatingCashflow',l:'Operating Cash Flow',pct:false},{k:'capitalExpenditures',l:'CapEx',pct:false},
+    {k:'cashflowFromInvestment',l:'Investing CF',pct:false},{k:'cashflowFromFinancing',l:'Financing CF',pct:false},
+    {k:'dividendPayout',l:'Dividends Paid',pct:false},{k:'changeInCash',l:'Net Change in Cash',pct:false},
+  ]
+  const keys = type==='income'?INCOME_KEYS:type==='balance'?BALANCE_KEYS:CF_KEYS
+  const cols = rows.slice(0, period==='annual'?5:6)
 
   return (
-    <div style={{ overflowX:'auto' }}>
-      <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12 }}>
-        <thead>
-          <tr style={{ borderBottom:'1px solid rgba(255,255,255,0.08)' }}>
-            {['Institution','Shares','% of Portfolio','Change','Filed'].map(h => (
-              <th key={h} style={{ padding:'8px 12px', textAlign:'left', color:'rgba(255,255,255,0.35)', fontWeight:700, fontSize:10, textTransform:'uppercase', letterSpacing:'0.06em' }}>{h}</th>
-            ))}
-          </tr>
-        </thead>
+    <div className="card" style={{overflowX:'auto'}}>
+      <table className="data-table">
+        <thead><tr>
+          <th style={{width:200}}>Metric (USD mn)</th>
+          {cols.map((c:any,i:number)=><th key={i} className="right">{c.date?.slice(0,7)}</th>)}
+          <th className="right">YoY Chg</th>
+        </tr></thead>
         <tbody>
-          {data.map((row: any, i: number) => {
-            const chg = row.changeInSharesNumberPercentage ?? 0
+          {keys.map(({k,l})=>{
+            const vals = cols.map((c:any)=>c[k])
+            const latest = vals[0], prev = vals[1]
+            const yoy = latest!=null&&prev!=null&&prev!==0 ? ((latest-prev)/Math.abs(prev))*100 : null
             return (
-              <tr key={i} style={{ borderBottom:'1px solid rgba(255,255,255,0.04)' }}>
-                <td style={{ padding:'10px 12px', color:'#fff', fontWeight:600 }}>{row.investorName ?? '—'}</td>
-                <td style={{ padding:'10px 12px', color:'rgba(255,255,255,0.7)' }}>{row.shares?.toLocaleString() ?? '—'}</td>
-                <td style={{ padding:'10px 12px', color:'rgba(255,255,255,0.6)' }}>{total > 0 ? ((row.shares/total)*100).toFixed(2)+'%' : '—'}</td>
-                <td style={{ padding:'10px 12px' }}>
-                  <span style={{ fontSize:11, fontWeight:700, color: chg > 0 ? '#34d399' : chg < 0 ? '#f87171' : 'rgba(255,255,255,0.4)' }}>
-                    {chg > 0 ? '+' : ''}{chg.toFixed(1)}%
-                  </span>
+              <tr key={k}>
+                <td style={{fontWeight:600,fontSize:13,color:'#1C2B4A'}}>{l}</td>
+                {vals.map((v:any,i:number)=>(
+                  <td key={i} className="right" style={{fontSize:13,color:'#3D4F6E'}}>{v!=null?fmtLarge(v):'—'}</td>
+                ))}
+                <td className={`right ${yoy!=null?(yoy>0?'pos':'neg'):''}`} style={{fontSize:13,fontWeight:600}}>
+                  {yoy!=null?fmtPct(yoy):'—'}
                 </td>
-                <td style={{ padding:'10px 12px', color:'rgba(255,255,255,0.4)' }}>{row.date?.slice(0,10) ?? '—'}</td>
               </tr>
             )
           })}
@@ -271,394 +429,35 @@ function OwnershipTab({ symbol }: { symbol: string }) {
   )
 }
 
-// ── Live Filings Tab ──────────────────────────────────────────────────────────
-function FilingsTab({ symbol }: { symbol: string }) {
+function FilingsTab({ symbol }: { symbol:string }) {
   const [filings, setFilings] = useState<any[]>([])
+  const [company, setCompany] = useState('')
   const [loading, setLoading] = useState(true)
-  const [type, setType] = useState('all')
+
   useEffect(() => {
-    setLoading(true)
-    fetch(`/api/sec/filings?symbol=${symbol}&limit=20${type!=='all'?`&type=${type}`:''}`)
-      .then(r => r.ok ? r.json() : null)
-      .then(d => { if (Array.isArray(d)) setFilings(d); else if (d?.filings) setFilings(d.filings); setLoading(false) })
-      .catch(() => setLoading(false))
-  }, [symbol, type])
-
-  const TYPES = ['all','10-K','10-Q','8-K','DEF 14A','S-1']
-  const typeColors: Record<string,string> = { '10-K':'#1B4FFF','10-Q':'#059669','8-K':'#D97706','DEF 14A':'#8B5CF6','S-1':'#EC4899','4':'#6b7280' }
-
-  return (
-    <div>
-      <div style={{ display:'flex', gap:8, marginBottom:20, flexWrap:'wrap' }}>
-        {TYPES.map(t => (
-          <button key={t} onClick={()=>setType(t)} style={{ padding:'5px 14px', borderRadius:6, border:'none', cursor:'pointer', fontSize:12, fontWeight:600, background: type===t ? '#1B4FFF' : 'rgba(255,255,255,0.06)', color: type===t ? '#fff' : 'rgba(255,255,255,0.5)' }}>{t}</button>
-        ))}
-      </div>
-      {loading ? (
-        <div style={{ padding:40, textAlign:'center', color:'rgba(255,255,255,0.3)' }}>Loading filings...</div>
-      ) : (
-        <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-          {filings.slice(0,20).map((f: any, i: number) => (
-            <a key={i} href={f.linkToFilingDetails ?? f.url ?? '#'} target="_blank" rel="noopener noreferrer"
-              style={{ display:'flex', alignItems:'center', gap:16, padding:'14px 16px', background:'rgba(255,255,255,0.02)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:9, textDecoration:'none', transition:'border-color 0.15s' }}
-              onMouseEnter={e=>(e.currentTarget.style.borderColor='rgba(27,79,255,0.3)')}
-              onMouseLeave={e=>(e.currentTarget.style.borderColor='rgba(255,255,255,0.06)')}>
-              <span style={{ fontSize:10, fontWeight:800, padding:'3px 8px', borderRadius:5, background: `${typeColors[f.type]||'#6b7280'}22`, color: typeColors[f.type]||'#6b7280', minWidth:48, textAlign:'center' }}>{f.type}</span>
-              <span style={{ fontSize:13.5, color:'#fff', fontWeight:500, flex:1 }}>{f.description ?? f.title ?? f.formType ?? 'Filing'}</span>
-              <span style={{ fontSize:12, color:'rgba(255,255,255,0.35)', whiteSpace:'nowrap' }}>{f.filedAt?.slice(0,10) ?? f.date?.slice(0,10) ?? ''}</span>
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.25)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 0 1 0h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-            </a>
-          ))}
-          {!filings.length && <div style={{ padding:40, textAlign:'center', color:'rgba(255,255,255,0.3)' }}>No filings found</div>}
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ── Live Estimates Tab ────────────────────────────────────────────────────────
-function EstimatesTab({ symbol }: { symbol: string }) {
-  const [consensus, setConsensus] = useState<any>(null)
-  const [estimates, setEstimates] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
-  useEffect(() => {
-    Promise.all([
-      fetch(`https://financialmodelingprep.com/stable/price-target-consensus?symbol=${symbol}&apikey=${process.env.NEXT_PUBLIC_FMP_API_KEY||''}`).then(r=>r.ok?r.json():null),
-      fetch(`https://financialmodelingprep.com/stable/analyst-estimates?symbol=${symbol}&period=annual&limit=4&apikey=${process.env.NEXT_PUBLIC_FMP_API_KEY||''}`).then(r=>r.ok?r.json():null),
-    ]).then(([c, e]) => {
-      if (c && c[0]) setConsensus(c[0])
-      if (Array.isArray(e)) setEstimates(e)
-      setLoading(false)
+    fetch(`/api/filings?symbol=${symbol}`).then(r=>r.json()).then(d=>{
+      setFilings(d.filings||[]);setCompany(d.company||symbol);setLoading(false)
     }).catch(()=>setLoading(false))
-  }, [symbol])
-
-  if (loading) return <div style={{ padding:40, textAlign:'center', color:'rgba(255,255,255,0.3)' }}>Loading estimates...</div>
-
-  return (
-    <div>
-      {consensus && (
-        <div style={{ display:'grid', gridTemplateColumns:'repeat(3,1fr)', gap:12, marginBottom:24 }}>
-          {[
-            { label:'Consensus PT', value: consensus.targetConsensus ? `$${consensus.targetConsensus.toFixed(2)}` : '—' },
-            { label:'High PT', value: consensus.targetHigh ? `$${consensus.targetHigh.toFixed(2)}` : '—' },
-            { label:'Low PT', value: consensus.targetLow ? `$${consensus.targetLow.toFixed(2)}` : '—' },
-          ].map(k => (
-            <div key={k.label} style={{ background:'rgba(255,255,255,0.03)', border:'1px solid rgba(255,255,255,0.07)', borderRadius:10, padding:16 }}>
-              <div style={{ fontSize:11, fontWeight:600, color:'rgba(255,255,255,0.35)', textTransform:'uppercase', letterSpacing:'0.06em', marginBottom:6 }}>{k.label}</div>
-              <div style={{ fontSize:22, fontWeight:700, color:'#93B4FF' }}>{k.value}</div>
-            </div>
-          ))}
-        </div>
-      )}
-      {estimates.length > 0 && (
-        <div style={{ overflowX:'auto' }}>
-          <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12 }}>
-            <thead>
-              <tr style={{ borderBottom:'1px solid rgba(255,255,255,0.08)' }}>
-                {['Year','Revenue Est.','EPS Est. Low','EPS Est. High','EPS Est. Avg'].map(h => (
-                  <th key={h} style={{ padding:'8px 12px', textAlign:'left', color:'rgba(255,255,255,0.35)', fontWeight:700, fontSize:10, textTransform:'uppercase', letterSpacing:'0.06em' }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {estimates.map((row: any, i: number) => (
-                <tr key={i} style={{ borderBottom:'1px solid rgba(255,255,255,0.04)' }}>
-                  <td style={{ padding:'10px 12px', color:'rgba(255,255,255,0.6)', fontWeight:600 }}>{row.date?.slice(0,4)}</td>
-                  <td style={{ padding:'10px 12px', color:'rgba(255,255,255,0.8)' }}>${((row.revenueAvg||0)/1e9).toFixed(1)}B</td>
-                  <td style={{ padding:'10px 12px', color:'rgba(255,255,255,0.6)' }}>${(row.epsAvgLow||0).toFixed(2)}</td>
-                  <td style={{ padding:'10px 12px', color:'rgba(255,255,255,0.6)' }}>${(row.epsAvgHigh||0).toFixed(2)}</td>
-                  <td style={{ padding:'10px 12px', color:'#93B4FF', fontWeight:600 }}>${(row.epsAvg||0).toFixed(2)}</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ── Live Transcripts Tab ──────────────────────────────────────────────────────
-function TranscriptsTab({ symbol }: { symbol: string }) {
-  const [list, setList] = useState<any[]>([])
-  const [selected, setSelected] = useState<any>(null)
-  const [loading, setLoading] = useState(true)
-  const [loadingText, setLoadingText] = useState(false)
-  useEffect(() => {
-    fetch(`/api/transcripts?symbol=${symbol}&limit=8`)
-      .then(r=>r.ok?r.json():null)
-      .then(d=>{ if(Array.isArray(d))setList(d); else if(d?.transcripts)setList(d.transcripts); setLoading(false) })
-      .catch(()=>setLoading(false))
   },[symbol])
 
-  const loadTranscript = (item: any) => {
-    if (item.content) { setSelected(item); return }
-    setLoadingText(true)
-    const url = `https://financialmodelingprep.com/stable/earnings-call-transcript?symbol=${symbol}&year=${item.year}&quarter=${item.quarter}&apikey=${process.env.NEXT_PUBLIC_FMP_API_KEY||''}`
-    fetch(url).then(r=>r.ok?r.json():null).then(d=>{
-      const t = Array.isArray(d)?d[0]:d
-      setSelected({ ...item, content: t?.content || 'Transcript not available.' })
-      setLoadingText(false)
-    }).catch(()=>setLoadingText(false))
-  }
-
-  if (loading) return <div style={{ padding:40, textAlign:'center', color:'rgba(255,255,255,0.3)' }}>Loading transcripts...</div>
-
-  if (selected) return (
-    <div>
-      <button onClick={()=>setSelected(null)} style={{ display:'flex', alignItems:'center', gap:6, marginBottom:20, background:'none', border:'none', cursor:'pointer', color:'rgba(255,255,255,0.5)', fontSize:13, fontWeight:600, padding:0 }}>
-        ← Back to list
-      </button>
-      <h3 style={{ fontSize:16, fontWeight:700, color:'#fff', marginBottom:16 }}>{selected.title ?? `Q${selected.quarter} ${selected.year} Earnings Call`}</h3>
-      {loadingText ? (
-        <div style={{ color:'rgba(255,255,255,0.3)', fontSize:13 }}>Loading transcript...</div>
-      ) : (
-        <div style={{ fontSize:13, color:'rgba(255,255,255,0.7)', lineHeight:1.8, whiteSpace:'pre-wrap', maxHeight:500, overflowY:'auto', background:'rgba(255,255,255,0.02)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:10, padding:20 }}>
-          {selected.content}
-        </div>
-      )}
-    </div>
-  )
-
+  const fc:Record<string,string> = {'10-K':'badge-blue','10-Q':'badge-blue','8-K':'badge-amber','DEF 14A':'badge-gray','4':'badge-gray','S-1':'badge-green'}
+  if (loading) return <div className="card" style={{padding:48,textAlign:'center'}}><div className="skeleton" style={{height:200}} /></div>
   return (
-    <div style={{ display:'flex', flexDirection:'column', gap:8 }}>
-      {list.map((item: any, i: number) => (
-        <button key={i} onClick={()=>loadTranscript(item)} style={{ display:'flex', alignItems:'center', justifyContent:'space-between', padding:'14px 18px', background:'rgba(255,255,255,0.02)', border:'1px solid rgba(255,255,255,0.06)', borderRadius:9, cursor:'pointer', textAlign:'left', transition:'border-color 0.15s' }}
-          onMouseEnter={e=>(e.currentTarget.style.borderColor='rgba(27,79,255,0.3)')}
-          onMouseLeave={e=>(e.currentTarget.style.borderColor='rgba(255,255,255,0.06)')}>
-          <div>
-            <div style={{ fontSize:14, fontWeight:600, color:'#fff' }}>{item.title ?? `Q${item.quarter} ${item.year} Earnings Call`}</div>
-            <div style={{ fontSize:12, color:'rgba(255,255,255,0.4)', marginTop:4 }}>{item.date?.slice(0,10) ?? ''}</div>
-          </div>
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="rgba(255,255,255,0.3)" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><polyline points="9 18 15 12 9 6"/></svg>
-        </button>
-      ))}
-      {!list.length && <div style={{ padding:40, textAlign:'center', color:'rgba(255,255,255,0.3)' }}>No transcripts available</div>}
-    </div>
-  )
-}
-
-// ── Live Financials Tab ───────────────────────────────────────────────────────
-function FinancialsTab({ symbol }: { symbol: string }) {
-  const [stmt, setStmt] = useState<'income'|'balance'|'cashflow'>('income')
-  const [period, setPeriod] = useState<'annual'|'quarterly'>('annual')
-  const [data, setData] = useState<any[]>([])
-  const [loading, setLoading] = useState(true)
-
-  useEffect(() => {
-    setLoading(true)
-    const map = { income:'income-statement', balance:'balance-sheet-statement', cashflow:'cash-flow-statement' }
-    fetch(`https://financialmodelingprep.com/stable/${map[stmt]}?symbol=${symbol}&period=${period}&limit=8&apikey=${process.env.NEXT_PUBLIC_FMP_API_KEY||''}`)
-      .then(r=>r.ok?r.json():null)
-      .then(d=>{ if(Array.isArray(d))setData(d); setLoading(false) })
-      .catch(()=>setLoading(false))
-  },[symbol,stmt,period])
-
-  const INCOME_ROWS = [
-    { key:'revenue', label:'Revenue' },
-    { key:'grossProfit', label:'Gross Profit' },
-    { key:'grossProfitRatio', label:'Gross Margin', pct:true },
-    { key:'operatingIncome', label:'Operating Income' },
-    { key:'operatingIncomeRatio', label:'Operating Margin', pct:true },
-    { key:'netIncome', label:'Net Income' },
-    { key:'netIncomeRatio', label:'Net Margin', pct:true },
-    { key:'eps', label:'EPS' },
-    { key:'ebitda', label:'EBITDA' },
-  ]
-  const BALANCE_ROWS = [
-    { key:'totalCurrentAssets', label:'Current Assets' },
-    { key:'cashAndCashEquivalents', label:'Cash & Equivalents' },
-    { key:'totalAssets', label:'Total Assets' },
-    { key:'totalCurrentLiabilities', label:'Current Liabilities' },
-    { key:'totalDebt', label:'Total Debt' },
-    { key:'totalStockholdersEquity', label:'Total Equity' },
-  ]
-  const CASHFLOW_ROWS = [
-    { key:'operatingCashFlow', label:'Operating CF' },
-    { key:'capitalExpenditure', label:'CapEx' },
-    { key:'freeCashFlow', label:'Free Cash Flow' },
-    { key:'dividendsPaid', label:'Dividends Paid' },
-    { key:'stockRepurchased', label:'Buybacks' },
-  ]
-  const rows = stmt==='income'?INCOME_ROWS:stmt==='balance'?BALANCE_ROWS:CASHFLOW_ROWS
-
-  const fmt = (v:any, pct:boolean=false) => {
-    if(v===null||v===undefined) return '—'
-    if(pct) return `${(v*100).toFixed(1)}%`
-    const n = Math.abs(v)
-    if(n>=1e9) return `${v<0?'-':''}$${(n/1e9).toFixed(1)}B`
-    if(n>=1e6) return `${v<0?'-':''}$${(n/1e6).toFixed(0)}M`
-    return `${v<0?'-':''}$${n.toFixed(2)}`
-  }
-
-  return (
-    <div>
-      <div style={{ display:'flex', gap:8, marginBottom:20, flexWrap:'wrap' }}>
-        {(['income','balance','cashflow'] as const).map(s => (
-          <button key={s} onClick={()=>setStmt(s)} style={{ padding:'6px 16px', borderRadius:7, border:'none', cursor:'pointer', fontSize:12, fontWeight:600, background:stmt===s?'#1B4FFF':'rgba(255,255,255,0.06)', color:stmt===s?'#fff':'rgba(255,255,255,0.5)' }}>
-            {s==='income'?'Income Statement':s==='balance'?'Balance Sheet':'Cash Flow'}
-          </button>
-        ))}
-        <div style={{ marginLeft:'auto', display:'flex', gap:6 }}>
-          {(['annual','quarterly'] as const).map(p => (
-            <button key={p} onClick={()=>setPeriod(p)} style={{ padding:'6px 14px', borderRadius:7, border:'none', cursor:'pointer', fontSize:12, fontWeight:600, background:period===p?'rgba(27,79,255,0.25)':'rgba(255,255,255,0.04)', color:period===p?'#93B4FF':'rgba(255,255,255,0.4)' }}>
-              {p==='annual'?'Annual':'Quarterly'}
-            </button>
+    <div className="card" style={{overflowX:'auto'}}>
+      <table className="data-table">
+        <thead><tr><th>Form</th><th>Filing Date</th><th>Accession #</th><th></th></tr></thead>
+        <tbody>
+          {filings.map((f,i)=>(
+            <tr key={i}>
+              <td><span className={`badge ${fc[f.form]||'badge-gray'}`}>{f.form}</span></td>
+              <td style={{fontSize:13,color:'#3D4F6E'}}>{f.date}</td>
+              <td style={{fontSize:11,fontFamily:'monospace',color:'#B0BCD0'}}>{f.accessionNumber}</td>
+              <td><a href={f.docUrl} target="_blank" rel="noopener noreferrer" className="btn btn-ghost btn-sm">SEC →</a></td>
+            </tr>
           ))}
-        </div>
-      </div>
-      {loading ? <div style={{ padding:40, textAlign:'center', color:'rgba(255,255,255,0.3)' }}>Loading...</div> : (
-        <div style={{ overflowX:'auto' }}>
-          <table style={{ width:'100%', borderCollapse:'collapse', fontSize:12 }}>
-            <thead>
-              <tr style={{ borderBottom:'1px solid rgba(255,255,255,0.08)' }}>
-                <th style={{ padding:'8px 12px', textAlign:'left', color:'rgba(255,255,255,0.35)', fontWeight:700, fontSize:10, textTransform:'uppercase', letterSpacing:'0.06em', minWidth:160 }}>Metric</th>
-                {data.map((d:any) => (
-                  <th key={d.date} style={{ padding:'8px 12px', textAlign:'right', color:'rgba(255,255,255,0.5)', fontWeight:600, fontSize:11 }}>{d.date?.slice(0,7)}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {rows.map(row => (
-                <tr key={row.key} style={{ borderBottom:'1px solid rgba(255,255,255,0.04)' }}>
-                  <td style={{ padding:'10px 12px', color:'rgba(255,255,255,0.65)', fontWeight:500 }}>{row.label}</td>
-                  {data.map((d:any, i:number) => (
-                    <td key={i} style={{ padding:'10px 12px', textAlign:'right', color:(row as any).pct?'rgba(255,255,255,0.65)':d[row.key]<0?'#f87171':'rgba(255,255,255,0.8)', fontWeight:600 }}>
-                      {fmt(d[row.key],(row as any).pct)}
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ── DCF Placeholder ───────────────────────────────────────────────────────────
-function DCFTab({ symbol }: { symbol: string }) {
-  return (
-    <div style={{ padding:40, textAlign:'center' }}>
-      <div style={{ fontSize:40, marginBottom:16 }}>📊</div>
-      <div style={{ fontSize:18, fontWeight:700, color:'#fff', marginBottom:8 }}>DCF Model</div>
-      <div style={{ fontSize:14, color:'rgba(255,255,255,0.4)' }}>Interactive DCF builder coming soon — set your own assumptions, see fair value range.</div>
-    </div>
-  )
-}
-
-// ── Main Page ─────────────────────────────────────────────────────────────────
-export default function CompanyPage() {
-  const params = useParams()
-  const symbol = (params.symbol as string)?.toUpperCase() ?? ''
-  const [tab, setTab] = useState<Tab>('overview')
-  const [profile, setProfile] = useState<any>(null)
-  const [profileLoading, setProfileLoading] = useState(true)
-
-  const TABS: { id: Tab; label: string }[] = [
-    { id:'overview',    label:'Overview' },
-    { id:'financials',  label:'Financials' },
-    { id:'news',        label:'News' },
-    { id:'insider',     label:'Insider' },
-    { id:'filings',     label:'Filings' },
-    { id:'estimates',   label:'Estimates' },
-    { id:'transcripts', label:'Transcripts' },
-    { id:'ownership',   label:'Ownership' },
-    { id:'dcf',         label:'DCF' },
-  ]
-
-  useEffect(() => {
-    if (!symbol) return
-    fetch(`/api/quote?symbol=${symbol}`)
-      .then(r => r.ok ? r.json() : null)
-      .then(d => {
-        // FMP quote returns array
-        const q = Array.isArray(d) ? d[0] : d
-        if (q) setProfile(q)
-        // Also fetch profile for description
-        return fetch(`https://financialmodelingprep.com/stable/profile?symbol=${symbol}&apikey=${process.env.NEXT_PUBLIC_FMP_API_KEY||''}`)
-      })
-      .then(r => r && r.ok ? r.json() : null)
-      .then(d => {
-        const p = Array.isArray(d) ? d[0] : d
-        if (p) setProfile((prev: any) => ({ ...prev, ...p }))
-        setProfileLoading(false)
-      })
-      .catch(() => setProfileLoading(false))
-  }, [symbol])
-
-  const pos = (profile?.changesPercentage ?? 0) >= 0
-
-  return (
-    <div style={{ minHeight:'100vh', background:'#080d1a', color:'#fff', fontFamily:'Inter,system-ui,sans-serif' }}>
-      {/* Header */}
-      <div style={{ padding:'28px 32px 0', maxWidth:1280, margin:'0 auto' }}>
-        <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:20, fontSize:13, color:'rgba(255,255,255,0.4)' }}>
-          <Link href="/app/research" style={{ color:'rgba(255,255,255,0.4)', textDecoration:'none' }}>Research</Link>
-          <span>/</span>
-          <span style={{ color:'rgba(255,255,255,0.7)' }}>{symbol}</span>
-        </div>
-
-        {profileLoading ? (
-          <div style={{ height:80, display:'flex', alignItems:'center' }}>
-            <div style={{ fontSize:14, color:'rgba(255,255,255,0.3)' }}>Loading {symbol}...</div>
-          </div>
-        ) : profile ? (
-          <div style={{ display:'flex', alignItems:'center', gap:20, marginBottom:28 }}>
-            {/* Logo */}
-            <div style={{ width:52, height:52, borderRadius:12, background:'rgba(255,255,255,0.08)', display:'flex', alignItems:'center', justifyContent:'center', fontSize:20, fontWeight:800, color:'#fff', border:'1px solid rgba(255,255,255,0.1)', flexShrink:0 }}>
-              {profile.image ? <img src={profile.image} alt={symbol} style={{ width:36, height:36, objectFit:'contain' }} onError={e=>(e.currentTarget.style.display='none')} /> : symbol.slice(0,1)}
-            </div>
-            <div style={{ flex:1 }}>
-              <div style={{ display:'flex', alignItems:'baseline', gap:12, flexWrap:'wrap' }}>
-                <h1 style={{ fontSize:24, fontWeight:800, color:'#fff', letterSpacing:'-0.025em', margin:0 }}>{profile.companyName ?? symbol}</h1>
-                <span style={{ fontSize:13, fontWeight:700, color:'rgba(255,255,255,0.3)', background:'rgba(255,255,255,0.07)', padding:'3px 10px', borderRadius:6 }}>{symbol}</span>
-                <span style={{ fontSize:13, color:'rgba(255,255,255,0.3)' }}>{profile.exchangeShortName} · {profile.sector}</span>
-              </div>
-              <div style={{ display:'flex', alignItems:'center', gap:16, marginTop:6 }}>
-                <span style={{ fontSize:28, fontWeight:800, color:'#fff', letterSpacing:'-0.025em' }}>
-                  ${(profile.price ?? 0).toLocaleString('en-US',{ minimumFractionDigits:2, maximumFractionDigits:2 })}
-                </span>
-                <span style={{ fontSize:15, fontWeight:700, color: pos ? '#34d399' : '#f87171' }}>
-                  {pos ? '+' : ''}{(profile.changesPercentage ?? 0).toFixed(2)}%
-                </span>
-              </div>
-            </div>
-          </div>
-        ) : (
-          <div style={{ marginBottom:28 }}>
-            <h1 style={{ fontSize:24, fontWeight:800, color:'#fff', margin:0 }}>{symbol}</h1>
-            <div style={{ fontSize:13, color:'rgba(255,255,255,0.4)', marginTop:4 }}>Live data unavailable</div>
-          </div>
-        )}
-
-        {/* Tab nav */}
-        <div style={{ display:'flex', gap:0, borderBottom:'1px solid rgba(255,255,255,0.08)', overflowX:'auto' }}>
-          {TABS.map(t => (
-            <button key={t.id} onClick={()=>setTab(t.id)} style={{
-              padding:'10px 18px', background:'none', border:'none', cursor:'pointer',
-              fontFamily:'inherit', fontSize:13, fontWeight:600,
-              color: tab===t.id ? '#fff' : 'rgba(255,255,255,0.38)',
-              borderBottom: `2px solid ${tab===t.id ? '#1B4FFF' : 'transparent'}`,
-              transition:'all 0.12s', whiteSpace:'nowrap',
-            }}>{t.label}</button>
-          ))}
-        </div>
-      </div>
-
-      {/* Tab content */}
-      <div style={{ maxWidth:1280, margin:'0 auto', padding:'28px 32px 60px' }}>
-        {tab === 'overview'    && <OverviewTab symbol={symbol} profile={profile} />}
-        {tab === 'financials'  && <FinancialsTab symbol={symbol} />}
-        {tab === 'news'        && <NewsTab symbol={symbol} />}
-        {tab === 'insider'     && <InsiderTab symbol={symbol} />}
-        {tab === 'filings'     && <FilingsTab symbol={symbol} />}
-        {tab === 'estimates'   && <EstimatesTab symbol={symbol} />}
-        {tab === 'transcripts' && <TranscriptsTab symbol={symbol} />}
-        {tab === 'ownership'   && <OwnershipTab symbol={symbol} />}
-        {tab === 'dcf'         && <DCFTab symbol={symbol} />}
-      </div>
+          {!filings.length&&<tr><td colSpan={4} style={{textAlign:'center',padding:48,color:'#7D8FA9'}}>No filings found for {symbol}</td></tr>}
+        </tbody>
+      </table>
     </div>
   )
 }
