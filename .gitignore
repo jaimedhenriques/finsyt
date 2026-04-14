@@ -1,4 +1,5 @@
 .agents/.env
 node_modules/
+.next/
 finsyt-platform/public/data/ciq_dictionary.json
 incoming_files/

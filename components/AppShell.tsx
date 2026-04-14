@@ -1,7 +1,29 @@
 'use client'
-import { useState } from 'react'
+import { useMemo, useState, type ReactNode } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
+
+import { useSupabaseAuthState, useSupabaseBrowser, useUser } from '@/lib/supabase/hooks'
+
+type SearchResult = {
+  name: string
+  region?: string
+  symbol: string
+}
+
+type NavItem = {
+  href: string
+  label: string
+  icon: string
+  exact?: boolean
+  badge?: string
+  pro?: boolean
+}
+
+type NavGroup = {
+  section: string | null
+  items: NavItem[]
+}
 
 const NAV = [
   { section: null, items: [
@@ -29,12 +51,24 @@ const NAV = [
   ]},
 ]
 
-export default function AppShell({ children }: { children: React.ReactNode }) {
+export default function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname()
   const router = useRouter()
+  const supabase = useSupabaseBrowser()
+  const user = useUser()
+  const { isConfigured } = useSupabaseAuthState()
   const [search, setSearch] = useState('')
-  const [searchResults, setSearchResults] = useState<any[]>([])
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([])
   const [sidebarOpen, setSidebarOpen] = useState(true)
+  const accountLabel = useMemo(() => {
+    const fullName = user?.user_metadata?.full_name
+    if (typeof fullName === 'string' && fullName.trim()) return fullName.trim()
+    if (user?.email) return user.email.split('@')[0]
+    return 'Account'
+  }, [user])
+  const avatarLabel = useMemo(() => {
+    return accountLabel.trim().charAt(0).toUpperCase() || 'A'
+  }, [accountLabel])
 
   async function handleSearch(val: string) {
     setSearch(val)
@@ -44,6 +78,14 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       const data = await res.json()
       setSearchResults(data.results || [])
     } catch {}
+  }
+
+  async function handleSignOut() {
+    if (!supabase) return
+
+    await supabase.auth.signOut()
+    router.replace('/app/auth/login')
+    router.refresh()
   }
 
   return (
@@ -79,7 +121,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
 
         {/* Nav */}
         <div style={{flex:1,overflowY:'auto',padding:'0.75rem 0.5rem'}}>
-          {NAV.map((group, gi) => (
+          {NAV.map((group: NavGroup, gi) => (
             <div key={gi} style={{marginBottom:'0.25rem'}}>
               {group.section && sidebarOpen && (
                 <div style={{fontSize:10,fontWeight:700,letterSpacing:'0.08em',color:'#3D5270',textTransform:'uppercase',padding:'0.75rem 0.5rem 0.25rem'}}>
@@ -87,7 +129,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 </div>
               )}
               {!sidebarOpen && gi > 0 && <div style={{height:1,background:'rgba(255,255,255,0.05)',margin:'0.5rem 0'}}/>}
-              {group.items.map((item: any) => {
+              {group.items.map((item: NavItem) => {
                 const active = item.exact
                   ? pathname === item.href
                   : pathname === item.href || pathname.startsWith(item.href + '/')
@@ -180,14 +222,50 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
             )}
           </div>
 
-          <div style={{display:'flex',alignItems:'center',gap:8,marginLeft:'auto'}}>
+          <div style={{display:'flex',alignItems:'center',gap:10,marginLeft:'auto'}}>
             {/* Live indicator */}
             <div style={{display:'flex',alignItems:'center',gap:6,padding:'4px 10px',borderRadius:20,background:'rgba(5,150,105,0.1)',border:'1px solid rgba(5,150,105,0.2)'}}>
               <div style={{width:6,height:6,borderRadius:'50%',background:'#059669',boxShadow:'0 0 6px #059669'}}/>
               <span style={{fontSize:11,fontWeight:600,color:'#059669'}}>Live</span>
             </div>
+            {user?.email && (
+              <div style={{display:'flex',flexDirection:'column',alignItems:'flex-end',minWidth:0}}>
+                <span style={{fontSize:12,fontWeight:700,color:'#E2E8F0',whiteSpace:'nowrap'}}>{accountLabel}</span>
+                <span style={{fontSize:11,color:'#7D8FA9',maxWidth:180,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{user.email}</span>
+              </div>
+            )}
+            {user ? (
+              <button
+                type="button"
+                onClick={handleSignOut}
+                style={{
+                  background:'transparent',
+                  border:'1px solid rgba(255,255,255,0.08)',
+                  borderRadius:999,
+                  color:'#C0CEDF',
+                  padding:'6px 10px',
+                  fontSize:12,
+                  fontWeight:600,
+                  cursor:'pointer',
+                }}
+              >
+                Sign out
+              </button>
+            ) : (
+              <Link
+                href="/app/auth/login"
+                style={{
+                  textDecoration:'none',
+                  fontSize:12,
+                  fontWeight:600,
+                  color:isConfigured ? '#93B4FF' : '#7D8FA9',
+                }}
+              >
+                {isConfigured ? 'Sign in' : 'Auth offline'}
+              </Link>
+            )}
             {/* Avatar */}
-            <div style={{width:32,height:32,borderRadius:'50%',background:'linear-gradient(135deg,#1B4FFF,#0D9FE8)',display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontSize:12,fontWeight:700,cursor:'pointer'}}>J</div>
+            <div style={{width:32,height:32,borderRadius:'50%',background:'linear-gradient(135deg,#1B4FFF,#0D9FE8)',display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontSize:12,fontWeight:700,cursor:'pointer'}}>{avatarLabel}</div>
           </div>
         </div>
 
