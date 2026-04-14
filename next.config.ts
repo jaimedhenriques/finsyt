@@ -23,6 +23,12 @@ const nextConfig: NextConfig = {
     SUPABASE_ANON_KEY:        process.env.SUPABASE_ANON_KEY        || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.finsyt_SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_finsyt_finsytSUPABASE_ANON_KEY || '',
     NEXT_PUBLIC_SUPABASE_URL: process.env.NEXT_PUBLIC_SUPABASE_URL || process.env.SUPABASE_URL || process.env.NEXT_PUBLIC_finsyt_finsytSUPABASE_URL || '',
     NEXT_PUBLIC_SUPABASE_ANON_KEY: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || process.env.SUPABASE_ANON_KEY || process.env.NEXT_PUBLIC_finsyt_finsytSUPABASE_ANON_KEY || '',
+    // Stripe
+    STRIPE_SECRET_KEY:        process.env.STRIPE_SECRET_KEY        || '',
+    STRIPE_WEBHOOK_SECRET:    process.env.STRIPE_WEBHOOK_SECRET    || '',
+    STRIPE_PRO_PRICE_ID:      process.env.STRIPE_PRO_PRICE_ID      || '',
+    STRIPE_ENTERPRISE_PRICE_ID: process.env.STRIPE_ENTERPRISE_PRICE_ID || '',
+    NEXT_PUBLIC_APP_URL:      process.env.NEXT_PUBLIC_APP_URL      || process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : 'http://localhost:3000',
     POSTGRES_DATABASE:        process.env.POSTGRES_DATABASE        || process.env.finsyt_POSTGRES_DATABASE || '',
     POSTGRES_HOST:            process.env.POSTGRES_HOST            || process.env.finsyt_POSTGRES_HOST || '',
     POSTGRES_USER:            process.env.POSTGRES_USER            || process.env.finsyt_POSTGRES_USER || '',

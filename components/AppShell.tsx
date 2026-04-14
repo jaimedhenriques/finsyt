@@ -3,6 +3,8 @@ import NPSWidget from '@/components/NPSWidget'
 import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
+import type { User } from '@supabase/supabase-js'
+import { createClient } from '@/lib/supabase/client'
 
 const NAV = [
   { section: null, items: [
@@ -30,12 +32,24 @@ const NAV = [
   ]},
 ]
 
-export default function AppShell({ children }: { children: React.ReactNode }) {
+export default function AppShell({ children, user }: { children: React.ReactNode; user?: User | null }) {
   const pathname = usePathname()
   const router   = useRouter()
   const [search, setSearch]             = useState('')
   const [searchResults, setSearchResults] = useState<any[]>([])
   const [sidebarOpen, setSidebarOpen]   = useState(true)
+  const [userMenuOpen, setUserMenuOpen] = useState(false)
+
+  async function handleSignOut() {
+    const supabase = createClient()
+    await supabase.auth.signOut()
+    router.push('/app/auth/login')
+    router.refresh()
+  }
+
+  const userInitial = user?.user_metadata?.full_name?.[0]?.toUpperCase()
+    || user?.email?.[0]?.toUpperCase()
+    || 'U'
 
   async function handleSearch(val: string) {
     setSearch(val)
@@ -190,8 +204,40 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
               <span style={{position:'absolute',top:4,right:4,width:7,height:7,borderRadius:'50%',background:'#1B4FFF',border:'1.5px solid #fff'}}/>
             </button>
-            {/* Avatar */}
-            <div style={{width:32,height:32,borderRadius:'50%',background:'linear-gradient(135deg,#1B4FFF,#0D9FE8)',display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontSize:12,fontWeight:700,cursor:'pointer',flexShrink:0}}>J</div>
+            {/* User menu */}
+            <div style={{position:'relative'}}>
+              <button
+                onClick={() => setUserMenuOpen(o => !o)}
+                style={{width:32,height:32,borderRadius:'50%',background:'linear-gradient(135deg,#1B4FFF,#0D9FE8)',display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontSize:12,fontWeight:700,cursor:'pointer',flexShrink:0,border:'none',padding:0}}
+              >{userInitial}</button>
+              {userMenuOpen && (
+                <div style={{position:'absolute',top:'calc(100% + 8px)',right:0,background:'#fff',borderRadius:12,boxShadow:'0 8px 40px rgba(0,0,0,0.12)',border:'1px solid #E2E8F2',zIndex:50,minWidth:200,overflow:'hidden'}}
+                  onMouseLeave={() => setUserMenuOpen(false)}>
+                  <div style={{padding:'12px 16px',borderBottom:'1px solid #F0F4FA'}}>
+                    <div style={{fontSize:13,fontWeight:600,color:'#1C2B4A',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{user?.user_metadata?.full_name || 'User'}</div>
+                    <div style={{fontSize:11,color:'#9BAFC8',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{user?.email}</div>
+                  </div>
+                  <Link href="/app/settings" onClick={() => setUserMenuOpen(false)}
+                    style={{display:'flex',alignItems:'center',gap:10,padding:'10px 16px',fontSize:13,color:'#4A5568',textDecoration:'none'}}
+                    onMouseEnter={e=>(e.currentTarget as HTMLElement).style.background='#F8FAFD'}
+                    onMouseLeave={e=>(e.currentTarget as HTMLElement).style.background='transparent'}>
+                    <span>⚙</span> Settings
+                  </Link>
+                  <Link href="/app/upgrade" onClick={() => setUserMenuOpen(false)}
+                    style={{display:'flex',alignItems:'center',gap:10,padding:'10px 16px',fontSize:13,color:'#1B4FFF',textDecoration:'none',fontWeight:600}}
+                    onMouseEnter={e=>(e.currentTarget as HTMLElement).style.background='#F5F8FF'}
+                    onMouseLeave={e=>(e.currentTarget as HTMLElement).style.background='transparent'}>
+                    <span>✦</span> Upgrade to Pro
+                  </Link>
+                  <button onClick={handleSignOut}
+                    style={{width:'100%',textAlign:'left',display:'flex',alignItems:'center',gap:10,padding:'10px 16px',fontSize:13,color:'#EF4444',background:'none',border:'none',borderTop:'1px solid #F0F4FA',cursor:'pointer',fontFamily:'inherit'}}
+                    onMouseEnter={e=>(e.currentTarget as HTMLElement).style.background='#FFF5F5'}
+                    onMouseLeave={e=>(e.currentTarget as HTMLElement).style.background='transparent'}>
+                    <span>→</span> Sign Out
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
