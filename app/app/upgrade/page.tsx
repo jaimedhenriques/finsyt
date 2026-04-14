@@ -1,5 +1,7 @@
 'use client'
+import { useState } from 'react'
 import Link from 'next/link'
+import { useAuth } from '@/lib/supabase/auth-provider'
 
 const T = {
   bg: '#080E1A', surface: '#0F1929', border: 'rgba(255,255,255,0.06)',
@@ -82,6 +84,31 @@ const COMPARE = [
 ]
 
 export default function UpgradePage() {
+  const { subscription } = useAuth()
+  const [checkoutLoading, setCheckoutLoading] = useState<string | null>(null)
+
+  async function handleCheckout(plan: string) {
+    if (plan === 'Enterprise') {
+      window.location.href = 'mailto:hello@finsyt.com?subject=Enterprise%20inquiry'
+      return
+    }
+    setCheckoutLoading(plan)
+    try {
+      const res = await fetch('/api/checkout', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ plan: plan.toLowerCase(), returnUrl: window.location.origin }),
+      })
+      const data = await res.json()
+      if (data.url) window.location.href = data.url
+      else setCheckoutLoading(null)
+    } catch {
+      setCheckoutLoading(null)
+    }
+  }
+
+  const currentPlan = subscription?.plan || 'free'
+
   return (
     <div className="page-content" style={{ background: T.bg, minHeight: '100vh', color: T.text }}>
       <style>{`
@@ -127,19 +154,22 @@ export default function UpgradePage() {
             </div>
 
             <button
-              onClick={() => { if (!plan.disabled && plan.name !== 'Enterprise') { window.location.href = '/api/stripe/create-checkout?plan=pro' } else if (plan.name === 'Enterprise') { window.location.href = 'mailto:hello@finsyt.com' } }}
-              disabled={plan.disabled}
+              onClick={() => {
+                const isCurrent = plan.name.toLowerCase() === currentPlan
+                if (!isCurrent) handleCheckout(plan.name)
+              }}
+              disabled={plan.name.toLowerCase() === currentPlan || checkoutLoading === plan.name}
               style={{
                 display: 'block', width: '100%', textAlign: 'center',
-                background: plan.highlight ? '#fff' : plan.disabled ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.1)',
-                color: plan.highlight ? '#1B4FFF' : plan.disabled ? T.textMuted : '#fff',
+                background: plan.highlight ? '#fff' : plan.name.toLowerCase() === currentPlan ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.1)',
+                color: plan.highlight ? '#1B4FFF' : plan.name.toLowerCase() === currentPlan ? T.textMuted : '#fff',
                 borderRadius: 9999, padding: '12px 24px',
                 fontFamily: T.sans, fontSize: 14, fontWeight: 700,
-                border: 'none', cursor: plan.disabled ? 'default' : 'pointer', marginBottom: 28,
+                border: 'none', cursor: plan.name.toLowerCase() === currentPlan ? 'default' : 'pointer', marginBottom: 28,
                 transition: 'opacity 0.15s',
                 letterSpacing: '-0.01em',
               }}
-            >{plan.cta}</button>
+            >{checkoutLoading === plan.name ? 'Redirecting…' : plan.name.toLowerCase() === currentPlan ? 'Current plan' : plan.cta}</button>
 
             <div style={{ height: 1, background: plan.highlight ? 'rgba(255,255,255,0.15)' : T.border, marginBottom: 24 }} />
 

@@ -3,6 +3,8 @@ import NPSWidget from '@/components/NPSWidget'
 import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
+import { useAuth } from '@/lib/supabase/auth-provider'
+import { useSignOut } from '@/lib/supabase/hooks'
 
 const NAV = [
   { section: null, items: [
@@ -33,9 +35,16 @@ const NAV = [
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const router   = useRouter()
+  const { user } = useAuth()
+  const signOut  = useSignOut()
   const [search, setSearch]             = useState('')
   const [searchResults, setSearchResults] = useState<any[]>([])
   const [sidebarOpen, setSidebarOpen]   = useState(true)
+  const [userMenuOpen, setUserMenuOpen] = useState(false)
+
+  const initials = user?.user_metadata?.full_name
+    ? user.user_metadata.full_name.split(' ').map((n: string) => n[0]).join('').toUpperCase().slice(0, 2)
+    : user?.email?.[0]?.toUpperCase() || 'U'
 
   async function handleSearch(val: string) {
     setSearch(val)
@@ -190,8 +199,33 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
               <span style={{position:'absolute',top:4,right:4,width:7,height:7,borderRadius:'50%',background:'#1B4FFF',border:'1.5px solid #fff'}}/>
             </button>
-            {/* Avatar */}
-            <div style={{width:32,height:32,borderRadius:'50%',background:'linear-gradient(135deg,#1B4FFF,#0D9FE8)',display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontSize:12,fontWeight:700,cursor:'pointer',flexShrink:0}}>J</div>
+            {/* Avatar + user menu */}
+            <div style={{position:'relative'}}>
+              <div
+                onClick={() => setUserMenuOpen(o => !o)}
+                style={{width:32,height:32,borderRadius:'50%',background:'linear-gradient(135deg,#1B4FFF,#0D9FE8)',display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontSize:12,fontWeight:700,cursor:'pointer',flexShrink:0}}
+              >{initials}</div>
+              {userMenuOpen && (
+                <div style={{position:'absolute',top:'100%',right:0,marginTop:8,width:220,background:'#fff',borderRadius:12,boxShadow:'0 8px 40px rgba(0,0,0,0.12)',border:'1px solid #E2E8F2',zIndex:60,overflow:'hidden'}}>
+                  <div style={{padding:'12px 16px',borderBottom:'1px solid #F0F4FA'}}>
+                    <div style={{fontSize:13,fontWeight:600,color:'#0A1628',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{user?.user_metadata?.full_name || 'User'}</div>
+                    <div style={{fontSize:12,color:'#9BAFC8',overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{user?.email}</div>
+                  </div>
+                  <button onClick={() => { router.push('/app/settings'); setUserMenuOpen(false) }}
+                    style={{width:'100%',textAlign:'left',padding:'10px 16px',background:'none',border:'none',cursor:'pointer',fontFamily:'inherit',fontSize:13,color:'#1C2B4A'}}
+                    onMouseEnter={e=>(e.currentTarget as HTMLElement).style.background='#F8FAFD'}
+                    onMouseLeave={e=>(e.currentTarget as HTMLElement).style.background='transparent'}>
+                    Settings
+                  </button>
+                  <button onClick={() => { signOut(); setUserMenuOpen(false) }}
+                    style={{width:'100%',textAlign:'left',padding:'10px 16px',background:'none',border:'none',cursor:'pointer',fontFamily:'inherit',fontSize:13,color:'#DC2626',borderTop:'1px solid #F0F4FA'}}
+                    onMouseEnter={e=>(e.currentTarget as HTMLElement).style.background='#FEF2F2'}
+                    onMouseLeave={e=>(e.currentTarget as HTMLElement).style.background='transparent'}>
+                    Sign out
+                  </button>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 

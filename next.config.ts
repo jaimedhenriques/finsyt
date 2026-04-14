@@ -29,6 +29,12 @@ const nextConfig: NextConfig = {
     POSTGRES_PASSWORD:        process.env.POSTGRES_PASSWORD        || process.env.finsyt_POSTGRES_PASSWORD || '',
     POSTGRES_PRISMA_URL:      process.env.POSTGRES_PRISMA_URL      || process.env.finsyt_POSTGRES_PRISMA_URL || '',
     POSTGRES_URL_NON_POOLING: process.env.POSTGRES_URL_NON_POOLING || process.env.finsyt_POSTGRES_URL_NON_POOLING || '',
+    // Stripe
+    STRIPE_SECRET_KEY:        process.env.STRIPE_SECRET_KEY        || '',
+    STRIPE_WEBHOOK_SECRET:    process.env.STRIPE_WEBHOOK_SECRET    || '',
+    STRIPE_PRO_PRICE_ID:      process.env.STRIPE_PRO_PRICE_ID      || '',
+    STRIPE_ENTERPRISE_PRICE_ID: process.env.STRIPE_ENTERPRISE_PRICE_ID || '',
+    NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: process.env.NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY || '',
   },
   async headers() {
     return [{
