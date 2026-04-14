@@ -2,129 +2,156 @@
 import { useState, useRef, useEffect, Suspense } from 'react'
 import { useSearchParams } from 'next/navigation'
 
-const SUGGESTED = [
-  "What's driving NVDA's margin expansion vs AMD?",
-  "Summarise AAPL Q1 2025 earnings vs consensus",
-  "Bull vs bear case for META in 2025",
-  "Compare MSFT and GOOGL cloud growth trajectories",
-  "Key risks for LLY given GLP-1 competition",
-  "What does JPM NII guidance imply for 2025?",
+interface Message { role:'user'|'assistant'; content:string; sources?:string[]; ts:Date }
+
+const PROMPTS = [
+  { label:'Company deep dive',  text:'Give me a deep dive on NVDA including financials, competitive positioning, and key risks' },
+  { label:'Earnings analysis',  text:'Analyze the most recent Apple earnings report. What surprised the market?' },
+  { label:'Sector comparison',  text:'Compare the margins and growth rates of top 5 cloud companies (MSFT, AMZN, GOOGL, ORCL, CRM)' },
+  { label:'10-K risk factors',  text:'What are the key risk factors in Tesla\'s latest 10-K filing?' },
+  { label:'Macro outlook',      text:'What is the current Fed policy stance and how does it affect growth stocks?' },
+  { label:'Valuation screen',   text:'Find technology companies with P/E under 20 and revenue growth over 15%' },
 ]
 
-interface Msg { role: 'user'|'ai'; content: string; sources?: any[]; model?: string }
-
 function ResearchInner() {
-  const sp = useSearchParams()
-  const [symbol, setSymbol] = useState(sp.get('symbol')||'')
-  const [query, setQuery] = useState('')
-  const [messages, setMessages] = useState<Msg[]>([])
+  const params    = useSearchParams()
+  const [msgs, setMsgs]     = useState<Message[]>([])
+  const [input, setInput]   = useState(params?.get('q') || '')
   const [loading, setLoading] = useState(false)
+  const [model, setModel]   = useState<'fast'|'deep'>('fast')
   const bottomRef = useRef<HTMLDivElement>(null)
-  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior:'smooth' }) }, [messages])
 
-  async function submit(q?: string) {
-    const fq = q || query
-    if (!fq.trim() || loading) return
-    setQuery('')
-    setMessages(prev => [...prev, { role:'user', content:fq }])
+  useEffect(() => { bottomRef.current?.scrollIntoView({ behavior:'smooth' }) }, [msgs])
+  useEffect(() => { if(params?.get('q')) handleSend(params.get('q')!) }, [])
+
+  async function handleSend(overrideText?: string) {
+    const text = overrideText ?? input
+    if (!text.trim() || loading) return
+    setInput('')
+    const userMsg: Message = { role:'user', content:text, ts:new Date() }
+    setMsgs(prev => [...prev, userMsg])
     setLoading(true)
     try {
-      const res = await fetch('/api/ai-research', { method:'POST', headers:{'Content-Type':'application/json'}, body:JSON.stringify({ query:fq, symbol:symbol||undefined }) })
-      const d = await res.json()
-      setMessages(prev => [...prev, { role:'ai', content:d.answer||'No response', sources:d.sources, model:d.model }])
+      const res = await fetch('/api/ai-research', {
+        method:'POST',
+        headers:{'Content-Type':'application/json'},
+        body: JSON.stringify({ query:text, history: msgs.slice(-6), model }),
+      })
+      const data = await res.json()
+      setMsgs(prev => [...prev, { role:'assistant', content:data.answer||data.text||'Sorry, I could not generate a response.', sources:data.sources||[], ts:new Date() }])
     } catch {
-      setMessages(prev => [...prev, { role:'ai', content:'Failed to get response. Please try again.' }])
+      setMsgs(prev => [...prev, { role:'assistant', content:'Connection error. Please try again.', ts:new Date() }])
     }
     setLoading(false)
   }
 
-  function renderContent(content: string) {
-    return content.split('\n').map((line, i) => {
-      const bold = line.replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
-      if (line.startsWith('- ')) return <li key={i} style={{fontSize:13,color:'#3D4F6E',marginLeft:16,marginBottom:4}} dangerouslySetInnerHTML={{__html:bold.slice(2)}} />
-      if (!line.trim()) return <div key={i} style={{marginBottom:8}} />
-      return <p key={i} style={{fontSize:13,color:'#3D4F6E',marginBottom:6,lineHeight:1.6}} dangerouslySetInnerHTML={{__html:bold}} />
-    })
+  function handleKey(e: React.KeyboardEvent) {
+    if (e.key==='Enter' && !e.shiftKey) { e.preventDefault(); handleSend() }
   }
 
   return (
-    <div className="page-content" style={{minHeight:'calc(100vh - 60px)',display:'flex',flexDirection:'column'}}>
-      <div className="flex items-center justify-between mb-5">
-        <div><h1 className="page-title">AI Research Engine</h1><p className="text-sm mt-0.5" style={{color:'#7D8FA9'}}>Multi-source analysis with cited reasoning</p></div>
+    <div style={{display:'flex',flexDirection:'column',height:'calc(100vh - 52px)',background:'#F5F7FB'}}>
+      {/* Header */}
+      <div style={{background:'#fff',borderBottom:'1px solid #E2E8F2',padding:'16px 24px',display:'flex',alignItems:'center',justifyContent:'space-between',flexShrink:0}}>
+        <div>
+          <h1 style={{fontSize:'1.125rem',fontWeight:800,color:'#0A1628',letterSpacing:'-0.02em'}}>AI Research</h1>
+          <p style={{fontSize:12,color:'#9BAFC8',marginTop:2}}>Powered by Finsyt Intelligence · Grounded in live market data</p>
+        </div>
+        <div style={{display:'flex',alignItems:'center',gap:8}}>
+          <span style={{fontSize:12,color:'#9BAFC8'}}>Mode:</span>
+          {(['fast','deep'] as const).map(m => (
+            <button key={m} onClick={()=>setModel(m)}
+              style={{padding:'5px 12px',borderRadius:6,fontSize:12,fontWeight:600,border:'1.5px solid',cursor:'pointer',
+                background:model===m?'#1B4FFF':'#fff',color:model===m?'#fff':'#7D8FA9',borderColor:model===m?'#1B4FFF':'#E2E8F2',transition:'all 0.14s'}}>
+              {m==='fast'?'⚡ Fast':'🔍 Deep'}
+            </button>
+          ))}
+          <button onClick={()=>setMsgs([])} className="btn btn-outline btn-sm">Clear</button>
+        </div>
       </div>
 
-      <div className="card p-4 mb-5" style={{display:'flex',alignItems:'center',gap:16}}>
-        <span style={{fontSize:13,fontWeight:600,color:'#3D4F6E',flexShrink:0}}>Focus on ticker:</span>
-        <input className="input" style={{maxWidth:160,height:36,textTransform:'uppercase'}} placeholder="e.g. NVDA" value={symbol} onChange={e=>setSymbol(e.target.value.toUpperCase())} />
-        {symbol && <span className="badge badge-blue">{symbol} context active</span>}
-        <span style={{marginLeft:'auto',fontSize:11,color:'#B0BCD0'}}>Leave blank for general research</span>
-      </div>
-
-      <div style={{flex:1,display:'flex',flexDirection:'column'}}>
-        {messages.length===0 ? (
-          <div>
-            <div style={{textAlign:'center',padding:'2.5rem 0 1.5rem'}}>
-              <div style={{width:56,height:56,borderRadius:16,background:'linear-gradient(135deg,#1B4FFF,#0D9FE8)',display:'flex',alignItems:'center',justifyContent:'center',margin:'0 auto 1rem',color:'#fff',fontWeight:900,fontSize:18}}>AI</div>
-              <h2 style={{fontWeight:700,fontSize:'1.125rem',color:'#0A1628',marginBottom:8}}>Finsyt Research Engine</h2>
-              <p style={{fontSize:13,color:'#7D8FA9'}}>Ask anything about companies, markets, deals, or macro</p>
+      {/* Messages */}
+      <div style={{flex:1,overflowY:'auto',padding:'24px',display:'flex',flexDirection:'column',gap:16}}>
+        {msgs.length===0 ? (
+          <div style={{maxWidth:680,margin:'0 auto',width:'100%'}}>
+            <div style={{textAlign:'center',marginBottom:32}}>
+              <div style={{width:56,height:56,borderRadius:16,background:'linear-gradient(135deg,#1B4FFF,#0D9FE8)',display:'flex',alignItems:'center',justifyContent:'center',fontSize:24,margin:'0 auto 16px'}}>◎</div>
+              <h2 style={{fontSize:'1.25rem',fontWeight:800,color:'#0A1628',marginBottom:8}}>What would you like to research?</h2>
+              <p style={{fontSize:14,color:'#9BAFC8',lineHeight:1.6}}>Ask about companies, financials, filings, macro trends, or anything in finance. Finsyt grounds answers in live data.</p>
             </div>
-            <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(240px,1fr))',gap:12,marginBottom:24}}>
-              {SUGGESTED.map((s,i) => (
-                <button key={i} onClick={()=>submit(s)} className="card" style={{padding:16,textAlign:'left',cursor:'pointer',border:'1.5px solid #E2E8F2',background:'#fff',fontFamily:'inherit',borderRadius:12}}>
-                  <p style={{fontSize:12,color:'#3D4F6E',lineHeight:1.5,margin:0}}>{s}</p>
+            <div style={{display:'grid',gridTemplateColumns:'1fr 1fr',gap:10}}>
+              {PROMPTS.map(p=>(
+                <button key={p.label} onClick={()=>handleSend(p.text)}
+                  style={{padding:'14px 16px',borderRadius:12,border:'1.5px solid #E2E8F2',background:'#fff',cursor:'pointer',textAlign:'left',transition:'all 0.14s'}}
+                  onMouseEnter={e=>{(e.currentTarget as HTMLElement).style.borderColor='#1B4FFF';(e.currentTarget as HTMLElement).style.background='#F5F8FF'}}
+                  onMouseLeave={e=>{(e.currentTarget as HTMLElement).style.borderColor='#E2E8F2';(e.currentTarget as HTMLElement).style.background='#fff'}}>
+                  <div style={{fontSize:12,fontWeight:700,color:'#1C2B4A',marginBottom:4}}>{p.label}</div>
+                  <div style={{fontSize:11,color:'#9BAFC8',lineHeight:1.4}}>{p.text.slice(0,80)}…</div>
                 </button>
               ))}
             </div>
           </div>
         ) : (
-          <div style={{display:'flex',flexDirection:'column',gap:16,marginBottom:16}}>
-            {messages.map((msg,i) => (
-              <div key={i} style={{display:'flex',gap:12,justifyContent:msg.role==='user'?'flex-end':'flex-start'}}>
-                {msg.role==='ai' && <div style={{width:32,height:32,borderRadius:10,background:'linear-gradient(135deg,#1B4FFF,#0D9FE8)',display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontWeight:900,fontSize:11,flexShrink:0,marginTop:2}}>AI</div>}
-                <div style={{borderRadius:msg.role==='user'?'16px 16px 4px 16px':'16px 16px 16px 4px',padding:16,maxWidth:640,background:msg.role==='user'?'#1B4FFF':'#fff',border:msg.role==='ai'?'1.5px solid #E2E8F2':'none'}}>
-                  {msg.role==='user' ? <p style={{fontSize:13,color:'#fff',fontWeight:500,margin:0}}>{msg.content}</p> : (
-                    <div>
-                      <ul style={{listStyle:'none',padding:0,margin:0}}>{renderContent(msg.content)}</ul>
-                      {msg.sources?.length && <div style={{display:'flex',flexWrap:'wrap',gap:8,marginTop:12,paddingTop:12,borderTop:'1px solid #E2E8F2'}}>
-                        <span style={{fontSize:12,fontWeight:600,color:'#7D8FA9'}}>Sources:</span>
-                        {msg.sources.map((s,si)=><span key={si} className="badge badge-blue">{s.label}</span>)}
-                      </div>}
-                      {msg.model && <div style={{fontSize:11,color:'#B0BCD0',marginTop:8}}>Model: {msg.model}</div>}
+          msgs.map((m,i) => (
+            <div key={i} style={{maxWidth:720,width:'100%',margin:m.role==='user'?'0 0 0 auto':'0 auto 0 0'}}>
+              {m.role==='user' ? (
+                <div style={{background:'#1B4FFF',borderRadius:'16px 16px 4px 16px',padding:'12px 16px',color:'#fff',fontSize:14,lineHeight:1.6}}>{m.content}</div>
+              ) : (
+                <div style={{background:'#fff',border:'1px solid #E2E8F2',borderRadius:'4px 16px 16px 16px',padding:'16px 20px'}}>
+                  <div style={{fontSize:14,color:'#1C2B4A',lineHeight:1.75,whiteSpace:'pre-wrap'}}>{m.content}</div>
+                  {m.sources && m.sources.length > 0 && (
+                    <div style={{marginTop:12,paddingTop:12,borderTop:'1px solid #F0F4FA'}}>
+                      <div style={{fontSize:11,fontWeight:600,color:'#9BAFC8',marginBottom:6,textTransform:'uppercase',letterSpacing:'0.05em'}}>Sources</div>
+                      <div style={{display:'flex',flexWrap:'wrap',gap:6}}>
+                        {m.sources.map((s,si)=>(
+                          <span key={si} className="badge badge-blue" style={{fontSize:11}}>{s}</span>
+                        ))}
+                      </div>
                     </div>
                   )}
+                  <div style={{fontSize:11,color:'#C0CEDF',marginTop:8}}>{m.ts.toLocaleTimeString()}</div>
                 </div>
-              </div>
-            ))}
-            {loading && (
-              <div style={{display:'flex',gap:12}}>
-                <div style={{width:32,height:32,borderRadius:10,background:'linear-gradient(135deg,#1B4FFF,#0D9FE8)',display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontWeight:900,fontSize:11,flexShrink:0}}>AI</div>
-                <div className="card" style={{padding:16}}>
-                  <div style={{display:'flex',gap:6,alignItems:'center'}}>
-                    {[0,1,2].map(i=><div key={i} style={{width:8,height:8,borderRadius:'50%',background:'#1B4FFF',animation:'bounce 1s infinite',animationDelay:`${i*0.15}s`}} />)}
-                    <span style={{fontSize:12,color:'#7D8FA9',marginLeft:8}}>Analysing across sources...</span>
-                  </div>
-                </div>
-              </div>
-            )}
-            <div ref={bottomRef} />
+              )}
+            </div>
+          ))
+        )}
+        {loading && (
+          <div style={{maxWidth:720,width:'100%'}}>
+            <div style={{background:'#fff',border:'1px solid #E2E8F2',borderRadius:'4px 16px 16px 16px',padding:'16px 20px',display:'flex',gap:6,alignItems:'center'}}>
+              {[0,1,2].map(i=><div key={i} style={{width:8,height:8,borderRadius:'50%',background:'#1B4FFF',animation:`bounce 1.2s ${i*0.2}s infinite`}}/>)}
+              <style>{`@keyframes bounce{0%,80%,100%{transform:scale(0.7);opacity:0.5}40%{transform:scale(1);opacity:1}}`}</style>
+            </div>
           </div>
         )}
+        <div ref={bottomRef}/>
       </div>
 
-      <div className="card" style={{padding:12,marginTop:16,position:'sticky',bottom:0,background:'#fff'}}>
-        <div style={{display:'flex',gap:12}}>
-          <textarea className="input" style={{flex:1,resize:'none',height:72}} rows={2}
-            placeholder="Ask anything — 'What's driving NVDA margins?' or 'Compare AAPL vs MSFT growth'"
-            value={query} onChange={e=>setQuery(e.target.value)}
-            onKeyDown={e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();submit()}}} />
-          <button onClick={()=>submit()} disabled={!query.trim()||loading} className="btn btn-primary" style={{alignSelf:'flex-end',opacity:(!query.trim()||loading)?0.5:1}}>Ask →</button>
+      {/* Input */}
+      <div style={{background:'#fff',borderTop:'1px solid #E2E8F2',padding:'16px 24px',flexShrink:0}}>
+        <div style={{maxWidth:720,margin:'0 auto',display:'flex',gap:10,alignItems:'flex-end'}}>
+          <textarea
+            value={input}
+            onChange={e=>setInput(e.target.value)}
+            onKeyDown={handleKey}
+            placeholder="Ask about any company, filing, metric, or market trend... (Enter to send)"
+            rows={2}
+            style={{flex:1,resize:'none',background:'#F5F7FB',border:'1.5px solid #E2E8F2',borderRadius:12,padding:'12px 16px',fontSize:14,fontFamily:'inherit',color:'#0A1628',outline:'none',lineHeight:1.5,transition:'border-color 0.14s'}}
+            onFocus={e=>{(e.target as HTMLTextAreaElement).style.borderColor='#1B4FFF';(e.target as HTMLTextAreaElement).style.background='#fff'}}
+            onBlur={e=>{(e.target as HTMLTextAreaElement).style.borderColor='#E2E8F2';(e.target as HTMLTextAreaElement).style.background='#F5F7FB'}}
+          />
+          <button onClick={()=>handleSend()} disabled={!input.trim()||loading}
+            style={{height:48,padding:'0 20px',borderRadius:12,background:'#1B4FFF',color:'#fff',border:'none',cursor:'pointer',fontSize:14,fontWeight:700,flexShrink:0,opacity:(!input.trim()||loading)?0.5:1,transition:'all 0.14s'}}>
+            {loading ? '...' : 'Send ↑'}
+          </button>
         </div>
-        <p style={{fontSize:11,color:'#B0BCD0',marginTop:8}}>Powered by Alpha Vantage · SEC EDGAR · News Sentiment · Press Enter to send</p>
+        <div style={{maxWidth:720,margin:'8px auto 0',fontSize:11,color:'#C0CEDF',textAlign:'center'}}>
+          Finsyt AI can make mistakes. Verify important financial data before acting.
+        </div>
       </div>
     </div>
   )
 }
 
 export default function ResearchPage() {
-  return <Suspense fallback={<div className="page-content">Loading...</div>}><ResearchInner /></Suspense>
+  return <Suspense fallback={<div style={{padding:32,color:'#9BAFC8'}}>Loading...</div>}><ResearchInner/></Suspense>
 }
