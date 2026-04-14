@@ -1,8 +1,9 @@
 'use client'
 import NPSWidget from '@/components/NPSWidget'
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
+import { useUser } from '@/lib/supabase/hooks'
 
 const NAV = [
   { section: null, items: [
@@ -33,9 +34,26 @@ const NAV = [
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const router   = useRouter()
+  const { user, signOut } = useUser()
   const [search, setSearch]             = useState('')
   const [searchResults, setSearchResults] = useState<any[]>([])
   const [sidebarOpen, setSidebarOpen]   = useState(true)
+  const [userMenuOpen, setUserMenuOpen] = useState(false)
+  const userMenuRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (userMenuRef.current && !userMenuRef.current.contains(e.target as Node)) {
+        setUserMenuOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [])
+
+  const userInitial = user?.user_metadata?.full_name?.[0]?.toUpperCase()
+    || user?.email?.[0]?.toUpperCase()
+    || '?'
 
   async function handleSearch(val: string) {
     setSearch(val)
@@ -190,8 +208,45 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
               <span style={{position:'absolute',top:4,right:4,width:7,height:7,borderRadius:'50%',background:'#1B4FFF',border:'1.5px solid #fff'}}/>
             </button>
-            {/* Avatar */}
-            <div style={{width:32,height:32,borderRadius:'50%',background:'linear-gradient(135deg,#1B4FFF,#0D9FE8)',display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontSize:12,fontWeight:700,cursor:'pointer',flexShrink:0}}>J</div>
+            {/* User Avatar + Menu */}
+            <div ref={userMenuRef} style={{position:'relative'}}>
+              <button
+                onClick={() => setUserMenuOpen(o => !o)}
+                style={{width:32,height:32,borderRadius:'50%',background:'linear-gradient(135deg,#1B4FFF,#0D9FE8)',display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontSize:12,fontWeight:700,cursor:'pointer',flexShrink:0,border:'none',padding:0}}
+              >
+                {user?.user_metadata?.avatar_url
+                  ? <img src={user.user_metadata.avatar_url} alt="" style={{width:32,height:32,borderRadius:'50%'}} />
+                  : userInitial}
+              </button>
+              {userMenuOpen && (
+                <div style={{position:'absolute',top:'100%',right:0,marginTop:8,background:'#fff',borderRadius:12,boxShadow:'0 8px 32px rgba(0,0,0,0.12)',border:'1px solid #E2E8F2',minWidth:220,zIndex:60,overflow:'hidden'}}>
+                  <div style={{padding:'14px 16px',borderBottom:'1px solid #F0F4FA'}}>
+                    <div style={{fontSize:13,fontWeight:600,color:'#1C2B4A'}}>{user?.user_metadata?.full_name || 'User'}</div>
+                    <div style={{fontSize:12,color:'#7D8FA9',marginTop:2}}>{user?.email}</div>
+                  </div>
+                  <Link href="/app/settings" onClick={() => setUserMenuOpen(false)}
+                    style={{display:'block',padding:'10px 16px',fontSize:13,color:'#4A5568',textDecoration:'none'}}
+                    onMouseEnter={e=>(e.currentTarget as HTMLElement).style.background='#F8FAFD'}
+                    onMouseLeave={e=>(e.currentTarget as HTMLElement).style.background='transparent'}>
+                    Settings
+                  </Link>
+                  <Link href="/app/upgrade" onClick={() => setUserMenuOpen(false)}
+                    style={{display:'block',padding:'10px 16px',fontSize:13,color:'#4A5568',textDecoration:'none'}}
+                    onMouseEnter={e=>(e.currentTarget as HTMLElement).style.background='#F8FAFD'}
+                    onMouseLeave={e=>(e.currentTarget as HTMLElement).style.background='transparent'}>
+                    Upgrade Plan
+                  </Link>
+                  <div style={{borderTop:'1px solid #F0F4FA'}}>
+                    <button onClick={signOut}
+                      style={{width:'100%',textAlign:'left',padding:'10px 16px',fontSize:13,color:'#EF4444',background:'none',border:'none',cursor:'pointer',fontFamily:'inherit'}}
+                      onMouseEnter={e=>(e.currentTarget as HTMLElement).style.background='#FEF2F2'}
+                      onMouseLeave={e=>(e.currentTarget as HTMLElement).style.background='transparent'}>
+                      Sign out
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
           </div>
         </div>
 

@@ -1,4 +1,10 @@
 .agents/.env
 node_modules/
+.next/
+out/
 finsyt-platform/public/data/ciq_dictionary.json
 incoming_files/
+*.tsbuildinfo
+.env
+.env.local
+.env.*.local

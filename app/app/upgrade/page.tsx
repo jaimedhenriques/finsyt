@@ -127,7 +127,19 @@ export default function UpgradePage() {
             </div>
 
             <button
-              onClick={() => { if (!plan.disabled && plan.name !== 'Enterprise') { window.location.href = '/api/stripe/create-checkout?plan=pro' } else if (plan.name === 'Enterprise') { window.location.href = 'mailto:hello@finsyt.com' } }}
+              onClick={async () => {
+                if (plan.disabled) return
+                if (plan.name === 'Enterprise') { window.location.href = 'mailto:hello@finsyt.com'; return }
+                try {
+                  const res = await fetch('/api/checkout', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ priceId: plan.name === 'Pro' ? (process.env.NEXT_PUBLIC_STRIPE_PRO_PRICE_ID || '') : '' }),
+                  })
+                  const data = await res.json()
+                  if (data.url) window.location.href = data.url
+                } catch {}
+              }}
               disabled={plan.disabled}
               style={{
                 display: 'block', width: '100%', textAlign: 'center',
