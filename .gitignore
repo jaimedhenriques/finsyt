@@ -4,7 +4,3 @@ finsyt-platform/public/data/ciq_dictionary.json
 incoming_files/
 .next/
 .env.local
-.agents/.env
-node_modules/
-finsyt-platform/public/data/ciq_dictionary.json
-incoming_files/
