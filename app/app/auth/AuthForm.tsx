@@ -330,6 +330,7 @@ export default function AuthForm({ mode }: { mode: AuthMode }) {
                 placeholder="you@company.com"
                 required
                 style={{ background: "#08111F", color: "#FFFFFF", borderColor: "rgba(255,255,255,0.08)" }}
+                disabled={!isConfigured || isPending}
               />
             </label>
             <label style={{ display: "grid", gap: 6 }}>
@@ -344,6 +345,7 @@ export default function AuthForm({ mode }: { mode: AuthMode }) {
                 required
                 minLength={8}
                 style={{ background: "#08111F", color: "#FFFFFF", borderColor: "rgba(255,255,255,0.08)" }}
+                disabled={!isConfigured || isPending}
               />
             </label>
           </div>
