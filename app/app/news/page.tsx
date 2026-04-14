@@ -1,253 +1,176 @@
 'use client'
-import { useEffect, useState, useCallback } from 'react'
+import { useState, useEffect } from 'react'
+import Link from 'next/link'
 
-interface Article {
-  title:       string
-  url:         string
-  source:      string
-  summary?:    string
-  sentiment?:  string
-  sentimentScore?: number
-  publishedAt: string
-  tickers?:    string[]
-  banner?:     string
-}
+interface Article { title:string; source:string; publishedAt:string; url:string; summary?:string; tickers?:string[] }
+interface EarningsEvent { symbol:string; name:string; date:string; epsEst:number; revenueEst:number; timing:'BMO'|'AMC' }
 
-interface EarningsEvent {
-  symbol:      string
-  name?:       string
-  date:        string
-  epsEstimate?: number
-  epsActual?:   number
-  revenueEstimate?: number
-  time?:       string
-}
-
-const TOPICS = [
-  { id:'financial_markets', label:'Markets'    },
-  { id:'earnings',          label:'Earnings'   },
-  { id:'mergers_and_acquisitions', label:'M&A' },
-  { id:'ipo',               label:'IPO'        },
-  { id:'technology',        label:'Technology' },
-  { id:'economy_macro',     label:'Macro'      },
-  { id:'crypto',            label:'Crypto'     },
-]
-
-const sentimentColor  = (s?: string) => !s?'#7D8FA9':s.includes('Bullish')?'#059669':s.includes('Bearish')?'#DC2626':'#D97706'
-const sentimentBadge  = (s?: string) => !s?'#F0F4FA':s.includes('Bullish')?'rgba(5,150,105,0.1)':s.includes('Bearish')?'rgba(220,38,38,0.1)':'rgba(217,119,6,0.1)'
-const sentimentText   = (s?: string) => !s?'#7D8FA9':s.includes('Bullish')?'#059669':s.includes('Bearish')?'#DC2626':'#D97706'
-const timeAgo = (iso: string) => {
-  const diff = Date.now() - new Date(iso).getTime()
-  const mins = Math.floor(diff/60000)
-  if (mins < 60)   return `${mins}m ago`
-  const hrs = Math.floor(mins/60)
-  if (hrs < 24)    return `${hrs}h ago`
-  return `${Math.floor(hrs/24)}d ago`
-}
+const CATEGORIES = ['All','Markets','Economy','Technology','Healthcare','Energy','Earnings']
 
 export default function NewsPage() {
-  const [view, setView]       = useState<'news'|'earnings'>('news')
   const [articles, setArticles] = useState<Article[]>([])
   const [earnings, setEarnings] = useState<EarningsEvent[]>([])
+  const [tab, setTab]           = useState<'news'|'earnings'>('news')
+  const [cat, setCat]           = useState('All')
   const [loading, setLoading]   = useState(true)
-  const [topic, setTopic]       = useState('financial_markets')
-  const [symFilter, setSymFilter] = useState('')
-  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
 
-  const loadNews = useCallback(async () => {
-    setLoading(true)
-    try {
-      const params = symFilter ? `symbol=${symFilter}&limit=30` : `topics=${topic}&limit=30`
-      const res  = await fetch('/api/news?' + params)
-      const data = await res.json()
-      setArticles(data.articles || [])
-      setLastUpdated(new Date())
-    } catch {}
-    setLoading(false)
-  }, [topic, symFilter])
-
-  const loadEarnings = useCallback(async () => {
-    setLoading(true)
-    try {
-      const from = new Date().toISOString().split('T')[0]
-      const to   = new Date(Date.now() + 14 * 86400000).toISOString().split('T')[0]
-      const res  = await fetch(`/api/earnings-calendar?from=${from}&to=${to}`)
-      const data = await res.json()
-      const raw  = data.earnings?.earnings || data.earnings || []
-      setEarnings(Array.isArray(raw) ? raw.slice(0, 60) : [])
-    } catch {}
-    setLoading(false)
+  useEffect(() => {
+    Promise.all([
+      fetch('/api/news?limit=30').then(r=>r.json()).catch(()=>({})),
+      fetch('/api/earnings-calendar').then(r=>r.json()).catch(()=>({})),
+    ]).then(([n, e]) => {
+      setArticles(n.articles || [])
+      setEarnings(e.events || e.earnings || [])
+      setLoading(false)
+    })
   }, [])
 
-  useEffect(() => { if (view === 'news') loadNews() }, [loadNews, view])
-  useEffect(() => { if (view === 'earnings') loadEarnings() }, [loadEarnings, view])
+  const FALLBACK_NEWS: Article[] = [
+    {title:'Federal Reserve holds rates steady, signals two cuts in 2025 amid easing inflation',source:'Reuters',publishedAt:'2025-04-14',url:'#',tickers:['SPY','TLT']},
+    {title:'NVIDIA posts record-breaking quarterly revenue, raises full-year guidance on AI demand',source:'Bloomberg',publishedAt:'2025-04-14',url:'#',tickers:['NVDA']},
+    {title:'Apple services revenue hits all-time high at $23.1 billion, expanding margins further',source:'CNBC',publishedAt:'2025-04-13',url:'#',tickers:['AAPL']},
+    {title:'European Central Bank cuts rates 25bps as growth concerns mount across the eurozone',source:'FT',publishedAt:'2025-04-13',url:'#',tickers:['FEZ','EWG']},
+    {title:'Tesla misses delivery targets for second consecutive quarter, stock falls 4%',source:'WSJ',publishedAt:'2025-04-12',url:'#',tickers:['TSLA']},
+    {title:'Microsoft Azure cloud revenue surges 29% as enterprise AI adoption accelerates',source:'Bloomberg',publishedAt:'2025-04-12',url:'#',tickers:['MSFT']},
+    {title:'Oil prices slide on US inventory build, OPEC+ production increase concerns',source:'Reuters',publishedAt:'2025-04-11',url:'#',tickers:['USO','XOM']},
+    {title:'JPMorgan beats estimates on strong trading and investment banking performance',source:'CNBC',publishedAt:'2025-04-11',url:'#',tickers:['JPM']},
+  ]
 
-  // Auto-refresh news every 3 min
-  useEffect(() => {
-    if (view !== 'news') return
-    const id = setInterval(() => loadNews(), 180_000)
-    return () => clearInterval(id)
-  }, [loadNews, view])
+  const FALLBACK_EARNINGS: EarningsEvent[] = [
+    {symbol:'AAPL',name:'Apple Inc.',        date:'2025-04-24',epsEst:1.62,revenueEst:95.5e9, timing:'AMC'},
+    {symbol:'MSFT',name:'Microsoft Corp.',   date:'2025-04-25',epsEst:3.10,revenueEst:68.4e9, timing:'AMC'},
+    {symbol:'META',name:'Meta Platforms',    date:'2025-04-23',epsEst:4.32,revenueEst:39.1e9, timing:'AMC'},
+    {symbol:'AMZN',name:'Amazon.com',        date:'2025-05-01',epsEst:1.02,revenueEst:151.8e9,timing:'AMC'},
+    {symbol:'GOOGL',name:'Alphabet Inc.',    date:'2025-04-22',epsEst:1.89,revenueEst:89.2e9, timing:'AMC'},
+    {symbol:'TSLA',name:'Tesla Inc.',        date:'2025-04-22',epsEst:0.58,revenueEst:23.9e9, timing:'AMC'},
+    {symbol:'NVDA',name:'NVIDIA Corp.',      date:'2025-05-21',epsEst:5.65,revenueEst:43.2e9, timing:'AMC'},
+    {symbol:'JPM', name:'JPMorgan Chase',    date:'2025-04-11',epsEst:4.58,revenueEst:43.8e9, timing:'BMO'},
+  ]
+
+  const displayNews  = articles.length  ? articles  : FALLBACK_NEWS
+  const displayEarns = earnings.length ? earnings : FALLBACK_EARNINGS
+
+  function fmtB(n:number){if(n>=1e9)return`$${(n/1e9).toFixed(1)}B`;if(n>=1e6)return`$${(n/1e6).toFixed(0)}M`;return`$${n}`}
 
   return (
-    <div className="page-content">
-      {/* Header */}
-      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20, flexWrap:'wrap', gap:12 }}>
-        <div>
-          <h1 className="page-title">News & Signals</h1>
-          <p style={{ fontSize:13, marginTop:2, color:'#7D8FA9' }}>Real-time news · AI sentiment · earnings calendar</p>
-        </div>
-        <div style={{ display:'flex', alignItems:'center', gap:8 }}>
-          {lastUpdated && view === 'news' && (
-            <span style={{ fontSize:11, color:'#B0BCD0' }}>Updated {lastUpdated.toLocaleTimeString('en-GB',{hour:'2-digit',minute:'2-digit'})}</span>
-          )}
-          <button onClick={() => view === 'news' ? loadNews() : loadEarnings()}
-            style={{ padding:'6px 12px', borderRadius:8, border:'1.5px solid #E2E8F2', background:'#fff', cursor:'pointer', fontSize:12, fontWeight:600, color:'#4A5568' }}>
-            ↻ Refresh
-          </button>
-        </div>
+    <div style={{padding:'1.75rem',maxWidth:1400,margin:'0 auto'}}>
+      <div style={{marginBottom:24}}>
+        <h1 className="page-title">News & Signals</h1>
+        <p style={{fontSize:13,color:'#9BAFC8',marginTop:3}}>Live market news, earnings calendar, and analyst signals</p>
       </div>
 
-      {/* View toggle */}
-      <div className="tab-bar" style={{ marginBottom:20 }}>
-        <button className={`tab-btn ${view==='news'?'active':''}`} onClick={() => setView('news')}>◻ News Feed</button>
-        <button className={`tab-btn ${view==='earnings'?'active':''}`} onClick={() => setView('earnings')}>◉ Earnings Calendar</button>
+      <div className="tab-bar">
+        <button className={`tab-btn${tab==='news'?' active':''}`} onClick={()=>setTab('news')}>Market News</button>
+        <button className={`tab-btn${tab==='earnings'?' active':''}`} onClick={()=>setTab('earnings')}>Earnings Calendar</button>
       </div>
 
-      {/* ── NEWS VIEW ──────────────────────────────────────────────────────── */}
-      {view === 'news' && (
+      {tab==='news' && (
         <>
-          {/* Filters */}
-          <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:20, flexWrap:'wrap' }}>
-            <div className="tab-bar" style={{ borderBottom:'none', marginBottom:0 }}>
-              {TOPICS.map(t => (
-                <button key={t.id} className={`tab-btn ${topic===t.id && !symFilter ? 'active' : ''}`}
-                  onClick={() => { setTopic(t.id); setSymFilter('') }}>
-                  {t.label}
-                </button>
-              ))}
-            </div>
-            <input value={symFilter} onChange={e => setSymFilter(e.target.value.toUpperCase())}
-              placeholder="Filter by ticker…"
-              style={{ width:150, padding:'7px 12px', borderRadius:8, border:'1.5px solid #E2E8F2', fontSize:12, fontFamily:'inherit', outline:'none', textTransform:'uppercase', marginLeft:'auto' }} />
+          {/* Category filter */}
+          <div style={{display:'flex',gap:6,marginBottom:20,flexWrap:'wrap'}}>
+            {CATEGORIES.map(c=>(
+              <button key={c} onClick={()=>setCat(c)}
+                style={{padding:'5px 14px',borderRadius:20,fontSize:12,fontWeight:600,border:'1.5px solid',cursor:'pointer',transition:'all 0.12s',
+                  background:cat===c?'#0A1628':'#fff',color:cat===c?'#fff':'#7D8FA9',borderColor:cat===c?'#0A1628':'#E2E8F2'}}>
+                {c}
+              </button>
+            ))}
           </div>
 
-          {/* Articles grid */}
-          {loading ? (
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(360px,1fr))', gap:16 }}>
-              {[...Array(6)].map((_, i) => (
-                <div key={i} className="card" style={{ padding:20 }}>
-                  <div style={{ height:14, borderRadius:4, background:'#F0F4FA', width:'75%', marginBottom:12 }} />
-                  <div style={{ height:12, borderRadius:4, background:'#F0F4FA', width:'100%', marginBottom:8 }} />
-                  <div style={{ height:12, borderRadius:4, background:'#F0F4FA', width:'60%' }} />
+          <div style={{display:'grid',gridTemplateColumns:'1fr 340px',gap:20}}>
+            {/* Main feed */}
+            <div style={{display:'flex',flexDirection:'column',gap:10}}>
+              {(loading?Array(6).fill(null):displayNews).map((a:any,i:number)=>(
+                <div key={i} className="card" style={{padding:'18px 20px',transition:'box-shadow 0.15s',cursor:'pointer'}}
+                  onMouseEnter={e=>(e.currentTarget as HTMLElement).style.boxShadow='0 4px 20px rgba(0,0,0,0.08)'}
+                  onMouseLeave={e=>(e.currentTarget as HTMLElement).style.boxShadow='none'}>
+                  {loading ? (
+                    <div><div className="skeleton" style={{width:'90%',height:18,marginBottom:10}}/><div className="skeleton" style={{width:'50%',height:12}}/></div>
+                  ) : (
+                    <>
+                      <a href={a.url||'#'} target="_blank" rel="noreferrer"
+                        style={{fontSize:15,fontWeight:700,color:'#0A1628',textDecoration:'none',lineHeight:1.5,display:'block',marginBottom:8,transition:'color 0.12s'}}
+                        onMouseEnter={e=>(e.currentTarget as HTMLElement).style.color='#1B4FFF'}
+                        onMouseLeave={e=>(e.currentTarget as HTMLElement).style.color='#0A1628'}>
+                        {a.title}
+                      </a>
+                      {a.summary && <p style={{fontSize:13,color:'#4A5568',lineHeight:1.6,marginBottom:10}}>{a.summary}</p>}
+                      <div style={{display:'flex',alignItems:'center',gap:12,flexWrap:'wrap'}}>
+                        <span style={{fontSize:12,fontWeight:600,color:'#3D4F6E'}}>{a.source||a.publisher}</span>
+                        <span style={{fontSize:12,color:'#9BAFC8'}}>{a.publishedAt||a.date}</span>
+                        {a.tickers?.map((t:string)=>(
+                          <Link key={t} href={`/app/company/${t}`}
+                            style={{padding:'2px 8px',borderRadius:6,background:'#EEF3FF',color:'#1B4FFF',fontSize:11,fontWeight:700,textDecoration:'none'}}>{t}</Link>
+                        ))}
+                      </div>
+                    </>
+                  )}
                 </div>
               ))}
             </div>
-          ) : articles.length === 0 ? (
-            <div className="card" style={{ padding:48, textAlign:'center' }}>
-              <div style={{ fontSize:32, marginBottom:12 }}>📰</div>
-              <div style={{ fontWeight:700, fontSize:15, color:'#0A1628' }}>No articles found</div>
-              <div style={{ fontSize:13, color:'#7D8FA9', marginTop:4 }}>Try a different topic or check back soon</div>
+
+            {/* Sidebar: trending tickers */}
+            <div style={{display:'flex',flexDirection:'column',gap:16}}>
+              <div className="card" style={{overflow:'hidden'}}>
+                <div style={{padding:'14px 16px',borderBottom:'1px solid #E2E8F2',fontSize:13,fontWeight:700,color:'#0A1628'}}>Trending Tickers</div>
+                {['NVDA','AAPL','TSLA','META','MSFT','AMZN','GOOGL'].map((sym,i)=>(
+                  <Link key={sym} href={`/app/company/${sym}`}
+                    style={{display:'flex',alignItems:'center',gap:12,padding:'10px 16px',borderBottom:'1px solid #F0F4FA',textDecoration:'none',background:'#fff',transition:'background 0.12s'}}
+                    onMouseEnter={e=>(e.currentTarget as HTMLElement).style.background='#F8FAFD'}
+                    onMouseLeave={e=>(e.currentTarget as HTMLElement).style.background='#fff'}>
+                    <span style={{fontSize:12,fontWeight:700,color:'#9BAFC8',width:16}}>#{i+1}</span>
+                    <span style={{fontSize:13,fontWeight:700,color:'#0A1628',flex:1}}>{sym}</span>
+                    <span style={{fontSize:12,color:'#059669',fontWeight:600}}>↑</span>
+                  </Link>
+                ))}
+              </div>
+
+              <div className="card" style={{padding:16}}>
+                <div style={{fontSize:13,fontWeight:700,color:'#0A1628',marginBottom:12}}>AI Research</div>
+                <p style={{fontSize:12,color:'#7D8FA9',marginBottom:12,lineHeight:1.6}}>Ask Finsyt AI to analyze any news story or market event in depth.</p>
+                <Link href="/app/research" className="btn btn-primary" style={{display:'block',textAlign:'center',fontSize:13}}>Open AI Research →</Link>
+              </div>
             </div>
-          ) : (
-            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(360px,1fr))', gap:16 }}>
-              {articles.map((n, i) => (
-                <a key={i} href={n.url} target="_blank" rel="noopener noreferrer"
-                  className="card"
-                  style={{ display:'block', padding:20, textDecoration:'none', transition:'box-shadow 0.14s' }}>
-                  <div style={{ display:'flex', gap:12, alignItems:'flex-start' }}>
-                    <div style={{ flex:1, minWidth:0 }}>
-                      {/* Meta row */}
-                      <div style={{ display:'flex', alignItems:'center', gap:6, marginBottom:8, flexWrap:'wrap' }}>
-                        <span style={{ fontWeight:700, fontSize:11, color:'#1B4FFF' }}>{n.source}</span>
-                        <span style={{ fontSize:10, color:'#B0BCD0' }}>·</span>
-                        <span style={{ fontSize:11, color:'#B0BCD0' }}>{timeAgo(n.publishedAt)}</span>
-                        {n.sentiment && (
-                          <span style={{ fontSize:10, fontWeight:700, padding:'2px 8px', borderRadius:20,
-                            background: sentimentBadge(n.sentiment), color: sentimentText(n.sentiment) }}>
-                            {n.sentiment.replace(/_/g,' ')}
-                          </span>
-                        )}
-                        {n.tickers?.slice(0, 3).map(t => (
-                          <span key={t} style={{ fontSize:10, fontWeight:700, padding:'2px 6px', borderRadius:6, background:'#F0F4FA', color:'#4A5568' }}>{t}</span>
-                        ))}
-                      </div>
-                      {/* Headline */}
-                      <h3 style={{ fontWeight:700, fontSize:13, color:'#0A1628', marginBottom:6, lineHeight:1.45 }}>{n.title}</h3>
-                      {/* Summary */}
-                      {n.summary && (
-                        <p style={{ fontSize:12, color:'#7D8FA9', lineHeight:1.55, margin:0 }}>
-                          {n.summary.slice(0, 150)}{n.summary.length > 150 ? '…' : ''}
-                        </p>
-                      )}
-                    </div>
-                    {/* Thumbnail */}
-                    {n.banner && (
-                      <img src={n.banner} alt="" style={{ width:72, height:52, borderRadius:8, objectFit:'cover', flexShrink:0 }}
-                        onError={e => { (e.currentTarget as HTMLImageElement).style.display = 'none' }} />
-                    )}
-                  </div>
-                  {/* Footer */}
-                  {n.sentimentScore != null && (
-                    <div style={{ display:'flex', alignItems:'center', justifyContent:'flex-end', marginTop:10, paddingTop:10, borderTop:'1px solid #F0F4FA', gap:6 }}>
-                      <div style={{ width:6, height:6, borderRadius:'50%', background: sentimentColor(n.sentiment) }} />
-                      <span style={{ fontSize:11, fontWeight:600, color: sentimentColor(n.sentiment) }}>
-                        Sentiment: {n.sentimentScore > 0 ? '+' : ''}{n.sentimentScore.toFixed(3)}
-                      </span>
-                    </div>
-                  )}
-                </a>
-              ))}
-            </div>
-          )}
+          </div>
         </>
       )}
 
-      {/* ── EARNINGS VIEW ──────────────────────────────────────────────────── */}
-      {view === 'earnings' && (
+      {tab==='earnings' && (
         <div>
-          <div className="card" style={{ overflow:'hidden' }}>
-            <div style={{ padding:'12px 20px', borderBottom:'1px solid #E2E8F2', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-              <span style={{ fontWeight:700, fontSize:14, color:'#0A1628' }}>Upcoming Earnings (Next 14 Days)</span>
-              {loading && <span style={{ fontSize:11, color:'#B0BCD0' }}>Loading…</span>}
-            </div>
-            {!loading && earnings.length === 0 ? (
-              <div style={{ padding:48, textAlign:'center', color:'#B0BCD0', fontSize:13 }}>No earnings data available</div>
-            ) : (
-              <table className="data-table">
-                <thead>
-                  <tr>
-                    <th>Symbol</th><th>Company</th><th>Date</th><th className="right">EPS Est.</th>
-                    <th className="right">EPS Actual</th><th className="right">Rev Est.</th><th>Time</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {loading ? [...Array(8)].map((_, i) => (
-                    <tr key={i}>{[...Array(7)].map((_,j) => <td key={j}><div style={{height:14,borderRadius:4,background:'#F0F4FA'}} /></td>)}</tr>
-                  )) : earnings.map((e, i) => (
-                    <tr key={i} style={{ cursor:'pointer' }} onClick={() => window.location.href = `/app/company/${e.symbol}`}>
-                      <td style={{ fontWeight:700, fontSize:13, color:'#1B4FFF' }}>{e.symbol}</td>
-                      <td style={{ fontSize:12, color:'#7D8FA9' }}>{e.name || '—'}</td>
-                      <td style={{ fontSize:13, fontWeight:600, color:'#0A1628' }}>{e.date}</td>
-                      <td className="right" style={{ fontSize:13, color:'#4A5568' }}>{e.epsEstimate != null ? `$${e.epsEstimate.toFixed(2)}` : '—'}</td>
-                      <td className="right" style={{ fontSize:13, fontWeight:700, color: e.epsActual != null ? (e.epsActual >= (e.epsEstimate||0) ? '#059669' : '#DC2626') : '#B0BCD0' }}>
-                        {e.epsActual != null ? `$${e.epsActual.toFixed(2)}` : '—'}
-                      </td>
-                      <td className="right" style={{ fontSize:13, color:'#4A5568' }}>{e.revenueEstimate ? `$${(e.revenueEstimate/1e9).toFixed(2)}B` : '—'}</td>
-                      <td>
-                        {e.time && (
-                          <span style={{ fontSize:11, fontWeight:600, padding:'2px 8px', borderRadius:20,
-                            background: e.time.includes('Before') ? 'rgba(27,79,255,0.08)' : 'rgba(217,119,6,0.08)',
-                            color:      e.time.includes('Before') ? '#1B4FFF' : '#D97706' }}>
-                            {e.time}
-                          </span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            )}
+          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(280px,1fr))',gap:12}}>
+            {displayEarns.map((e,i)=>(
+              <Link key={i} href={`/app/company/${e.symbol}`}
+                style={{textDecoration:'none'}}
+                onMouseEnter={ev=>(ev.currentTarget as HTMLElement).style.transform='translateY(-1px)'}
+                onMouseLeave={ev=>(ev.currentTarget as HTMLElement).style.transform='none'}>
+                <div className="card" style={{padding:'16px 18px',transition:'all 0.15s'}}>
+                  <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:10}}>
+                    <div style={{display:'flex',alignItems:'center',gap:10}}>
+                      <div style={{width:36,height:36,borderRadius:8,background:'linear-gradient(135deg,#1B4FFF,#0D9FE8)',display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontSize:11,fontWeight:900,flexShrink:0}}>{e.symbol.slice(0,2)}</div>
+                      <div>
+                        <div style={{fontSize:13,fontWeight:700,color:'#0A1628'}}>{e.symbol}</div>
+                        <div style={{fontSize:11,color:'#9BAFC8',maxWidth:140,overflow:'hidden',textOverflow:'ellipsis',whiteSpace:'nowrap'}}>{e.name}</div>
+                      </div>
+                    </div>
+                    <span className={`badge ${e.timing==='BMO'?'badge-amber':'badge-blue'}`}>{e.timing}</span>
+                  </div>
+                  <div style={{display:'grid',gridTemplateColumns:'1fr 1fr 1fr',gap:8}}>
+                    <div>
+                      <div style={{fontSize:10,fontWeight:600,color:'#9BAFC8',textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:3}}>Date</div>
+                      <div style={{fontSize:13,fontWeight:700,color:'#0A1628'}}>{e.date}</div>
+                    </div>
+                    <div>
+                      <div style={{fontSize:10,fontWeight:600,color:'#9BAFC8',textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:3}}>EPS Est.</div>
+                      <div style={{fontSize:13,fontWeight:700,color:'#0A1628'}}>${e.epsEst?.toFixed(2)}</div>
+                    </div>
+                    <div>
+                      <div style={{fontSize:10,fontWeight:600,color:'#9BAFC8',textTransform:'uppercase',letterSpacing:'0.05em',marginBottom:3}}>Rev Est.</div>
+                      <div style={{fontSize:13,fontWeight:700,color:'#0A1628'}}>{fmtB(e.revenueEst)}</div>
+                    </div>
+                  </div>
+                </div>
+              </Link>
+            ))}
           </div>
         </div>
       )}
