@@ -4,7 +4,27 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 
-const NAV = [
+type NavItem = {
+  href: string
+  label: string
+  icon: string
+  exact?: boolean
+  badge?: string
+  pro?: boolean
+}
+
+type NavGroup = {
+  section: string | null
+  items: NavItem[]
+}
+
+type SearchResult = {
+  symbol: string
+  name: string
+  exchange: string
+}
+
+const NAV: NavGroup[] = [
   { section: null, items: [
     { href: '/app', label: 'Overview', icon: '⊞', exact: true },
     { href: '/app/watchlist', label: 'Watchlist', icon: '◈' },
@@ -34,7 +54,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const router   = useRouter()
   const [search, setSearch]             = useState('')
-  const [searchResults, setSearchResults] = useState<any[]>([])
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([])
   const [sidebarOpen, setSidebarOpen]   = useState(true)
 
   if (pathname.startsWith('/app/auth')) {
@@ -86,7 +106,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 </div>
               )}
               {!sidebarOpen && gi > 0 && <div style={{height:1,background:'rgba(255,255,255,0.05)',margin:'0.5rem 0'}}/>}
-              {group.items.map((item: any) => {
+              {group.items.map((item) => {
                 const active = item.exact ? pathname===item.href : pathname===item.href||pathname.startsWith(item.href+'/')
                 return (
                   <Link key={item.href} href={item.href} title={!sidebarOpen ? item.label : undefined}

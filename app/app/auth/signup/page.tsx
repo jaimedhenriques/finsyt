@@ -1,7 +1,5 @@
-'use client'
-
-import AuthCard from '@/app/app/auth/_components/AuthCard'
+import AuthPageShell from '@/app/app/auth/_components/AuthPageShell'
 
 export default function SignupPage() {
-  return <AuthCard mode="signup" />
+  return <AuthPageShell mode="signup" />
 }

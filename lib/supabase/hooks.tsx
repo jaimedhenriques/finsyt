@@ -26,11 +26,6 @@ export function SessionProvider({
   const [user, setUser] = useState<User | null>(initialSession?.user ?? null)
 
   useEffect(() => {
-    setSession(initialSession)
-    setUser(initialSession?.user ?? null)
-  }, [initialSession])
-
-  useEffect(() => {
     if (!supabase) {
       return
     }
