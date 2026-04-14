@@ -25,13 +25,10 @@ export function SupabaseAuthProvider({
 }) {
   const supabase = useMemo(() => createClient(), [])
   const [session, setSession] = useState<Session | null>(initialSession)
-  const [isLoading, setIsLoading] = useState(Boolean(supabase))
+  const [isLoading, setIsLoading] = useState(() => Boolean(supabase))
 
   useEffect(() => {
-    if (!supabase) {
-      setIsLoading(false)
-      return
-    }
+    if (!supabase) return
 
     let isMounted = true
 

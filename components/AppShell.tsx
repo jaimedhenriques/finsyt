@@ -7,7 +7,27 @@ import { usePathname, useRouter } from 'next/navigation'
 import { useSupabaseClient, useUser } from '@/lib/supabase/hooks'
 import { useSupabaseAuth } from '@/lib/supabase/provider'
 
-const NAV = [
+type SearchResult = {
+  symbol: string
+  name: string
+  exchange?: string
+}
+
+type NavItem = {
+  href: string
+  label: string
+  icon: string
+  exact?: boolean
+  badge?: string
+  pro?: boolean
+}
+
+type NavGroup = {
+  section: string | null
+  items: NavItem[]
+}
+
+const NAV: NavGroup[] = [
   { section: null, items: [
     { href: '/app', label: 'Overview', icon: '⊞', exact: true },
     { href: '/app/watchlist', label: 'Watchlist', icon: '◈' },
@@ -40,7 +60,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const supabase = useSupabaseClient()
   const { isConfigured, isLoading } = useSupabaseAuth()
   const [search, setSearch] = useState('')
-  const [searchResults, setSearchResults] = useState<any[]>([])
+  const [searchResults, setSearchResults] = useState<SearchResult[]>([])
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [isSigningOut, setIsSigningOut] = useState(false)
 
@@ -159,7 +179,7 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
                 </div>
               )}
               {!sidebarOpen && gi > 0 && <div style={{height:1,background:'rgba(255,255,255,0.05)',margin:'0.5rem 0'}}/>}
-              {group.items.map((item: any) => {
+              {group.items.map((item) => {
                 const active = item.exact ? pathname===item.href : pathname===item.href||pathname.startsWith(item.href+'/')
                 return (
                   <Link key={item.href} href={item.href} title={!sidebarOpen ? item.label : undefined}
