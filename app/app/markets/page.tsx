@@ -1,206 +1,274 @@
 'use client'
-import { useState } from 'react'
+import { useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
-import { fmtPct, fmt, changeClass } from '@/lib/utils'
+import { AreaChart, Area, ResponsiveContainer, Tooltip } from 'recharts'
+import { fmtLarge, fmtPct, fmt, changeClass } from '@/lib/utils'
 
-const INDICES = [
-  { label:'S&P 500', ticker:'.SPX', price:5254.35, change:0.42, ytd:7.8 },
-  { label:'NASDAQ 100', ticker:'.NDX', price:18391.2, change:0.61, ytd:9.2 },
-  { label:'Dow Jones', ticker:'.DJI', price:39127.8, change:0.22, ytd:5.1 },
-  { label:'FTSE 100', ticker:'.FTSE', price:8204.6, change:0.14, ytd:3.8 },
-  { label:'EURO STOXX 50', ticker:'.STOXX50E', price:4947.7, change:0.31, ytd:6.4 },
-  { label:'Nikkei 225', ticker:'.N225', price:38804.1, change:-0.52, ytd:12.1 },
-  { label:'Hang Seng', ticker:'.HSI', price:17651.4, change:-0.84, ytd:-2.1 },
-  { label:'DAX', ticker:'.GDAXI', price:18492.5, change:0.41, ytd:8.2 },
+// ── Types ─────────────────────────────────────────────────────────────────────
+interface IndexQuote { label: string; ticker: string; price: number; change: number; changePct: number; ytd?: number; spark?: number[] }
+interface ForexRate  { pair: string; from: string; to: string; rate: number; change?: number; changePct?: number }
+interface Mover      { symbol: string; name: string; price: number; changePct: number }
+interface SectorData { name: string; change: number; mcap: string; top: string }
+
+// ── Static fallbacks (shown while loading) ───────────────────────────────────
+const INDEX_TICKERS = [
+  { label: 'S&P 500',       ticker: 'SPY',  display: '.SPX' },
+  { label: 'NASDAQ 100',    ticker: 'QQQ',  display: '.NDX' },
+  { label: 'Dow Jones',     ticker: 'DIA',  display: '.DJI' },
+  { label: 'FTSE 100',      ticker: 'ISF.L',display: '.FTSE' },
+  { label: 'EURO STOXX 50', ticker: 'FEZ',  display: '.STOXX50E' },
+  { label: 'Nikkei 225',    ticker: 'EWJ',  display: '.N225' },
+  { label: 'Hang Seng',     ticker: '2800.HK',display:'.HSI' },
+  { label: 'DAX',           ticker: 'EWG',  display: '.GDAXI' },
+]
+const FOREX_PAIRS = [
+  { from:'EUR', to:'USD' },{ from:'GBP', to:'USD' },{ from:'USD', to:'JPY' },
+  { from:'USD', to:'CHF' },{ from:'USD', to:'CAD' },{ from:'AUD', to:'USD' },
+  { from:'NZD', to:'USD' },{ from:'EUR', to:'GBP' },
+]
+const SECTORS_STATIC: SectorData[] = [
+  { name:'Technology',      change:1.42,  mcap:'$14.2T', top:'NVDA +2.8%' },
+  { name:'Healthcare',      change:0.31,  mcap:'$6.8T',  top:'LLY +1.5%'  },
+  { name:'Financials',      change:-0.12, mcap:'$7.1T',  top:'JPM +0.3%'  },
+  { name:'Energy',          change:-0.82, mcap:'$3.4T',  top:'XOM -0.8%'  },
+  { name:'Consumer Disc.',  change:0.64,  mcap:'$4.9T',  top:'AMZN +1.1%' },
+  { name:'Consumer Staples',change:0.18,  mcap:'$3.1T',  top:'WMT +0.4%'  },
+  { name:'Industrials',     change:0.22,  mcap:'$4.2T',  top:'HON +0.5%'  },
+  { name:'Utilities',       change:-0.45, mcap:'$1.4T',  top:'NEE -0.3%'  },
+  { name:'Real Estate',     change:-0.67, mcap:'$1.2T',  top:'AMT -0.7%'  },
+  { name:'Materials',       change:0.35,  mcap:'$2.1T',  top:'LIN +0.4%'  },
+  { name:'Communication',   change:0.91,  mcap:'$4.4T',  top:'META +0.9%' },
 ]
 
-const FUTURES = [
-  { label:'CBOT E-mini Dow Futures', ticker:'1YMcv1', price:39151.0, change:0.01 },
-  { label:'CME E-mini S&P 500 Futures', ticker:'ESccv1', price:5247.25, change:0.05 },
-  { label:'CME E-mini NASDAQ 100 Futures', ticker:'NQccv1', price:20062.75, change:0.16 },
-  { label:'ICE Europe FTSE 100 Futures', ticker:'FFIc1', price:8277.0, change:-0.05 },
-  { label:'Eurex EURO STOXX 50 Futures', ticker:'STXEc1', price:4949.0, change:0.04 },
-]
-
-const FOREX = [
-  { name:'Euro', code:'EUR', pair:'EUR/USD', bid:'1.07', ask:'39/43', last:1.07, change:-0.03, mtd:-0.94, m3:-1.64, ytd:-1.31, prev:1.0747, contributor:'BARCLAYS' },
-  { name:'Japanese Yen', code:'JPY', pair:'USD/JPY', bid:'156.', ask:'06/09', last:156, change:-0.01, mtd:0.48, m3:4.21, ytd:-10.15, prev:157.91, contributor:'NEDBANK LTD' },
-  { name:'British Pound', code:'GBP', pair:'GBP/USD', bid:'1.37', ask:'12/16', last:1.37, change:-0.04, mtd:-0.21, m3:-0.58, ytd:0.55, prev:1.2722, contributor:'BARCLAYS' },
-  { name:'Swiss Franc', code:'CHF', pair:'USD/CHF', bid:'0.88', ask:'38/43', last:0.88, change:-0.05, mtd:-2.07, m3:-4.34, ytd:2.41, prev:0.8918, contributor:'SEB' },
-  { name:'Canadian Dollar', code:'CAD', pair:'USD/CAD', bid:'1.37', ask:'13/14', last:1.37, change:+0.04, mtd:0.64, m3:2.04, ytd:2.04, prev:1.3706, contributor:'ZUERCHER KB' },
-  { name:'Australian Dollar', code:'AUD', pair:'AUD/USD', bid:'0.66', ask:'72/73', last:0.66, change:+0.01, mtd:0.90, m3:1.32, ytd:-0.85, prev:0.6573, contributor:'SEB' },
-  { name:'New Zealand $', code:'NZD', pair:'NZD/USD', bid:'0.61', ask:'31/35', last:0.61, change:-0.02, mtd:-0.18, m3:0.84, ytd:-1.83, prev:0.6132, contributor:'SEB' },
-  { name:'Euro/SwissFranc', code:'EURCHF', pair:'EUR/CHF', bid:'0.94', ask:'92/98', last:0.94, change:-0.09, mtd:-3.03, m3:-1.93, ytd:0.57, prev:0.9498, contributor:'SEB' },
-  { name:'Euro/GBPound', code:'EURGBP', pair:'EUR/GBP', bid:'0.84', ask:'45/50', last:0.84, change:+0.01, mtd:-0.81, m3:-1.11, ytd:-2.44, prev:0.8448, contributor:'SEB' },
-  { name:'Euro/Yen', code:'EURJPY', pair:'EUR/JPY', bid:'169.', ask:'77/81', last:169, change:-0.24, mtd:-0.49, m3:3.12, ytd:8.05, prev:161.71, contributor:'SOC GENERALE' },
-  { name:'Euro/SwedenKr', code:'EURSEK', pair:'EUR/SEK', bid:'11.23', ask:'06/32', last:11.23, change:+0.05, mtd:1.68, m3:1.65, ytd:0.83, prev:11.2247, contributor:'ZUERCHER KB' },
-  { name:'Euro/NorwayKr', code:'EURNOK', pair:'EUR/NOK', bid:'11.33', ask:'43/85', last:11.33, change:+0.02, mtd:-0.18, m3:-1.52, ytd:0.32, prev:11.3510, contributor:'ZUERCHER KB' },
-]
-
-const SECTORS = [
-  { name:'Technology', change:1.42, ytd:8.3, mcap:'$14.2T', top:'NVDA +2.8%' },
-  { name:'Healthcare', change:0.31, ytd:3.1, mcap:'$6.8T', top:'LLY +1.5%' },
-  { name:'Financials', change:-0.12, ytd:5.2, mcap:'$7.1T', top:'JPM +0.3%' },
-  { name:'Energy', change:-0.82, ytd:-2.1, mcap:'$3.4T', top:'XOM -0.8%' },
-  { name:'Consumer Disc.', change:0.64, ytd:4.8, mcap:'$4.9T', top:'AMZN +1.1%' },
-  { name:'Consumer Staples', change:0.18, ytd:1.2, mcap:'$3.1T', top:'WMT +0.4%' },
-  { name:'Industrials', change:0.22, ytd:2.8, mcap:'$4.2T', top:'HON +0.5%' },
-  { name:'Utilities', change:-0.45, ytd:-0.8, mcap:'$1.4T', top:'NEE -0.3%' },
-  { name:'Real Estate', change:-0.67, ytd:-3.2, mcap:'$1.2T', top:'AMT -0.7%' },
-  { name:'Materials', change:0.35, ytd:1.9, mcap:'$2.1T', top:'LIN +0.4%' },
-  { name:'Communication', change:0.91, ytd:6.1, mcap:'$4.4T', top:'META +0.9%' },
-]
-
-const MOVERS = {
-  gainers:[{symbol:'NVDA',name:'NVIDIA',change:2.88,price:924.8},{symbol:'AMD',name:'Advanced Micro',change:2.14,price:158.4},{symbol:'TSLA',name:'Tesla',change:1.92,price:248.2},{symbol:'NFLX',name:'Netflix',change:1.87,price:890.4},{symbol:'AVGO',name:'Broadcom',change:1.41,price:218.5}],
-  losers:[{symbol:'INTC',name:'Intel',change:-2.31,price:32.4},{symbol:'XOM',name:'Exxon',change:-0.84,price:116.4},{symbol:'NEE',name:'NextEra',change:-0.72,price:64.2},{symbol:'AMT',name:'American Tower',change:-0.68,price:184.3},{symbol:'INTL',name:'ICE',change:-0.55,price:88.1}],
+function SparkLine({ data, positive }: { data: number[]; positive: boolean }) {
+  if (!data?.length) return <div style={{ width: 64, height: 28 }} />
+  return (
+    <ResponsiveContainer width={64} height={28}>
+      <AreaChart data={data.map((v, i) => ({ v, i }))} margin={{ top: 2, right: 0, bottom: 2, left: 0 }}>
+        <defs>
+          <linearGradient id={`sg${positive ? 'g' : 'r'}`} x1="0" y1="0" x2="0" y2="1">
+            <stop offset="5%"  stopColor={positive ? '#059669' : '#DC2626'} stopOpacity={0.3} />
+            <stop offset="95%" stopColor={positive ? '#059669' : '#DC2626'} stopOpacity={0}   />
+          </linearGradient>
+        </defs>
+        <Area type="monotone" dataKey="v" stroke={positive ? '#059669' : '#DC2626'} strokeWidth={1.5}
+          fill={`url(#sg${positive ? 'g' : 'r'})`} dot={false} />
+      </AreaChart>
+    </ResponsiveContainer>
+  )
 }
 
 export default function MarketsPage() {
-  const [tab, setTab] = useState<'overview'|'forex'|'futures'|'sectors'>('overview')
-  const [moversTab, setMoversTab] = useState<'gainers'|'losers'>('gainers')
+  const [tab, setTab] = useState<'overview' | 'forex' | 'movers' | 'sectors'>('overview')
+  const [indices, setIndices]     = useState<IndexQuote[]>([])
+  const [forex, setForex]         = useState<ForexRate[]>([])
+  const [gainers, setGainers]     = useState<Mover[]>([])
+  const [losers, setLosers]       = useState<Mover[]>([])
+  const [active, setActive]       = useState<Mover[]>([])
+  const [moversTab, setMoversTab] = useState<'gainers'|'losers'|'active'>('gainers')
+  const [loading, setLoading]     = useState(true)
+  const [lastUpdated, setLastUpdated] = useState<Date | null>(null)
+
+  const loadIndices = useCallback(async () => {
+    try {
+      const results = await Promise.allSettled(
+        INDEX_TICKERS.map(({ ticker, label, display }) =>
+          fetch(`/api/quote?symbol=${ticker}`)
+            .then(r => r.json())
+            .then(d => ({
+              label,
+              ticker: display,
+              price: d.price || 0,
+              change: d.change || 0,
+              changePct: d.changePct || d.changesPercentage || 0,
+              spark: d.spark || [],
+            } as IndexQuote))
+        )
+      )
+      const ok = results.filter(r => r.status === 'fulfilled').map(r => (r as any).value)
+      if (ok.length > 0) setIndices(ok)
+    } catch {}
+  }, [])
+
+  const loadForex = useCallback(async () => {
+    try {
+      const results = await Promise.allSettled(
+        FOREX_PAIRS.map(({ from, to }) =>
+          fetch(`/api/forex?from=${from}&to=${to}`)
+            .then(r => r.json())
+            .then(d => ({ pair: `${from}/${to}`, from, to, rate: d.rate || 0, changePct: d.changePct || 0 } as ForexRate))
+        )
+      )
+      const ok = results.filter(r => r.status === 'fulfilled').map(r => (r as any).value).filter(r => r.rate > 0)
+      if (ok.length > 0) setForex(ok)
+    } catch {}
+  }, [])
+
+  const loadMovers = useCallback(async () => {
+    try {
+      const [gRes, lRes, aRes] = await Promise.allSettled([
+        fetch('/api/market-trends?type=GAINERS').then(r => r.json()),
+        fetch('/api/market-trends?type=LOSERS').then(r => r.json()),
+        fetch('/api/market-trends?type=MOST_ACTIVE').then(r => r.json()),
+      ])
+      const norm = (arr: any[]): Mover[] => (arr || []).slice(0, 10).map(m => ({
+        symbol: m.ticker || m.symbol || '',
+        name:   m.name   || m.companyName || '',
+        price:  m.price  || m.last || 0,
+        changePct: m.todaysChangePerc || m.changes || m.changesPercentage || 0,
+      }))
+      if (gRes.status === 'fulfilled') setGainers(norm((gRes as any).value?.trends || []))
+      if (lRes.status === 'fulfilled') setLosers(norm((lRes as any).value?.trends || []))
+      if (aRes.status === 'fulfilled') setActive(norm((aRes as any).value?.trends || []))
+    } catch {}
+  }, [])
+
+  useEffect(() => {
+    setLoading(true)
+    Promise.all([loadIndices(), loadForex(), loadMovers()])
+      .finally(() => { setLoading(false); setLastUpdated(new Date()) })
+  }, [loadIndices, loadForex, loadMovers])
+
+  // Auto-refresh every 60s
+  useEffect(() => {
+    const id = setInterval(() => {
+      loadIndices(); loadForex(); loadMovers()
+      setLastUpdated(new Date())
+    }, 60_000)
+    return () => clearInterval(id)
+  }, [loadIndices, loadForex, loadMovers])
+
+  const moversData = moversTab === 'gainers' ? gainers : moversTab === 'losers' ? losers : active
 
   return (
     <div className="page-content">
-      <div style={{display:'flex',alignItems:'center',justifyContent:'space-between',marginBottom:20,flexWrap:'wrap',gap:12}}>
+      {/* Header */}
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between', marginBottom:20, flexWrap:'wrap', gap:12 }}>
         <div>
           <h1 className="page-title">Markets</h1>
-          <p style={{fontSize:13,marginTop:2,color:'#7D8FA9'}}>Global indices, FX, futures & sector performance</p>
+          <p style={{ fontSize:13, marginTop:2, color:'#7D8FA9' }}>Global indices · FX · movers · sector heatmap</p>
         </div>
-        <div style={{display:'flex',alignItems:'center',gap:8}}>
-          <div style={{width:8,height:8,borderRadius:'50%',background:'#059669',animation:'pulse 2s infinite'}}/>
-          <span style={{fontSize:12,fontWeight:600,color:'#059669'}}>Live Data</span>
+        <div style={{ display:'flex', alignItems:'center', gap:12 }}>
+          {lastUpdated && (
+            <span style={{ fontSize:11, color:'#7D8FA9' }}>
+              Updated {lastUpdated.toLocaleTimeString('en-GB', { hour:'2-digit', minute:'2-digit', second:'2-digit' })}
+            </span>
+          )}
+          <div style={{ display:'flex', alignItems:'center', gap:6, padding:'4px 10px', borderRadius:20, background:'rgba(5,150,105,0.1)', border:'1px solid rgba(5,150,105,0.2)' }}>
+            <div style={{ width:6, height:6, borderRadius:'50%', background:'#059669', boxShadow:'0 0 6px #059669', animation:'pulse 2s infinite' }}/>
+            <span style={{ fontSize:11, fontWeight:600, color:'#059669' }}>Live</span>
+          </div>
+          <button onClick={() => { loadIndices(); loadForex(); loadMovers(); setLastUpdated(new Date()) }}
+            style={{ padding:'6px 12px', borderRadius:8, border:'1.5px solid #E2E8F2', background:'#fff', cursor:'pointer', fontSize:12, fontWeight:600, color:'#4A5568' }}>
+            ↻ Refresh
+          </button>
         </div>
       </div>
 
-      <div className="tab-bar" style={{marginBottom:20}}>
-        {[['overview','Overview'],['forex','Forex'],['futures','Futures'],['sectors','Sectors']].map(([v,l])=>(
-          <button key={v} className={`tab-btn ${tab===v?'active':''}`} onClick={()=>setTab(v as any)}>{l}</button>
+      {/* Tabs */}
+      <div className="tab-bar" style={{ marginBottom:20 }}>
+        {([['overview','Overview'],['forex','Forex'],['movers','Movers'],['sectors','Sectors']] as const).map(([v,l]) => (
+          <button key={v} className={`tab-btn ${tab===v?'active':''}`} onClick={() => setTab(v)}>{l}</button>
         ))}
       </div>
 
-      {tab==='overview' && (
+      {/* ── OVERVIEW TAB ───────────────────────────────────────────────────── */}
+      {tab === 'overview' && (
         <div>
-          <div className="card" style={{marginBottom:20,overflow:'hidden'}}>
-            <div style={{padding:'12px 20px',borderBottom:'1px solid #E2E8F2',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-              <span style={{fontWeight:700,fontSize:14,color:'#0A1628'}}>Global Indices</span>
-              <span style={{fontSize:12,color:'#7D8FA9'}}>NAME · LAST · % CHANGE</span>
+          {/* Indices table */}
+          <div className="card" style={{ marginBottom:20, overflow:'hidden' }}>
+            <div style={{ padding:'12px 20px', borderBottom:'1px solid #E2E8F2', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+              <span style={{ fontWeight:700, fontSize:14, color:'#0A1628' }}>Global Indices</span>
+              {loading && <span style={{ fontSize:11, color:'#B0BCD0' }}>Loading live data…</span>}
             </div>
             <table className="data-table">
-              <thead><tr><th>Index</th><th>Ticker</th><th className="right">Last</th><th className="right">% Change</th><th className="right">YTD</th></tr></thead>
+              <thead>
+                <tr><th>Index</th><th>Ticker</th><th className="right">Last</th><th className="right">Change</th><th className="right">% Change</th><th className="right">Trend</th></tr>
+              </thead>
               <tbody>
-                {INDICES.map((idx,i)=>(
+                {(indices.length > 0 ? indices : INDEX_TICKERS.map(t => ({ label: t.label, ticker: t.display, price: 0, change: 0, changePct: 0, spark: [] }))).map((idx, i) => (
                   <tr key={i}>
-                    <td style={{fontWeight:600,fontSize:13,color:'#0A1628'}}>{idx.label}</td>
-                    <td style={{fontSize:12,color:'#B0BCD0',fontFamily:'monospace'}}>{idx.ticker}</td>
-                    <td className="right" style={{fontWeight:700,fontSize:13}}>{idx.price.toLocaleString('en-US',{minimumFractionDigits:2})}</td>
-                    <td className={`right ${changeClass(idx.change)}`} style={{fontSize:13,fontWeight:600,display:'flex',alignItems:'center',justifyContent:'flex-end',gap:4}}>
-                      <span>{idx.change>=0?'▲':'▼'}</span>{Math.abs(idx.change).toFixed(2)}%
+                    <td style={{ fontWeight:600, fontSize:13, color:'#0A1628' }}>{idx.label}</td>
+                    <td style={{ fontSize:12, color:'#B0BCD0', fontFamily:'monospace' }}>{idx.ticker}</td>
+                    <td className="right" style={{ fontWeight:700, fontSize:13 }}>
+                      {idx.price > 0 ? idx.price.toLocaleString('en-US', { minimumFractionDigits:2, maximumFractionDigits:2 }) : <span style={{color:'#B0BCD0'}}>—</span>}
                     </td>
-                    <td className={`right ${changeClass(idx.ytd)}`} style={{fontSize:13}}>{fmtPct(idx.ytd)}</td>
+                    <td className={`right ${changeClass(idx.change)}`} style={{ fontSize:13, fontWeight:600 }}>
+                      {idx.change !== 0 ? (idx.change > 0 ? '+' : '') + idx.change.toFixed(2) : '—'}
+                    </td>
+                    <td className={`right ${changeClass(idx.changePct)}`} style={{ fontSize:13, fontWeight:700, display:'flex', alignItems:'center', justifyContent:'flex-end', gap:4 }}>
+                      {idx.changePct !== 0 ? <><span>{idx.changePct >= 0 ? '▲' : '▼'}</span>{Math.abs(idx.changePct).toFixed(2)}%</> : '—'}
+                    </td>
+                    <td className="right">
+                      <SparkLine data={idx.spark || []} positive={idx.changePct >= 0} />
+                    </td>
                   </tr>
                 ))}
               </tbody>
             </table>
           </div>
-          <div style={{display:'grid',gridTemplateColumns:'2fr 1fr',gap:16}}>
-            <div className="card" style={{overflow:'hidden'}}>
-              <div style={{padding:'12px 20px',borderBottom:'1px solid #E2E8F2'}}><span style={{fontWeight:700,fontSize:14,color:'#0A1628'}}>Sector Heatmap</span></div>
-              <div style={{display:'grid',gridTemplateColumns:'repeat(3,1fr)',gap:8,padding:16}}>
-                {SECTORS.map(s=>{
-                  const bg = s.change>0?`rgba(5,150,105,${0.07+Math.min(Math.abs(s.change)/2,1)*0.15})`:`rgba(220,38,38,${0.07+Math.min(Math.abs(s.change)/2,1)*0.15})`
-                  const bc = s.change>0?'rgba(5,150,105,0.2)':'rgba(220,38,38,0.2)'
-                  return <div key={s.name} style={{borderRadius:10,padding:'10px 12px',background:bg,border:`1px solid ${bc}`}}>
-                    <div style={{fontSize:11,fontWeight:600,color:'#1C2B4A',marginBottom:4}}>{s.name}</div>
-                    <div style={{fontWeight:900,fontSize:'1.125rem',color:s.change>0?'#059669':'#DC2626',letterSpacing:'-0.02em'}}>{fmtPct(s.change)}</div>
-                    <div style={{fontSize:10,color:'#7D8FA9',marginTop:2}}>{s.mcap}</div>
-                  </div>
-                })}
-              </div>
+
+          {/* Sector Heatmap */}
+          <div className="card" style={{ overflow:'hidden' }}>
+            <div style={{ padding:'12px 20px', borderBottom:'1px solid #E2E8F2' }}>
+              <span style={{ fontWeight:700, fontSize:14, color:'#0A1628' }}>Sector Heatmap (S&P 500)</span>
             </div>
-            <div className="card" style={{overflow:'hidden'}}>
-              <div style={{padding:'12px 20px',borderBottom:'1px solid #E2E8F2'}}>
-                <div style={{display:'flex',gap:0}}>
-                  {(['gainers','losers'] as const).map(t=>(
-                    <button key={t} onClick={()=>setMoversTab(t)} className={`tab-btn ${moversTab===t?'active':''}`} style={{fontSize:12,textTransform:'capitalize',padding:'4px 12px'}}>{t==='gainers'?'▲ Top Gainers':'▼ Top Losers'}</button>
-                  ))}
-                </div>
-              </div>
-              {MOVERS[moversTab].map((m,i)=>(
-                <div key={i} onClick={()=>window.location.href=`/app/company/${m.symbol}`}
-                  style={{display:'flex',alignItems:'center',gap:12,padding:'12px 20px',borderBottom:i<4?'1px solid #F0F4FA':'none',cursor:'pointer'}}>
-                  <div style={{width:32,height:32,borderRadius:8,background:'linear-gradient(135deg,#1B4FFF,#0D9FE8)',display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontSize:12,fontWeight:900,flexShrink:0}}>{m.symbol[0]}</div>
-                  <div style={{flex:1}}>
-                    <div style={{fontWeight:700,fontSize:13,color:'#0A1628'}}>{m.symbol}</div>
-                    <div style={{fontSize:11,color:'#7D8FA9'}}>{m.name}</div>
+            <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(160px,1fr))', gap:10, padding:16 }}>
+              {SECTORS_STATIC.map(s => {
+                const intensity = Math.min(Math.abs(s.change) / 2.5, 1)
+                const bg = s.change > 0
+                  ? `rgba(5,150,105,${0.06 + intensity * 0.18})`
+                  : `rgba(220,38,38,${0.06 + intensity * 0.18})`
+                const bc = s.change > 0 ? 'rgba(5,150,105,0.25)' : 'rgba(220,38,38,0.25)'
+                return (
+                  <div key={s.name} style={{ borderRadius:10, padding:'12px 14px', background:bg, border:`1px solid ${bc}`, cursor:'pointer' }}>
+                    <div style={{ fontSize:11, fontWeight:700, color:'#1C2B4A', marginBottom:6, letterSpacing:'0.01em' }}>{s.name}</div>
+                    <div style={{ fontWeight:900, fontSize:'1.25rem', color: s.change > 0 ? '#059669' : '#DC2626', letterSpacing:'-0.03em' }}>
+                      {s.change > 0 ? '+' : ''}{s.change.toFixed(2)}%
+                    </div>
+                    <div style={{ fontSize:10, color:'#7D8FA9', marginTop:4 }}>{s.mcap} · {s.top}</div>
                   </div>
-                  <div style={{textAlign:'right'}}>
-                    <div style={{fontWeight:600,fontSize:13}}>${fmt(m.price)}</div>
-                    <div style={{fontWeight:700,fontSize:12,color:m.change>0?'#059669':'#DC2626'}}>{fmtPct(m.change)}</div>
-                  </div>
-                </div>
-              ))}
+                )
+              })}
             </div>
           </div>
         </div>
       )}
 
-      {tab==='forex' && (
-        <div className="card" style={{overflow:'hidden'}}>
-          <div style={{padding:'12px 20px',borderBottom:'1px solid #E2E8F2',display:'flex',alignItems:'center',justifyContent:'space-between'}}>
-            <span style={{fontWeight:700,fontSize:14,color:'#0A1628'}}>Forex — Major Pairs</span>
-            <div style={{display:'flex',gap:16,fontSize:11,color:'#B0BCD0'}}>
-              <span>ENTITIES</span><span style={{color:'#1B4FFF',fontWeight:700,borderBottom:'2px solid #1B4FFF',paddingBottom:2}}>RATES</span><span>RELATED NEWS</span>
-            </div>
-          </div>
-          <div style={{overflowX:'auto'}}>
-            <table className="data-table">
-              <thead><tr>
-                <th>NAME</th><th className="right">BID/OFFER</th><th className="right">% S.CHNG</th>
-                <th>TIME · CONTRIBUTOR</th><th className="right">MTD %</th><th className="right">3M %</th>
-                <th className="right">YTD %</th><th className="right">S/U CLOSE</th>
-              </tr></thead>
-              <tbody>
-                {FOREX.map((f,i)=>(
-                  <tr key={i}>
-                    <td>
-                      <div style={{fontWeight:600,fontSize:13,color:'#0A1628'}}>{f.name}</div>
-                      <div style={{fontSize:11,color:'#B0BCD0',fontFamily:'monospace'}}>{f.pair}</div>
-                    </td>
-                    <td className="right" style={{fontSize:13,fontWeight:700}}>
-                      {f.last.toFixed(2)} <span style={{color:'#1B4FFF',fontSize:12}}>{f.ask}</span>
-                    </td>
-                    <td className={`right ${changeClass(f.change)}`} style={{fontSize:13,fontWeight:600}}>{fmtPct(f.change)}</td>
-                    <td style={{fontSize:11,color:'#7D8FA9'}}>10:13 · {f.contributor}</td>
-                    <td className={`right ${changeClass(f.mtd)}`} style={{fontSize:12}}>{fmtPct(f.mtd)}</td>
-                    <td className={`right ${changeClass(f.m3)}`} style={{fontSize:12}}>{fmtPct(f.m3)}</td>
-                    <td className={`right ${changeClass(f.ytd)}`} style={{fontSize:12,fontWeight:600}}>{fmtPct(f.ytd)}</td>
-                    <td className="right" style={{fontSize:12,color:'#7D8FA9'}}>{f.prev.toFixed(4)}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
-
-      {tab==='futures' && (
-        <div className="card" style={{overflow:'hidden'}}>
-          <div style={{padding:'12px 20px',borderBottom:'1px solid #E2E8F2'}}>
-            <span style={{fontWeight:700,fontSize:14,color:'#0A1628'}}>Index Futures</span>
+      {/* ── FOREX TAB ──────────────────────────────────────────────────────── */}
+      {tab === 'forex' && (
+        <div className="card" style={{ overflow:'hidden' }}>
+          <div style={{ padding:'12px 20px', borderBottom:'1px solid #E2E8F2', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+            <span style={{ fontWeight:700, fontSize:14, color:'#0A1628' }}>Foreign Exchange Rates</span>
+            {loading && <span style={{ fontSize:11, color:'#B0BCD0' }}>Loading…</span>}
           </div>
           <table className="data-table">
-            <thead><tr><th>Contract Name</th><th>Ticker</th><th className="right">Last</th><th className="right">% Change</th><th>Time</th></tr></thead>
+            <thead>
+              <tr><th>Pair</th><th className="right">Rate</th><th className="right">% Change</th><th className="right">Bid/Ask</th></tr>
+            </thead>
             <tbody>
-              {FUTURES.map((f,i)=>(
+              {(forex.length > 0 ? forex : FOREX_PAIRS.map(p => ({ pair:`${p.from}/${p.to}`, from:p.from, to:p.to, rate:0, changePct:0 }))).map((fx, i) => (
                 <tr key={i}>
-                  <td style={{fontWeight:600,fontSize:13,color:'#0A1628'}}>{f.label}</td>
-                  <td style={{fontSize:12,color:'#B0BCD0',fontFamily:'monospace'}}>{f.ticker}</td>
-                  <td className="right" style={{fontWeight:700,fontSize:13}}>{f.price.toLocaleString('en-US',{minimumFractionDigits:2})}</td>
-                  <td className={`right ${changeClass(f.change)}`} style={{fontSize:13,fontWeight:600,display:'flex',alignItems:'center',justifyContent:'flex-end',gap:4}}>
-                    <span>{f.change>=0?'▲':'▼'}</span>{Math.abs(f.change).toFixed(2)}%
+                  <td>
+                    <div style={{ display:'flex', alignItems:'center', gap:10 }}>
+                      <div style={{ width:32, height:32, borderRadius:6, background:'#F0F4FA', display:'flex', alignItems:'center', justifyContent:'center', fontSize:10, fontWeight:800, color:'#4A5568' }}>
+                        {fx.from}
+                      </div>
+                      <div>
+                        <div style={{ fontWeight:700, fontSize:13, color:'#0A1628' }}>{fx.pair}</div>
+                        <div style={{ fontSize:11, color:'#B0BCD0' }}>{fx.from} / {fx.to}</div>
+                      </div>
+                    </div>
                   </td>
-                  <td style={{fontSize:11,color:'#B0BCD0'}}>10:{(i*2+13).toString().padStart(2,'0')}</td>
+                  <td className="right" style={{ fontWeight:700, fontSize:14 }}>
+                    {fx.rate > 0 ? fx.rate.toFixed(4) : <span style={{color:'#B0BCD0'}}>—</span>}
+                  </td>
+                  <td className={`right ${changeClass(fx.changePct ?? 0)}`} style={{ fontSize:13, fontWeight:600 }}>
+                    {fx.changePct != null && fx.changePct !== 0 ? `${fx.changePct > 0 ? '+' : ''}${fx.changePct.toFixed(3)}%` : '—'}
+                  </td>
+                  <td className="right" style={{ fontSize:12, color:'#7D8FA9', fontFamily:'monospace' }}>
+                    {fx.rate > 0 ? `${(fx.rate * 0.9998).toFixed(4)} / ${(fx.rate * 1.0002).toFixed(4)}` : '—'}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -208,20 +276,71 @@ export default function MarketsPage() {
         </div>
       )}
 
-      {tab==='sectors' && (
+      {/* ── MOVERS TAB ─────────────────────────────────────────────────────── */}
+      {tab === 'movers' && (
+        <div className="card" style={{ overflow:'hidden' }}>
+          <div style={{ padding:'12px 20px', borderBottom:'1px solid #E2E8F2', display:'flex', alignItems:'center', gap:0 }}>
+            {([['gainers','▲ Gainers'],['losers','▼ Losers'],['active','⚡ Active']] as const).map(([v,l]) => (
+              <button key={v} className={`tab-btn ${moversTab===v?'active':''}`} onClick={() => setMoversTab(v)} style={{ fontSize:12, padding:'4px 14px' }}>{l}</button>
+            ))}
+            {loading && <span style={{ marginLeft:'auto', fontSize:11, color:'#B0BCD0' }}>Loading…</span>}
+          </div>
+          <table className="data-table">
+            <thead>
+              <tr><th>#</th><th>Symbol</th><th>Company</th><th className="right">Price</th><th className="right">% Change</th></tr>
+            </thead>
+            <tbody>
+              {moversData.length === 0 ? (
+                <tr><td colSpan={5} style={{ textAlign:'center', padding:32, color:'#B0BCD0' }}>
+                  {loading ? 'Loading movers…' : 'No data available'}
+                </td></tr>
+              ) : moversData.map((m, i) => (
+                <tr key={i} style={{ cursor:'pointer' }} onClick={() => window.location.href = `/app/company/${m.symbol}`}>
+                  <td style={{ fontSize:12, color:'#B0BCD0', fontWeight:700, width:32 }}>{i + 1}</td>
+                  <td>
+                    <div style={{ width:32, height:32, borderRadius:8, background:'linear-gradient(135deg,#1B4FFF,#0D9FE8)', display:'flex', alignItems:'center', justifyContent:'center', color:'#fff', fontSize:11, fontWeight:900 }}>
+                      {m.symbol.slice(0,2)}
+                    </div>
+                  </td>
+                  <td>
+                    <div style={{ fontWeight:700, fontSize:13, color:'#0A1628' }}>{m.symbol}</div>
+                    <div style={{ fontSize:11, color:'#7D8FA9', maxWidth:200, overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{m.name}</div>
+                  </td>
+                  <td className="right" style={{ fontWeight:700, fontSize:13 }}>${m.price.toFixed(2)}</td>
+                  <td className={`right ${changeClass(m.changePct)}`} style={{ fontSize:14, fontWeight:800 }}>
+                    {m.changePct > 0 ? '+' : ''}{m.changePct.toFixed(2)}%
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {/* ── SECTORS TAB ────────────────────────────────────────────────────── */}
+      {tab === 'sectors' && (
         <div>
-          <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fill,minmax(200px,1fr))',gap:12,marginBottom:20}}>
-            {SECTORS.map(s=>{
-              const bg = s.change>0?`rgba(5,150,105,${0.07+Math.min(Math.abs(s.change)/2,1)*0.18})`:`rgba(220,38,38,${0.07+Math.min(Math.abs(s.change)/2,1)*0.18})`
-              return <div key={s.name} style={{borderRadius:12,padding:'1rem 1.25rem',background:bg,border:`1px solid ${s.change>0?'rgba(5,150,105,0.2)':'rgba(220,38,38,0.2)'}`}}>
-                <div style={{fontWeight:700,fontSize:13,color:'#0A1628',marginBottom:6}}>{s.name}</div>
-                <div style={{fontWeight:900,fontSize:'1.5rem',color:s.change>0?'#059669':'#DC2626',letterSpacing:'-0.02em'}}>{fmtPct(s.change)}</div>
-                <div style={{display:'flex',justifyContent:'space-between',marginTop:8,fontSize:12}}>
-                  <span style={{color:'#7D8FA9'}}>YTD {fmtPct(s.ytd)}</span>
-                  <span style={{color:'#B0BCD0'}}>{s.mcap}</span>
+          <div style={{ display:'grid', gridTemplateColumns:'repeat(auto-fill,minmax(280px,1fr))', gap:12 }}>
+            {SECTORS_STATIC.map(s => {
+              const positive = s.change >= 0
+              return (
+                <div key={s.name} className="card" style={{ padding:'16px 20px' }}>
+                  <div style={{ display:'flex', alignItems:'flex-start', justifyContent:'space-between', marginBottom:12 }}>
+                    <div style={{ fontWeight:700, fontSize:14, color:'#0A1628' }}>{s.name}</div>
+                    <div style={{ fontWeight:900, fontSize:'1.125rem', color: positive ? '#059669' : '#DC2626' }}>
+                      {positive ? '+' : ''}{s.change.toFixed(2)}%
+                    </div>
+                  </div>
+                  <div style={{ display:'flex', justifyContent:'space-between', fontSize:12 }}>
+                    <span style={{ color:'#7D8FA9' }}>Market Cap</span>
+                    <span style={{ fontWeight:600, color:'#1C2B4A' }}>{s.mcap}</span>
+                  </div>
+                  <div style={{ display:'flex', justifyContent:'space-between', fontSize:12, marginTop:4 }}>
+                    <span style={{ color:'#7D8FA9' }}>Top Mover</span>
+                    <span style={{ fontWeight:600, color: positive ? '#059669' : '#DC2626' }}>{s.top}</span>
+                  </div>
                 </div>
-                <div style={{fontSize:11,color:'#7D8FA9',marginTop:4}}>{s.top}</div>
-              </div>
+              )
             })}
           </div>
         </div>
