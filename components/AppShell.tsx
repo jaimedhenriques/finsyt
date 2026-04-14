@@ -4,6 +4,9 @@ import { useState } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 
+import { useSupabaseClient, useUser } from '@/lib/supabase/hooks'
+import { useSupabaseAuth } from '@/lib/supabase/provider'
+
 const NAV = [
   { section: null, items: [
     { href: '/app', label: 'Overview', icon: '⊞', exact: true },
@@ -32,10 +35,22 @@ const NAV = [
 
 export default function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
-  const router   = useRouter()
-  const [search, setSearch]             = useState('')
+  const router = useRouter()
+  const user = useUser()
+  const supabase = useSupabaseClient()
+  const { isConfigured, isLoading } = useSupabaseAuth()
+  const [search, setSearch] = useState('')
   const [searchResults, setSearchResults] = useState<any[]>([])
-  const [sidebarOpen, setSidebarOpen]   = useState(true)
+  const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [isSigningOut, setIsSigningOut] = useState(false)
+
+  const isAuthRoute = pathname?.startsWith('/app/auth')
+  const userLabel =
+    (typeof user?.user_metadata?.full_name === 'string' && user.user_metadata.full_name) ||
+    (typeof user?.email === 'string' && user.email.split('@')[0]) ||
+    'Workspace'
+  const userEmail = typeof user?.email === 'string' ? user.email : null
+  const userInitial = userLabel.charAt(0).toUpperCase()
 
   async function handleSearch(val: string) {
     setSearch(val)
@@ -45,6 +60,68 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
       const data = await res.json()
       setSearchResults(data.results || [])
     } catch {}
+  }
+
+  async function handleSignOut() {
+    if (!supabase) return
+
+    setIsSigningOut(true)
+    await supabase.auth.signOut()
+    router.replace('/app/auth/login')
+    router.refresh()
+    setIsSigningOut(false)
+  }
+
+  if (isAuthRoute) {
+    return (
+      <div
+        style={{
+          minHeight: '100vh',
+          background: '#080E1A',
+          color: '#E2E8F0',
+          fontFamily: "'Inter',-apple-system,BlinkMacSystemFont,sans-serif",
+          padding: '32px 24px',
+        }}
+      >
+        <div style={{ maxWidth: 1120, margin: '0 auto' }}>
+          <Link href="/" style={{ display: 'inline-flex', alignItems: 'center', gap: 10, textDecoration: 'none', color: '#fff', marginBottom: 48 }}>
+            <div style={{ width: 34, height: 34, borderRadius: 10, background: 'linear-gradient(135deg,#1B4FFF,#0D9FE8)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontWeight: 900, color: '#fff', fontSize: 13 }}>F</div>
+            <span style={{ fontWeight: 800, fontSize: 18, letterSpacing: '-0.03em' }}>Finsyt</span>
+          </Link>
+
+          <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0,1fr) minmax(0,440px)', gap: 48, alignItems: 'center' }}>
+            <div>
+              <div style={{ display: 'inline-flex', alignItems: 'center', gap: 8, borderRadius: 999, background: 'rgba(27,79,255,0.16)', border: '1px solid rgba(255,255,255,0.08)', color: '#93B4FF', fontSize: 12, fontWeight: 700, padding: '6px 12px', marginBottom: 20 }}>
+                Platform access
+              </div>
+              <h1 style={{ margin: 0, fontSize: 'clamp(44px, 6vw, 68px)', lineHeight: 0.96, letterSpacing: '-0.06em', maxWidth: 560 }}>
+                Institutional-grade research starts with secure access.
+              </h1>
+              <p style={{ marginTop: 20, maxWidth: 560, color: 'rgba(255,255,255,0.72)', fontSize: 17, lineHeight: 1.7 }}>
+                Sign in to reach your live market workspace, streaming research tools, filings, watchlists, and developer APIs from one protected account.
+              </p>
+
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, minmax(0, 1fr))', gap: 14, marginTop: 30, maxWidth: 620 }}>
+                {[
+                  { label: 'Research', value: 'Streaming AI workflows' },
+                  { label: 'Data', value: 'Markets, filings, macro' },
+                  { label: 'Platform', value: 'APIs, workspaces, alerts' },
+                ].map((item) => (
+                  <div key={item.label} style={{ borderRadius: 18, border: '1px solid rgba(255,255,255,0.08)', background: 'rgba(255,255,255,0.03)', padding: 18 }}>
+                    <div style={{ color: '#93B4FF', fontSize: 12, fontWeight: 700, letterSpacing: '0.08em', textTransform: 'uppercase', marginBottom: 10 }}>{item.label}</div>
+                    <div style={{ color: '#F8FAFC', fontSize: 15, fontWeight: 600, lineHeight: 1.5 }}>{item.value}</div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            <div style={{ width: '100%', display: 'flex', justifyContent: 'center' }}>
+              {children}
+            </div>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   return (
@@ -183,6 +260,11 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               <div style={{width:6,height:6,borderRadius:'50%',background:'#059669',boxShadow:'0 0 6px rgba(5,150,105,0.5)'}}/>
               <span style={{fontSize:11,fontWeight:600,color:'#059669'}}>Markets Open</span>
             </div>
+            <div style={{display:'flex',alignItems:'center',gap:6,padding:'4px 10px',borderRadius:20,background:isConfigured ? '#EEF2FF' : '#FEF3C7',border:`1px solid ${isConfigured ? '#C7D2FE' : '#FCD34D'}`}}>
+              <span style={{fontSize:11,fontWeight:700,color:isConfigured ? '#4338CA' : '#92400E'}}>
+                {isConfigured ? (isLoading ? 'Syncing session' : 'Auth live') : 'Auth setup pending'}
+              </span>
+            </div>
             {/* Notifications */}
             <button style={{background:'none',border:'none',cursor:'pointer',padding:'6px',borderRadius:8,color:'#7D8FA9',position:'relative'}}
               onMouseEnter={e=>(e.currentTarget as HTMLElement).style.background='#F5F7FB'}
@@ -190,8 +272,33 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.73 21a2 2 0 0 1-3.46 0"/></svg>
               <span style={{position:'absolute',top:4,right:4,width:7,height:7,borderRadius:'50%',background:'#1B4FFF',border:'1.5px solid #fff'}}/>
             </button>
+            <div style={{display:'flex',alignItems:'center',gap:10,padding:'0 6px 0 4px'}}>
+              <div style={{textAlign:'right'}}>
+                <div style={{fontSize:12,fontWeight:700,color:'#1C2B4A'}}>{userLabel}</div>
+                <div style={{fontSize:11,color:'#7D8FA9'}}>{userEmail ?? 'No active session'}</div>
+              </div>
+              <button
+                type="button"
+                onClick={handleSignOut}
+                disabled={!user || !supabase || isSigningOut}
+                style={{
+                  border:'1px solid #E2E8F2',
+                  background:'#fff',
+                  color:'#1C2B4A',
+                  borderRadius:10,
+                  height:32,
+                  padding:'0 10px',
+                  fontSize:12,
+                  fontWeight:700,
+                  cursor:!user || !supabase || isSigningOut ? 'not-allowed' : 'pointer',
+                  opacity:!user || !supabase || isSigningOut ? 0.55 : 1,
+                }}
+              >
+                {isSigningOut ? 'Signing out...' : 'Sign out'}
+              </button>
+            </div>
             {/* Avatar */}
-            <div style={{width:32,height:32,borderRadius:'50%',background:'linear-gradient(135deg,#1B4FFF,#0D9FE8)',display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontSize:12,fontWeight:700,cursor:'pointer',flexShrink:0}}>J</div>
+            <div style={{width:32,height:32,borderRadius:'50%',background:'linear-gradient(135deg,#1B4FFF,#0D9FE8)',display:'flex',alignItems:'center',justifyContent:'center',color:'#fff',fontSize:12,fontWeight:700,cursor:'pointer',flexShrink:0}}>{userInitial}</div>
           </div>
         </div>
 
