@@ -37,6 +37,10 @@ export default function AppShell({ children }: { children: React.ReactNode }) {
   const [searchResults, setSearchResults] = useState<any[]>([])
   const [sidebarOpen, setSidebarOpen]   = useState(true)
 
+  if (pathname.startsWith('/app/auth')) {
+    return <>{children}</>
+  }
+
   async function handleSearch(val: string) {
     setSearch(val)
     if (val.length < 2) { setSearchResults([]); return }
