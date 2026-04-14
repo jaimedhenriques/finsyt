@@ -127,7 +127,7 @@ export default function UpgradePage() {
             </div>
 
             <button
-              onClick={() => { if (!plan.disabled && plan.name !== 'Enterprise') { window.location.href = '/api/stripe/create-checkout?plan=pro' } else if (plan.name === 'Enterprise') { window.location.href = 'mailto:hello@finsyt.com' } }}
+              onClick={() => { if (!plan.disabled && plan.name !== 'Enterprise') { window.location.href = '/api/checkout?plan=pro' } else if (plan.name === 'Enterprise') { window.location.href = 'mailto:hello@finsyt.com' } }}
               disabled={plan.disabled}
               style={{
                 display: 'block', width: '100%', textAlign: 'center',
