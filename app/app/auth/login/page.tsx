@@ -1,9 +1,9 @@
 'use client'
 
-import { createClient } from '@/lib/supabase/client'
+import { createClient, isSupabaseBrowserConfigured } from '@/lib/supabase/client'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { FormEvent, useMemo, useState } from 'react'
+import { FormEvent, Suspense, useMemo, useState } from 'react'
 
 const cardStyle: React.CSSProperties = {
   width: '100%',
@@ -15,10 +15,11 @@ const cardStyle: React.CSSProperties = {
   boxShadow: '0 8px 32px rgba(15, 23, 42, 0.08)',
 }
 
-export default function LoginPage() {
+function LoginForm() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const redirectTo = searchParams.get('next') || '/app'
+  const redirectTo = searchParams.get('next') || searchParams.get('redirect') || '/app'
+  const supabaseConfigured = useMemo(() => isSupabaseBrowserConfigured(), [])
   const callbackBase = useMemo(() => {
     if (typeof window !== 'undefined') {
       return window.location.origin
@@ -30,6 +31,26 @@ export default function LoginPage() {
   const [password, setPassword] = useState('')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [supabaseUnavailable, setSupabaseUnavailable] = useState(!supabaseConfigured)
+
+  function getSupabaseClient() {
+    if (!supabaseConfigured) {
+      setSupabaseUnavailable(true)
+      setError(
+        'Authentication is not configured for this environment. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.',
+      )
+      return null
+    }
+    try {
+      return createClient()
+    } catch {
+      setSupabaseUnavailable(true)
+      setError(
+        'Authentication is not configured for this environment. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.',
+      )
+      return null
+    }
+  }
 
   async function handleSubmit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault()
@@ -37,7 +58,10 @@ export default function LoginPage() {
     setError(null)
 
     try {
-      const supabase = createClient()
+      const supabase = getSupabaseClient()
+      if (!supabase) {
+        return
+      }
       const { error: signInError } = await supabase.auth.signInWithPassword({
         email,
         password,
@@ -59,7 +83,10 @@ export default function LoginPage() {
     setLoading(true)
     setError(null)
     try {
-      const supabase = createClient()
+      const supabase = getSupabaseClient()
+      if (!supabase) {
+        return
+      }
       const { error: oauthError } = await supabase.auth.signInWithOAuth({
         provider: 'google',
         options: {
@@ -118,7 +145,11 @@ export default function LoginPage() {
           {error ? (
             <p style={{ color: '#DC2626', fontSize: '0.85rem', marginTop: '0.25rem' }}>{error}</p>
           ) : null}
-          <button disabled={loading} className="btn btn-primary" style={{ justifyContent: 'center', marginTop: '0.5rem' }}>
+          <button
+            disabled={loading || supabaseUnavailable}
+            className="btn btn-primary"
+            style={{ justifyContent: 'center', marginTop: '0.5rem' }}
+          >
             {loading ? 'Signing in…' : 'Sign in'}
           </button>
         </form>
@@ -128,12 +159,18 @@ export default function LoginPage() {
         <button
           type="button"
           onClick={signInWithGoogle}
-          disabled={loading}
+          disabled={loading || supabaseUnavailable}
           className="btn btn-outline"
           style={{ width: '100%', justifyContent: 'center' }}
         >
           Continue with Google
         </button>
+
+        {!error && !supabaseConfigured ? (
+          <p style={{ marginTop: '0.75rem', fontSize: '0.85rem', color: '#D97706' }}>
+            Authentication is not configured for this environment. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.
+          </p>
+        ) : null}
 
         <p style={{ marginTop: '1.25rem', fontSize: '0.9rem', color: '#64748B' }}>
           New here?{' '}
@@ -143,5 +180,13 @@ export default function LoginPage() {
         </p>
       </div>
     </div>
+  )
+}
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={<div style={{ minHeight: '100vh', background: '#F5F7FB' }} />}>
+      <LoginForm />
+    </Suspense>
   )
 }

@@ -33,7 +33,11 @@ export async function middleware(request: NextRequest) {
 
   const { url, anonKey } = resolveSupabaseEnv()
   if (!url || !anonKey) {
-    return NextResponse.next()
+    const loginUrl = request.nextUrl.clone()
+    loginUrl.pathname = '/app/auth/login'
+    loginUrl.searchParams.set('next', pathname)
+    loginUrl.searchParams.set('error', 'auth_not_configured')
+    return NextResponse.redirect(loginUrl)
   }
 
   let response = NextResponse.next({
@@ -48,7 +52,7 @@ export async function middleware(request: NextRequest) {
         return request.cookies.getAll()
       },
       setAll(cookiesToSet) {
-        cookiesToSet.forEach(({ name, value, options }) => request.cookies.set(name, value))
+        cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
         response = NextResponse.next({
           request,
         })

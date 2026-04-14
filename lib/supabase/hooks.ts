@@ -1,14 +1,19 @@
 'use client'
 
-import { createClient } from '@/lib/supabase/client'
+import { createClient, isSupabaseBrowserConfigured } from '@/lib/supabase/client'
 import type { Session, User } from '@supabase/supabase-js'
 import { useEffect, useState } from 'react'
 
 export function useSession() {
+  const supabaseConfigured = isSupabaseBrowserConfigured()
   const [session, setSession] = useState<Session | null>(null)
-  const [loading, setLoading] = useState(true)
+  const [loading, setLoading] = useState(supabaseConfigured)
 
   useEffect(() => {
+    if (!supabaseConfigured) {
+      return
+    }
+
     const supabase = createClient()
 
     let mounted = true
@@ -33,7 +38,7 @@ export function useSession() {
       mounted = false
       subscription.unsubscribe()
     }
-  }, [])
+  }, [supabaseConfigured])
 
   return { session, loading }
 }

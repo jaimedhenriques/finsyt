@@ -7,7 +7,15 @@ export default function AuthActions() {
   const router = useRouter()
 
   async function signOut() {
-    const supabase = createClient()
+    let supabase
+    try {
+      supabase = createClient()
+    } catch {
+      router.push('/app/auth/login')
+      router.refresh()
+      return
+    }
+
     await supabase.auth.signOut()
     router.push('/app/auth/login')
     router.refresh()

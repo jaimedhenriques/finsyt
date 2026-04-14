@@ -1,6 +1,6 @@
 'use client'
 
-import { createClient } from '@/lib/supabase/client'
+import { createClient, isSupabaseBrowserConfigured } from '@/lib/supabase/client'
 import type { Session, User } from '@supabase/supabase-js'
 import { createContext, useContext, useEffect, useMemo, useState } from 'react'
 
@@ -19,10 +19,17 @@ export function SessionProvider({
   initialSession: Session | null
   children: React.ReactNode
 }) {
+  const supabaseConfigured = isSupabaseBrowserConfigured()
   const [session, setSession] = useState<Session | null>(initialSession)
-  const [loading, setLoading] = useState(false)
+  const [loading, setLoading] = useState(
+    !initialSession && supabaseConfigured,
+  )
 
   useEffect(() => {
+    if (!supabaseConfigured) {
+      return
+    }
+
     const supabase = createClient()
 
     // Keep client state synced with auth changes (including token refreshes).
@@ -36,7 +43,7 @@ export function SessionProvider({
     return () => {
       subscription.unsubscribe()
     }
-  }, [])
+  }, [supabaseConfigured])
 
   const value = useMemo<SessionContextValue>(
     () => ({ session, user: session?.user ?? null, loading }),

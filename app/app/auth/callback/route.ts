@@ -10,7 +10,14 @@ export async function GET(request: NextRequest) {
     return NextResponse.redirect(new URL('/app/auth/login?error=missing_code', request.url))
   }
 
-  const supabase = await createClient()
+  let supabase
+  try {
+    supabase = await createClient()
+  } catch {
+    return NextResponse.redirect(
+      new URL('/app/auth/login?error=auth_not_configured', request.url),
+    )
+  }
   const { error } = await supabase.auth.exchangeCodeForSession(code)
 
   if (error) {

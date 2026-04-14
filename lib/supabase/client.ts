@@ -10,7 +10,7 @@ type SupabaseEnv = {
 
 let browserClient: SupabaseClient | null = null
 
-function resolveSupabaseEnv(): SupabaseEnv {
+function resolveSupabaseEnv(): SupabaseEnv | null {
   const url =
     process.env.NEXT_PUBLIC_SUPABASE_URL ||
     process.env.SUPABASE_URL ||
@@ -24,12 +24,14 @@ function resolveSupabaseEnv(): SupabaseEnv {
     ''
 
   if (!url || !anonKey) {
-    throw new Error(
-      'Supabase browser client is not configured. Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY.',
-    )
+    return null
   }
 
   return { url, anonKey }
+}
+
+export function isSupabaseBrowserConfigured() {
+  return resolveSupabaseEnv() !== null
 }
 
 export function createClient() {
@@ -37,7 +39,14 @@ export function createClient() {
     return browserClient
   }
 
-  const { url, anonKey } = resolveSupabaseEnv()
+  const env = resolveSupabaseEnv()
+  if (!env) {
+    throw new Error(
+      'Supabase browser client is not configured. Missing NEXT_PUBLIC_SUPABASE_URL or NEXT_PUBLIC_SUPABASE_ANON_KEY.',
+    )
+  }
+
+  const { url, anonKey } = env
   browserClient = createBrowserClient(url, anonKey)
   return browserClient
 }

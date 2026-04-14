@@ -1,21 +1,19 @@
-import AppShell from '@/components/AppShell'
-import { SessionProvider } from '@/lib/supabase/session-provider'
+import AppLayoutShell from '@/components/AppLayoutShell'
 import { createClient } from '@/lib/supabase/server'
+import type { Session } from '@supabase/supabase-js'
 
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
-  let initialSession = null
+  let initialSession: Session | null = null
 
   try {
     const supabase = await createClient()
-    const { data } = await supabase.auth.getSession()
-    initialSession = data.session ?? null
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
+    initialSession = session ?? null
   } catch {
-    // If Supabase is not configured in an environment, the app shell still renders.
+    // Gracefully continue when Supabase env vars are not configured.
   }
 
-  return (
-    <SessionProvider initialSession={initialSession}>
-      <AppShell>{children}</AppShell>
-    </SessionProvider>
-  )
+  return <AppLayoutShell initialSession={initialSession}>{children}</AppLayoutShell>
 }

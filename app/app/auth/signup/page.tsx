@@ -1,15 +1,22 @@
 'use client'
 
-import { createClient } from '@/lib/supabase/client'
+import { createClient, isSupabaseBrowserConfigured } from '@/lib/supabase/client'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
-import { FormEvent, useMemo, useState } from 'react'
+import { FormEvent, Suspense, useMemo, useState } from 'react'
 
-export default function SignupPage() {
+function SignupPageInner() {
   const router = useRouter()
   const searchParams = useSearchParams()
-  const redirectTo = searchParams.get('redirect') || '/app'
-  const supabase = useMemo(() => createClient(), [])
+  const redirectTo =
+    searchParams.get('next') || searchParams.get('redirect') || '/app'
+  const supabaseConfigured = useMemo(() => isSupabaseBrowserConfigured(), [])
+  const supabase = useMemo(() => {
+    if (!supabaseConfigured) {
+      return null
+    }
+    return createClient()
+  }, [supabaseConfigured])
 
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -22,6 +29,13 @@ export default function SignupPage() {
     event.preventDefault()
     setError(null)
     setMessage(null)
+
+    if (!supabase) {
+      setError(
+        'Authentication is not configured for this environment. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.',
+      )
+      return
+    }
 
     if (password !== confirmPassword) {
       setError('Passwords do not match.')
@@ -56,6 +70,13 @@ export default function SignupPage() {
 
   async function handleGoogleSignup() {
     setError(null)
+    if (!supabase) {
+      setError(
+        'Authentication is not configured for this environment. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.',
+      )
+      return
+    }
+
     setLoading(true)
     const origin =
       typeof window !== 'undefined' ? window.location.origin : process.env.NEXT_PUBLIC_SITE_URL
@@ -161,6 +182,11 @@ export default function SignupPage() {
         {error && (
           <p style={{ marginTop: 12, fontSize: 12, color: '#DC2626', fontWeight: 600 }}>{error}</p>
         )}
+        {!error && !supabaseConfigured && (
+          <p style={{ marginTop: 12, fontSize: 12, color: '#D97706', fontWeight: 600 }}>
+            Authentication is not configured for this environment. Add NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY.
+          </p>
+        )}
         {message && (
           <p style={{ marginTop: 12, fontSize: 12, color: '#059669', fontWeight: 600 }}>
             {message}
@@ -195,5 +221,13 @@ export default function SignupPage() {
         </button>
       </div>
     </div>
+  )
+}
+
+export default function SignupPage() {
+  return (
+    <Suspense fallback={null}>
+      <SignupPageInner />
+    </Suspense>
   )
 }
