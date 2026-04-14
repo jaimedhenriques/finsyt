@@ -276,7 +276,7 @@ export default function AlertsPage() {
           </div>
           <div style={{ fontSize: 13, color: '#9BAFC8' }}>
             {filterTab === 'all' && 'Create your first alert to get notified when prices move'}
-            {filterTab === 'active' && 'You've paused all your alerts'}
+            {filterTab === 'active' && 'YouYou've paused all your alerts#39;ve paused all your alerts'}
             {filterTab === 'triggered' && 'All quiet—keep monitoring'}
           </div>
         </div>
