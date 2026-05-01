@@ -1,0 +1,24 @@
+{
+  "name": "@workspace/scripts",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "hello": "tsx ./src/hello.ts",
+    "test:rls": "tsx ./src/test-rls-isolation.ts",
+    "seed:demo": "tsx ./src/seed-demo.ts",
+    "enforce:clerk-org": "tsx ./src/enforce-clerk-org-settings.ts",
+    "build:artifacts": "tsx ./src/build-artifacts.ts",
+    "test": "tsx --test ./src/*.test.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "dependencies": {
+    "@clerk/backend": "^2.18.0",
+    "@workspace/db": "workspace:*",
+    "drizzle-orm": "catalog:"
+  },
+  "devDependencies": {
+    "@types/node": "catalog:",
+    "tsx": "catalog:"
+  }
+}

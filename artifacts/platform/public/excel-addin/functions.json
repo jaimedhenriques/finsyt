@@ -1,0 +1,53 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/office-js/custom-functions.schema.json",
+  "functions": [
+    {
+      "id": "QUOTE",
+      "name": "QUOTE",
+      "description": "Returns a single field for a stock quote (price, change, marketCap, pe, etc.)",
+      "helpUrl": "https://finsyt.com/platform/app/developer",
+      "result": { "type": "any", "dimensionality": "scalar" },
+      "parameters": [
+        { "name": "symbol", "description": "Ticker symbol", "type": "string", "dimensionality": "scalar" },
+        { "name": "field",  "description": "Field name (default: price)", "type": "string", "dimensionality": "scalar", "optional": true }
+      ]
+    },
+    {
+      "id": "METRIC",
+      "name": "METRIC",
+      "description": "Returns a fundamental metric value for the requested period.",
+      "helpUrl": "https://finsyt.com/platform/app/developer",
+      "result": { "type": "any", "dimensionality": "scalar" },
+      "parameters": [
+        { "name": "symbol", "description": "Ticker symbol", "type": "string", "dimensionality": "scalar" },
+        { "name": "metric", "description": "Metric mnemonic (e.g. revenue, netIncome, iq_total_rev)", "type": "string", "dimensionality": "scalar" },
+        { "name": "period", "description": "annual or quarterly (default: annual)", "type": "string", "dimensionality": "scalar", "optional": true },
+        { "name": "offset", "description": "0=most recent, -1=prior period, etc.", "type": "number", "dimensionality": "scalar", "optional": true }
+      ]
+    },
+    {
+      "id": "HISTORY",
+      "name": "HISTORY",
+      "description": "Returns OHLCV history as a 2-D range (date, open, high, low, close, volume).",
+      "helpUrl": "https://finsyt.com/platform/app/developer",
+      "result": { "type": "any", "dimensionality": "matrix" },
+      "parameters": [
+        { "name": "symbol", "description": "Ticker symbol", "type": "string", "dimensionality": "scalar" },
+        { "name": "from",   "description": "Start date YYYY-MM-DD", "type": "string", "dimensionality": "scalar" },
+        { "name": "to",     "description": "End date YYYY-MM-DD",   "type": "string", "dimensionality": "scalar" },
+        { "name": "timespan", "description": "minute|hour|day|week|month (default: day)", "type": "string", "dimensionality": "scalar", "optional": true }
+      ]
+    },
+    {
+      "id": "SEARCH",
+      "name": "SEARCH",
+      "description": "Searches the global ticker universe and returns matches as a 2-D range (symbol, name, exchange).",
+      "helpUrl": "https://finsyt.com/platform/app/developer",
+      "result": { "type": "any", "dimensionality": "matrix" },
+      "parameters": [
+        { "name": "query", "description": "Company or ticker text", "type": "string", "dimensionality": "scalar" },
+        { "name": "limit", "description": "Max rows (default 10)",  "type": "number", "dimensionality": "scalar", "optional": true }
+      ]
+    }
+  ]
+}

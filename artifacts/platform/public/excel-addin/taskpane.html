@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <title>Finsyt for Excel</title>
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: -apple-system, "Segoe UI", system-ui, sans-serif; margin: 0; padding: 20px; background: #FAFBFC; color: #0A1628; }
+    .logo { font-weight: 900; font-size: 22px; letter-spacing: -0.02em; margin-bottom: 4px; color: #1B4FFF; }
+    .tag  { font-size: 12px; color: #7D8FA9; margin-bottom: 24px; }
+    h2    { font-size: 13px; text-transform: uppercase; letter-spacing: 0.06em; color: #3D4F6E; margin-top: 24px; margin-bottom: 8px; }
+    label { display: block; font-size: 12px; font-weight: 600; color: #3D4F6E; margin-bottom: 4px; }
+    input { width: 100%; padding: 8px 10px; border: 1px solid #C5CFDF; border-radius: 6px; font-size: 13px; font-family: monospace; }
+    button { width: 100%; padding: 10px; background: #1B4FFF; color: #fff; border: none; border-radius: 6px; font-weight: 700; cursor: pointer; font-size: 13px; margin-top: 12px; }
+    button:hover { background: #154AD0; }
+    button.ghost { background: transparent; color: #3D4F6E; border: 1px solid #C5CFDF; }
+    .status { padding: 8px 10px; border-radius: 6px; font-size: 12px; margin-top: 8px; }
+    .status.ok { background: #E6F7EE; color: #0F5132; }
+    .status.err { background: #FCE8E8; color: #7A1B1B; }
+    pre { background: #F0F2F7; padding: 10px; border-radius: 6px; font-size: 11px; overflow-x: auto; line-height: 1.6; margin: 6px 0; }
+    .row { font-size: 12px; color: #3D4F6E; margin: 6px 0; }
+    a { color: #1B4FFF; text-decoration: none; font-weight: 600; }
+  </style>
+</head>
+<body>
+  <div class="logo">Finsyt</div>
+  <div class="tag">Live financial data inside Excel</div>
+
+  <h2>1. Paste your API key</h2>
+  <label for="key">API Key (starts with <code>fsk_</code>)</label>
+  <input id="key" type="password" placeholder="fsk_..." autocomplete="off" />
+  <button id="save">Sign in</button>
+  <div id="status" class="status" style="display:none"></div>
+
+  <h2>2. Try a formula</h2>
+  <pre>=FINSYT.QUOTE("AAPL")
+=FINSYT.METRIC("AAPL","revenue","annual",-1)
+=FINSYT.HISTORY("AAPL","2024-01-01","2024-12-31")
+=FINSYT.SEARCH("apple")</pre>
+
+  <h2>Need a key?</h2>
+  <div class="row">Generate one in the <a href="https://finsyt.com/platform/app/developer" target="_blank">Developer console</a> &rarr; Keys tab.</div>
+
+  <button class="ghost" id="signout" style="margin-top:24px">Sign out</button>
+
+  <script>
+    Office.onReady(() => {
+      const $ = (id) => document.getElementById(id);
+      const status = $("status");
+      const setStatus = (msg, ok) => {
+        status.style.display = "block";
+        status.className = "status " + (ok ? "ok" : "err");
+        status.textContent = msg;
+      };
+
+      // Hydrate from settings
+      try {
+        const existing = Office.context.document.settings.get("finsyt_api_key");
+        if (existing) $("key").value = "(saved key — overwrite to change)";
+      } catch (_) { /* settings unavailable in some surfaces */ }
+
+      $("save").onclick = async () => {
+        const k = $("key").value.trim();
+        if (!k.startsWith("fsk_")) { setStatus("Key must start with fsk_", false); return; }
+        try {
+          const res = await fetch("https://finsyt.com/platform/api/v1/quote?symbol=AAPL", {
+            headers: { "Authorization": "Bearer " + k },
+          });
+          if (res.status === 401) { setStatus("Invalid key", false); return; }
+          if (!res.ok) { setStatus("Server returned " + res.status, false); return; }
+          Office.context.document.settings.set("finsyt_api_key", k);
+          await new Promise((r) => Office.context.document.settings.saveAsync(r));
+          setStatus("Signed in. Custom functions are ready.", true);
+        } catch (e) { setStatus("Network error: " + e.message, false); }
+      };
+
+      $("signout").onclick = async () => {
+        Office.context.document.settings.remove("finsyt_api_key");
+        await new Promise((r) => Office.context.document.settings.saveAsync(r));
+        $("key").value = "";
+        setStatus("Signed out.", true);
+      };
+    });
+  </script>
+</body>
+</html>
