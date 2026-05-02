@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta http-equiv="X-UA-Compatible" content="IE=edge" />
+  <title>Finsyt for Excel</title>
+  <script src="https://appsforoffice.microsoft.com/lib/1/hosted/office.js"></script>
+  <style>
+    * { box-sizing: border-box; }
+    html, body { height: 100%; }
+    body {
+      font-family: -apple-system, "Segoe UI", system-ui, sans-serif;
+      margin: 0; padding: 0; background: #FAFBFC; color: #0A1628;
+      font-size: 13px; line-height: 1.45;
+      display: flex; flex-direction: column; height: 100vh;
+    }
+    header {
+      padding: 14px 16px 10px; border-bottom: 1px solid #E1E6EF;
+      display: flex; align-items: center; justify-content: space-between;
+    }
+    .logo { font-weight: 900; font-size: 18px; letter-spacing: -0.02em; color: #1B4FFF; }
+    .me { font-size: 11px; color: #7D8FA9; }
+    .me a { color: #1B4FFF; text-decoration: none; cursor: pointer; }
+    .tabs {
+      display: flex; padding: 0 8px; border-bottom: 1px solid #E1E6EF; background: #fff;
+    }
+    .tab {
+      padding: 10px 14px; font-size: 12px; font-weight: 600; color: #7D8FA9;
+      cursor: pointer; border-bottom: 2px solid transparent;
+    }
+    .tab.active { color: #1B4FFF; border-bottom-color: #1B4FFF; }
+    .pane { flex: 1; overflow: auto; }
+    .pane[hidden] { display: none; }
+
+    /* ── Sign-in pane ─────────────────────────────────────────────────────── */
+    .signin { padding: 24px 18px; max-width: 360px; margin: 0 auto; }
+    .signin h2 { font-size: 14px; margin: 0 0 6px; color: #0A1628; }
+    .signin p  { font-size: 12px; color: #7D8FA9; margin: 0 0 14px; }
+    .signin label { display: block; font-size: 11px; font-weight: 700; color: #3D4F6E; margin: 12px 0 4px; text-transform: uppercase; letter-spacing: 0.05em; }
+    .signin input {
+      width: 100%; padding: 9px 10px; border: 1px solid #C5CFDF; border-radius: 6px;
+      font-size: 12px; font-family: ui-monospace, monospace;
+    }
+    .btn {
+      width: 100%; padding: 10px 12px; background: #1B4FFF; color: #fff; border: none;
+      border-radius: 6px; font-weight: 700; cursor: pointer; font-size: 13px;
+    }
+    .btn:hover { background: #154AD0; }
+    .btn:disabled { opacity: .55; cursor: not-allowed; }
+    .btn.ghost { background: transparent; color: #1B4FFF; border: 1px solid #C5CFDF; }
+    .btn.ghost:hover { background: #F2F5FB; }
+    .btn.sm { padding: 6px 10px; font-size: 11px; width: auto; }
+    .divider { display: flex; align-items: center; gap: 8px; margin: 16px 0; color: #B7C2D6; font-size: 11px; }
+    .divider::before, .divider::after { content: ""; flex: 1; height: 1px; background: #E1E6EF; }
+    .status { padding: 8px 10px; border-radius: 6px; font-size: 12px; margin-top: 10px; }
+    .status.ok { background: #E6F7EE; color: #0F5132; }
+    .status.err { background: #FCE8E8; color: #7A1B1B; }
+
+    /* ── Agent pane ───────────────────────────────────────────────────────── */
+    .ctxbar {
+      display: flex; align-items: center; gap: 6px; padding: 8px 14px;
+      background: #F2F5FB; border-bottom: 1px solid #E1E6EF; font-size: 11px;
+      color: #3D4F6E;
+    }
+    .chip {
+      display: inline-flex; align-items: center; gap: 4px; padding: 3px 8px;
+      background: #fff; border: 1px solid #D7DFEC; border-radius: 999px; font-size: 11px;
+      color: #3D4F6E;
+    }
+    .chip.on { border-color: #1B4FFF; color: #1B4FFF; }
+    .chip code { font-family: ui-monospace, monospace; font-size: 10px; }
+    .ctxbar .grow { flex: 1; }
+
+    .chat { padding: 12px 14px 8px; display: flex; flex-direction: column; gap: 12px; }
+    .msg { max-width: 100%; word-wrap: break-word; }
+    .msg .role { font-size: 10px; text-transform: uppercase; letter-spacing: 0.06em; color: #7D8FA9; margin-bottom: 4px; }
+    .msg.user  { align-self: flex-end; }
+    .msg.user .body { background: #1B4FFF; color: #fff; padding: 8px 12px; border-radius: 12px 12px 2px 12px; font-size: 13px; }
+    .msg.bot   { align-self: flex-start; width: 100%; }
+    .msg.bot .body { font-size: 13px; line-height: 1.55; color: #0A1628; }
+    .msg.bot .body p { margin: 0 0 8px; }
+    .msg.bot .body ul { padding-left: 18px; margin: 0 0 8px; }
+    .msg.bot .body code { background: #F0F2F7; padding: 1px 4px; border-radius: 3px; font-family: ui-monospace, monospace; font-size: 12px; }
+
+    .steps { font-size: 11px; color: #7D8FA9; }
+    .steps .step { display: flex; align-items: center; gap: 6px; padding: 2px 0; }
+    .steps .dot { width: 6px; height: 6px; border-radius: 999px; background: #B7C2D6; }
+    .steps .dot.run { background: #1B4FFF; animation: pulse 1.2s infinite; }
+    .steps .dot.ok  { background: #16a34a; }
+    .steps .dot.err { background: #dc2626; }
+    @keyframes pulse { 0%, 100% { opacity: 1 } 50% { opacity: .35 } }
+
+    .action {
+      margin-top: 8px; padding: 10px; border: 1px solid #C7D6FB; background: #F4F7FF;
+      border-radius: 8px;
+    }
+    .action h4 { margin: 0 0 4px; font-size: 12px; color: #1B4FFF; font-weight: 700; }
+    .action .preview {
+      background: #fff; border: 1px solid #E1E6EF; border-radius: 6px; padding: 8px;
+      margin: 6px 0 8px; font-family: ui-monospace, monospace; font-size: 11px;
+      max-height: 140px; overflow: auto; white-space: pre-wrap;
+    }
+    .action .row { display: flex; gap: 6px; }
+
+    .composer {
+      border-top: 1px solid #E1E6EF; padding: 8px 10px; background: #fff;
+      display: flex; flex-direction: column; gap: 6px;
+    }
+    .composer textarea {
+      width: 100%; min-height: 52px; max-height: 140px; resize: vertical;
+      padding: 8px 10px; border: 1px solid #C5CFDF; border-radius: 6px;
+      font-size: 13px; font-family: inherit;
+    }
+    .composer .row { display: flex; gap: 6px; align-items: center; }
+    .composer .grow { flex: 1; }
+    .composer .send { padding: 8px 14px; background: #1B4FFF; color: #fff; border: none; border-radius: 6px; font-weight: 700; cursor: pointer; }
+    .composer .send:disabled { opacity: .55; cursor: not-allowed; }
+
+    /* ── Builder pane ─────────────────────────────────────────────────────── */
+    .builder { padding: 14px; }
+    .builder p { font-size: 12px; color: #7D8FA9; margin: 0 0 12px; }
+    .builder .input-row { display: flex; gap: 6px; margin-bottom: 12px; }
+    .builder input {
+      flex: 1; padding: 8px 10px; border: 1px solid #C5CFDF; border-radius: 6px;
+      font-size: 12px; font-family: ui-monospace, monospace; text-transform: uppercase;
+    }
+    .templates { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .tpl {
+      padding: 12px; border: 1px solid #E1E6EF; border-radius: 8px; background: #fff;
+      cursor: pointer; transition: border-color .15s, transform .05s;
+    }
+    .tpl:hover { border-color: #1B4FFF; }
+    .tpl:active { transform: translateY(1px); }
+    .tpl h3 { margin: 0 0 4px; font-size: 13px; color: #0A1628; }
+    .tpl .desc { font-size: 11px; color: #7D8FA9; }
+
+    /* ── Functions pane ───────────────────────────────────────────────────── */
+    .fnlist { padding: 14px; font-size: 12px; }
+    .fnlist .fn { padding: 8px 0; border-bottom: 1px solid #EEF1F7; }
+    .fnlist .fn:last-child { border-bottom: none; }
+    .fnlist code { background: #F0F2F7; padding: 1px 4px; border-radius: 3px; font-family: ui-monospace, monospace; font-size: 11px; }
+    .fnlist .desc { color: #7D8FA9; font-size: 11px; margin-top: 2px; }
+  </style>
+</head>
+<body>
+
+<!-- ── Header ─────────────────────────────────────────────────────────────── -->
+<header>
+  <div class="logo">Finsyt</div>
+  <div class="me" id="me-area"></div>
+</header>
+
+<!-- ── Sign-in pane ───────────────────────────────────────────────────────── -->
+<section id="pane-signin" class="pane signin" hidden>
+  <h2>Sign in to Finsyt</h2>
+  <p>Connect this workbook to your Finsyt workspace.</p>
+
+  <button id="btn-clerk" class="btn">Sign in with Finsyt</button>
+
+  <div class="divider">or</div>
+
+  <label for="key-input">API key</label>
+  <input id="key-input" type="password" placeholder="fsk_…" autocomplete="off" />
+  <button id="btn-key" class="btn ghost" style="margin-top:8px">Use API key</button>
+
+  <div id="signin-status" class="status" style="display:none"></div>
+
+  <p style="margin-top:18px; font-size:11px; color:#7D8FA9;">
+    Need a key? Generate one in the
+    <a id="dev-link" href="#" target="_blank">Developer console</a>.
+  </p>
+</section>
+
+<!-- ── Tabs (visible after sign-in) ───────────────────────────────────────── -->
+<nav id="tabs" class="tabs" hidden>
+  <div class="tab active" data-pane="copilot">Agent</div>
+  <div class="tab" data-pane="builder">Builder</div>
+  <div class="tab" data-pane="functions">Functions</div>
+</nav>
+
+<!-- ── Agent pane ─────────────────────────────────────────────────────────── -->
+<section id="pane-copilot" class="pane" hidden>
+  <div class="ctxbar">
+    <span class="chip on" id="ctx-chip" title="Click to toggle sending sheet context">
+      Context: <code id="ctx-text">—</code>
+    </span>
+    <span class="chip on" id="confirm-chip" title="When on, action cards require an Insert click before writing">
+      Confirm writes
+    </span>
+    <span class="grow"></span>
+    <button class="btn ghost sm" id="btn-clear">Clear</button>
+  </div>
+
+  <div id="chat" class="chat"></div>
+
+  <div class="composer">
+    <textarea id="prompt" placeholder="Ask anything: 'AAPL revenue last 5 years', 'Build me a DCF for MSFT', 'What did NVDA say about AI guidance?'" rows="2"></textarea>
+    <div class="row">
+      <span class="grow"></span>
+      <button id="btn-send" class="send">Ask</button>
+    </div>
+  </div>
+</section>
+
+<!-- ── Builder pane ───────────────────────────────────────────────────────── -->
+<section id="pane-builder" class="pane builder" hidden>
+  <p>One-click model templates. Each template is inserted starting at your <strong>active cell</strong> on the current sheet — most cells use live <code>=FINSYT.*</code> formulas so the values stay current. Pick a clean spot before clicking.</p>
+
+  <div class="input-row">
+    <input id="tpl-symbol" placeholder="TICKER (e.g. AAPL)" maxlength="10" />
+  </div>
+
+  <div class="templates">
+    <div class="tpl" data-kind="dcf">
+      <h3>DCF</h3>
+      <div class="desc">5-yr revenue → FCF → enterprise value, with growth, margin, and WACC inputs.</div>
+    </div>
+    <div class="tpl" data-kind="comps">
+      <h3>Comps</h3>
+      <div class="desc">Trading-comparables table: P/E, EV/Sales, EV/EBITDA across the symbol's peers.</div>
+    </div>
+    <div class="tpl" data-kind="sensitivity">
+      <h3>Sensitivity</h3>
+      <div class="desc">2-D table: WACC × terminal growth → equity value per share.</div>
+    </div>
+    <div class="tpl" data-kind="wacc">
+      <h3>WACC</h3>
+      <div class="desc">Cost of equity (CAPM) + after-tax cost of debt → weighted average.</div>
+    </div>
+  </div>
+
+  <div id="builder-status" class="status" style="display:none; margin-top:14px"></div>
+</section>
+
+<!-- ── Functions pane ─────────────────────────────────────────────────────── -->
+<section id="pane-functions" class="pane fnlist" hidden>
+  <div class="fn"><code>=FINSYT.QUOTE("AAPL","price")</code><div class="desc">One field of a real-time quote (price, marketCap, pe, …).</div></div>
+  <div class="fn"><code>=FINSYT.METRIC("AAPL","revenue","annual",0)</code><div class="desc">Fundamental metric value for a given period.</div></div>
+  <div class="fn"><code>=FINSYT.HISTORY("AAPL","2024-01-01","2024-12-31")</code><div class="desc">OHLCV history as a 2-D range.</div></div>
+  <div class="fn"><code>=FINSYT.FINANCIALS("AAPL","income","revenue","FY-1")</code><div class="desc">One line item from a statement at a specific period.</div></div>
+  <div class="fn"><code>=FINSYT.ESTIMATE("AAPL","eps","next_q")</code><div class="desc">Analyst consensus for a forward period (consensus|high|low|median).</div></div>
+  <div class="fn"><code>=FINSYT.TRANSCRIPT("AAPL","2024Q1","summary")</code><div class="desc">Transcript text as a 2-D spill (summary|prepared|qa|full).</div></div>
+  <div class="fn"><code>=FINSYT.FILINGS("AAPL","10-K",5)</code><div class="desc">SEC filings list.</div></div>
+  <div class="fn"><code>=FINSYT.NEWS("AAPL",6)</code><div class="desc">Latest headlines.</div></div>
+  <div class="fn"><code>=FINSYT.MACRO("CPI","2020-01-01","2024-12-31")</code><div class="desc">Macro indicator series between two dates.</div></div>
+  <div class="fn"><code>=FINSYT.DIVIDEND("AAPL","yield")</code><div class="desc">Dividend metric (yield|payout|nextExDate|amount|frequency).</div></div>
+  <div class="fn"><code>=FINSYT.SEARCH("apple",5)</code><div class="desc">Ticker search.</div></div>
+  <div class="fn"><code>=FINSYT.ASK("Why did NVDA pop?","NVDA")</code><div class="desc">Synthesised research answer (optional symbol context).</div></div>
+</section>
+
+<script src="taskpane.js"></script>
+</body>
+</html>
