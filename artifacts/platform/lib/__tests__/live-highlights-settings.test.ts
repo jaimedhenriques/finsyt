@@ -100,3 +100,21 @@ test('emailRecipients filters non-emails and caps at 50', async () => {
   assert.equal(next.emailRecipients.length, 50)
   assert.ok(next.emailRecipients.every((e: string) => /@/.test(e) && !/\s/.test(e)))
 })
+
+test('emailRecipients normalizes case and dedupes before persisting', async () => {
+  const org = freshOrg('emails-dedupe')
+  const next = await updateLiveHighlightsSettings(org, {
+    emailRecipients: [
+      ' Analyst@Fund.com ',
+      'analyst@fund.com',
+      'OPS@Fund.com',
+      'ops@fund.com ',
+    ],
+  })
+
+  assert.deepEqual(next.emailRecipients, ['analyst@fund.com', 'ops@fund.com'])
+  assert.deepEqual((await getLiveHighlightsSettings(org)).emailRecipients, [
+    'analyst@fund.com',
+    'ops@fund.com',
+  ])
+})

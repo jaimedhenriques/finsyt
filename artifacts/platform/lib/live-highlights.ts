@@ -256,6 +256,21 @@ export interface SettingsPatch {
 const SLACK_WEBHOOK_PATTERN = /^https:\/\/hooks\.slack\.com\/services\/[A-Za-z0-9_/-]+$/
 const EMAIL_PATTERN = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
 
+function normalizeEmailRecipients(recipients: string[]): string[] {
+  const seen = new Set<string>()
+  const normalized: string[] = []
+
+  for (const raw of recipients) {
+    const email = String(raw).trim().toLowerCase()
+    if (!EMAIL_PATTERN.test(email) || seen.has(email)) continue
+    seen.add(email)
+    normalized.push(email)
+    if (normalized.length >= 50) break
+  }
+
+  return normalized
+}
+
 export async function updateLiveHighlightsSettings(
   orgId: string,
   patch: SettingsPatch,
@@ -297,10 +312,7 @@ export async function updateLiveHighlightsSettings(
   }
 
   const emailRecipients = Array.isArray(patch.emailRecipients)
-    ? patch.emailRecipients
-        .map((x) => String(x).trim())
-        .filter((x) => EMAIL_PATTERN.test(x))
-        .slice(0, 50)
+    ? normalizeEmailRecipients(patch.emailRecipients)
     : current.emailRecipients
 
   const next: LiveHighlightsSettings = {
