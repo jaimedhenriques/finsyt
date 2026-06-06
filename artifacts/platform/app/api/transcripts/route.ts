@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { auth } from '@/lib/auth-server'
+import { requireProFeature } from '@/lib/billing'
 import { buildRealDeck } from '@/lib/slide-decks'
 import { loadAlignedTranscript } from '@/lib/transcripts-server'
 
@@ -22,6 +24,15 @@ export async function GET(req: NextRequest) {
         title: `${symbol} Q${t[1]} ${t[0]} Earnings Call`,
       }))
       return NextResponse.json({ transcripts })
+    }
+
+    const { orgId } = await auth()
+    const pro = await requireProFeature(orgId, 'Earnings transcripts')
+    if (!pro.allowed) {
+      return NextResponse.json(
+        { error: pro.reason, upgradeUrl: '/platform/app/upgrade' },
+        { status: 402 },
+      )
     }
 
     // Aligned-or-estimated transcript payload (shared with the live event

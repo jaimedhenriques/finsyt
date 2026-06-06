@@ -14,5 +14,6 @@ export * from "./blueprints";
 export * from "./matrices";
 export * from "./deck-overrides";
 export * from "./live-highlights";
+export * from "./billing";
 
 export const TENANT_TABLES = ["leads", "research_notes", "chat_messages", "memberships", "portfolio_positions", "api_keys", "connections", "connection_credentials", "connection_operations", "connection_events", "alerts", "workspaces", "workspace_views", "matrices", "matrix_snapshots"] as const;

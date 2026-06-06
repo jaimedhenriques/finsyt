@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { currentUser } from '@clerk/nextjs/server'
 import { auth } from '@/lib/auth-server'
+import { requireProFeature } from '@/lib/billing'
 import { getClustersForSymbol, getGlobalClusters, type QuestionCluster } from '@/lib/question-clusters'
 
 export const dynamic = 'force-dynamic'
@@ -100,20 +100,15 @@ function filterFallback(symbol?: string): QuestionCluster[] {
 export async function GET(req: NextRequest) {
   // Require a verified Clerk session — unauthenticated callers are rejected
   // before any entitlement check so cookie forgery cannot bypass this gate.
-  const { userId } = await auth()
+  const { userId, orgId } = await auth()
   if (!userId) {
     return NextResponse.json({ error: 'Authentication required.' }, { status: 401 })
   }
-
-  // Read the tier from the server-side Clerk user record (publicMetadata),
-  // not from a client-controlled cookie which can be forged by anyone.
-  // Any paid tier (pro or enterprise) unlocks this feature; only 'free' is blocked.
-  const user = await currentUser()
-  const tier = (user?.publicMetadata as { tier?: string } | null)?.tier ?? 'free'
-  if (tier === 'free') {
+  const pro = await requireProFeature(orgId, 'Clustered analyst Q&A')
+  if (!pro.allowed) {
     return NextResponse.json(
-      { error: 'Clustered analyst Q&A is a Pro feature. Upgrade to enable.', clusters: [] },
-      { status: 402 }
+      { error: pro.reason ?? 'Clustered analyst Q&A is a Pro feature.', clusters: [] },
+      { status: 402 },
     )
   }
 

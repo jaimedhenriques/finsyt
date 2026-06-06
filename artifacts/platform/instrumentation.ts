@@ -9,13 +9,20 @@
  */
 export async function register() {
   if (process.env.NEXT_RUNTIME === "nodejs") {
-    const { assertRlsSafe, bootstrapRls, ensureDeckOverridesSchema, ensureLiveHighlightsSchema, ensureWorkspaceViewsSchema } = await import("@workspace/db");
+    const { assertRlsSafe, bootstrapRls, ensureBillingSchema, ensureDeckOverridesSchema, ensureLiveHighlightsSchema, ensureWorkspaceViewsSchema } = await import("@workspace/db");
 
     // Live Highlights tables must exist BEFORE bootstrapRls so the
     // tenant-isolation policies attach on first boot (the policy DO blocks
     // are no-ops when the target table doesn't exist yet). The DDL is
     // idempotent and pure CREATE TABLE IF NOT EXISTS, so it is safe to run
     // before any RLS context is bound.
+    try {
+      await ensureBillingSchema();
+    } catch (e) {
+      console.error("[instrumentation] failed to bootstrap billing schema", e);
+      throw e;
+    }
+
     try {
       await ensureLiveHighlightsSchema();
     } catch (e) {

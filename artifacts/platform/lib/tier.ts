@@ -1,24 +1,69 @@
 'use client'
-import { useEffect, useState } from 'react'
+import { useCallback, useEffect, useState } from 'react'
 
 export type Tier = 'free' | 'pro' | 'enterprise'
 
-export function useTier(): { tier: Tier; isPro: boolean; setTier: (t: Tier) => void } {
-  const [tier, setTier] = useState<Tier>('pro')
-  useEffect(() => {
-    try {
-      const stored = (localStorage.getItem('finsyt_tier') as Tier) || 'pro'
-      setTier(stored)
-      document.cookie = `finsyt_tier=${stored}; path=/; max-age=${60 * 60 * 24 * 365}; SameSite=Lax`
-    } catch {}
+export interface BillingSnapshot {
+  tier: Tier
+  isPro: boolean
+  status: string
+  currentPeriodEnd: string | null
+  cancelAtPeriodEnd: boolean
+  aiQueriesUsed: number
+  aiQueriesLimit: number | null
+  priceLabel: string | null
+}
+
+const DEFAULT_BILLING: BillingSnapshot = {
+  tier: 'free',
+  isPro: false,
+  status: 'active',
+  currentPeriodEnd: null,
+  cancelAtPeriodEnd: false,
+  aiQueriesUsed: 0,
+  aiQueriesLimit: 10,
+  priceLabel: null,
+}
+
+export function useTier(): {
+  tier: Tier
+  isPro: boolean
+  billing: BillingSnapshot
+  loading: boolean
+  refresh: () => void
+} {
+  const [billing, setBilling] = useState<BillingSnapshot>(DEFAULT_BILLING)
+  const [loading, setLoading] = useState(true)
+
+  const refresh = useCallback(() => {
+    setLoading(true)
+    fetch('/platform/api/billing/status', { credentials: 'include' })
+      .then((r) => (r.ok ? r.json() : DEFAULT_BILLING))
+      .then((data: BillingSnapshot) => {
+        setBilling({
+          tier: data.tier ?? 'free',
+          isPro: Boolean(data.isPro),
+          status: data.status ?? 'active',
+          currentPeriodEnd: data.currentPeriodEnd ?? null,
+          cancelAtPeriodEnd: Boolean(data.cancelAtPeriodEnd),
+          aiQueriesUsed: data.aiQueriesUsed ?? 0,
+          aiQueriesLimit: data.aiQueriesLimit ?? 10,
+          priceLabel: data.priceLabel ?? null,
+        })
+      })
+      .catch(() => setBilling(DEFAULT_BILLING))
+      .finally(() => setLoading(false))
   }, [])
-  function update(t: Tier) {
-    setTier(t)
-    try {
-      localStorage.setItem('finsyt_tier', t)
-      // Mirror to a cookie so server routes can read the entitlement.
-      document.cookie = `finsyt_tier=${t}; path=/; max-age=${60 * 60 * 24 * 365}; SameSite=Lax`
-    } catch {}
+
+  useEffect(() => {
+    refresh()
+  }, [refresh])
+
+  return {
+    tier: billing.tier,
+    isPro: billing.isPro,
+    billing,
+    loading,
+    refresh,
   }
-  return { tier, isPro: tier !== 'free', setTier: update }
 }

@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "test": "DB_RUNTIME_ROLE=${DB_RUNTIME_ROLE:-app_runtime} node --experimental-test-module-mocks --import tsx --test \"lib/__tests__/**/*.test.ts\"",
-    "test:ci": "DB_RUNTIME_ROLE=${DB_RUNTIME_ROLE:-app_runtime} node --experimental-test-module-mocks --import tsx --test \"lib/__tests__/live-highlights-persistence.test.ts\""
+    "test:ci": "node --experimental-test-module-mocks --import tsx --test \"lib/__tests__/billing-entitlements.test.ts\" \"lib/__tests__/agent-tool-result-payload.test.ts\" \"lib/__tests__/connectors-url-safety.test.ts\" \"lib/__tests__/live-events-call-identity.test.ts\" \"lib/__tests__/data-sources-trace.test.ts\""
   },
   "dependencies": {
     "@21st-sdk/agent": "^0.0.16",
@@ -41,6 +41,7 @@
     "react-dom": "19.2.4",
     "react-markdown": "^10.1.0",
     "recharts": "^3.8.1",
+    "stripe": "^17.7.0",
     "remark-gfm": "^4.0.1",
     "tailwind-merge": "^2.3.0",
     "zod": "^3.23.8"

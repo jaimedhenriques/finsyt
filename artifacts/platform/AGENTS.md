@@ -34,12 +34,12 @@
 | app/app/research/ | Base44 | Done | Finsyt Intelligence streaming chat (SSE) |
 | app/app/page.tsx | Base44 | Done | Redirects → /app/research |
 | app/api/research/ | Base44 | Done | SSE streaming with 7 tools (Groq+Perplexity+EODHD+FMP+FRED+Finnhub+SEC) |
-| app/app/layout.tsx | Cursor | Needed | Auth middleware + session provider |
-| middleware.ts | Cursor | Needed | Protect /app/* → redirect unauthenticated |
-| lib/supabase/ | Cursor | Needed | createClient, useUser, useSession hooks |
-| app/app/auth/ | Cursor | Needed | Login/signup pages (app router) |
-| app/api/webhooks/stripe/ | Cursor | Needed | Stripe webhook handler |
-| app/api/checkout/ | Cursor | Needed | Stripe checkout session |
+| app/app/layout.tsx | Cursor | Done | Clerk provider + app shell |
+| middleware.ts | Cursor | Done | Clerk auth; `/api/webhooks/stripe` public |
+| lib/auth-server.ts, lib/billing.ts | Cursor | Done | Org-scoped entitlements + Stripe sync |
+| app/api/webhooks/stripe/ | Cursor | Done | Stripe webhook → `org_subscriptions` |
+| app/api/stripe/create-checkout/ | Cursor | Done | Checkout redirect (replaces legacy `/api/checkout/`) |
+| app/api/billing/status/, portal/ | Cursor | Done | Live plan UI + Customer Portal |
 
 ## Base44 Agent — Current State
 
@@ -66,15 +66,28 @@ Owns: product UI, data wiring, feature pages. Pushes directly to `main`.
 
 Owns: auth, payments, infrastructure, database schema. Branch → PR flow.
 
-**Priority order:**
-1. **#16 Auth** — `middleware.ts` + `lib/supabase/` + `app/app/auth/` (login/signup) + `app/app/layout.tsx` session provider
-2. **#17 Stripe** — `app/api/webhooks/stripe/` + `app/api/checkout/`
-3. **#20 Feature gating** — guard research/company pages behind subscription check
+**Auth (canonical):** Clerk — sign-in at `/platform/sign-in`. Do **not** add client-side tier spoofing; entitlements live in `lib/billing.ts` keyed on `clerk_org_id`.
 
-**Supabase env vars (set in Vercel):**
-- `NEXT_PUBLIC_finsyt_finsytSUPABASE_URL`
-- `NEXT_PUBLIC_finsyt_finsytSUPABASE_ANON_KEY`
-- `finsyt_SUPABASE_SERVICE_ROLE_KEY`
+**Billing / Stripe (Cursor owns):**
+- `lib/billing.ts` — server entitlements (`getOrgTier`, `checkAiQueryEntitlement`, `requireProFeature`)
+- `lib/billing-entitlements.ts` — pure helpers (unit-tested, no DB)
+- `lib/stripe.ts` — Stripe client + env helpers
+- `app/api/stripe/create-checkout/route.ts` — Pro checkout (`?plan=pro`)
+- `app/api/webhooks/stripe/route.ts` — subscription lifecycle webhooks (public route)
+- `app/api/billing/status/route.ts` — JSON plan snapshot for UI
+- `app/api/billing/portal/route.ts` — Stripe Customer Portal session
+- Feature gates: `app/api/agent/ask`, `app/api/research` (top gate), `app/api/transcripts`, `app/api/insider`, `app/api/analyst-questions`, `app/api/extract-graphs`
+- UI: `app/app/upgrade/page.tsx`, `app/app/settings/page.tsx` (`BillingPlanCard`), `lib/tier.ts` (fetches `/platform/api/billing/status`)
+- Launch checklist: `docs/MVP_LAUNCH.md`
+
+**Billing env vars (Vercel — server-only):**
+- `STRIPE_SECRET_KEY`, `STRIPE_WEBHOOK_SECRET`, `STRIPE_PRO_PRICE_ID`
+- `APP_URL` (production canonical URL, e.g. `https://finsyt.com`)
+- `DATABASE_URL` / `POSTGRES_URL` — required for `org_subscriptions` + `usage_counters`
+- **Production:** `PLATFORM_OPEN_MODE` must be unset (demo bypass grants Pro)
+
+**Clerk env vars (set in Vercel):**
+- `CLERK_SECRET_KEY`, `NEXT_PUBLIC_CLERK_PUBLISHABLE_KEY` (wired via `next.config.ts`)
 
 **Data API env vars (already wired in `next.config.ts`):**
 - `EODHD_API_KEY` / `eodhd_api` (both aliased)
@@ -83,24 +96,6 @@ Owns: auth, payments, infrastructure, database schema. Branch → PR flow.
 - `API_KEY_21ST` / `_21st_api`, `POSTGRES_URL`, `JWT_SECRET`
 
 **DO NOT edit:** `app/app/company/`, `app/app/research/`, `app/api/research/`, `app/app/page.tsx`
-
-## What Cursor Should Build Next (Auth — #16)
-
-```
-lib/supabase/
-  client.ts          ← createBrowserClient() for client components
-  server.ts          ← createServerClient() for server components / route handlers
-  hooks.ts           ← useUser(), useSession() React hooks
-
-app/app/auth/
-  login/page.tsx     ← email+password + Google OAuth
-  signup/page.tsx    ← email+password + Google OAuth
-  callback/route.ts  ← OAuth callback handler
-
-middleware.ts        ← matcher: /app/:path* — redirect → /app/auth/login if no session
-
-app/app/layout.tsx   ← wrap children with SessionProvider (or pass user server-side)
-```
 
 ## Branch Conventions
 

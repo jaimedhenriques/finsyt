@@ -1,4 +1,6 @@
 import { NextRequest } from 'next/server'
+import { auth } from '@/lib/auth-server'
+import { checkAiQueryEntitlement } from '@/lib/billing'
 
 const GROQ       = process.env.GROQ_API_KEY
 const PERPLEXITY = process.env.PERPLEXITY_API_KEY
@@ -444,6 +446,21 @@ ${d.results?.map((s: any) => `  ${s.symbol} | ${s.name} | ${s.sector} | Price: $
 
 // ── Main streaming handler ──────────────────────────────────────────────────────
 export async function POST(req: NextRequest) {
+  const { orgId } = await auth()
+  const entitlement = await checkAiQueryEntitlement(orgId, { increment: true })
+  if (!entitlement.allowed) {
+    return new Response(
+      JSON.stringify({
+        error: entitlement.reason ?? 'Upgrade required',
+        tier: entitlement.tier,
+        aiQueriesUsed: entitlement.aiQueriesUsed,
+        aiQueriesLimit: entitlement.aiQueriesLimit,
+        upgradeUrl: '/platform/app/upgrade',
+      }),
+      { status: 402, headers: { 'content-type': 'application/json' } },
+    )
+  }
+
   const body = await req.json()
   const { messages, chatHistory } = body
 

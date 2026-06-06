@@ -8,6 +8,7 @@ import {
 } from '@/lib/data-providers'
 import { credentialHealthSummary, listCredentialHealth } from '@/lib/credential-health'
 import { censusHealthCheck } from '@/lib/census-provider'
+import { validateBillingEnv } from '@/lib/billing-config'
 
 async function testProvider(name: string, fn: () => Promise<any>) {
   if (!PROVIDERS[name as keyof typeof PROVIDERS]) return { ok: false, detail: 'not configured' }
@@ -66,6 +67,7 @@ export async function GET() {
   // silently rejected by the upstream (Census key rotated, OWN key revoked,
   // etc.). External monitors should alert on `credentialHealth.summary.rejected > 0`.
   const credSummary = credentialHealthSummary()
+  const billingEnv = validateBillingEnv()
   const credentialHealth = {
     summary: credSummary,
     providers: listCredentialHealth(),
@@ -79,7 +81,11 @@ export async function GET() {
     summary:    `${configured} providers configured, ${passing} passing live tests`
                 + (credSummary.rejected > 0
                     ? ` — ${credSummary.rejected} credential(s) rejected: ${credSummary.rejectedProviders.join(', ')}`
+                    : '')
+                + (!billingEnv.configured
+                    ? ` — billing not configured (missing: ${billingEnv.missing.join(', ')})`
                     : ''),
+    billing: billingEnv,
     credentialHealth,
     providers,
     liveTests,

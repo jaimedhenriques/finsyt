@@ -1,5 +1,6 @@
 'use client'
 import { useCallback, useEffect, useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { RoleGate, usePrincipal } from '@/lib/auth'
 import { ConnectSourcesPanel } from '@/components/research-pack'
 import { UserProfile, useUser } from '@clerk/nextjs'
@@ -9,6 +10,93 @@ import { useWorkspace, THEME_OPTIONS } from '@/lib/workspace'
 // (it owns that path prefix), so we explicitly target the platform's
 // basePath to land on our authenticated Next.js route handlers.
 const ACCOUNT_API = '/platform/api/account'
+const BILLING_API = '/platform/api/billing'
+
+function BillingPlanCard() {
+  const searchParams = useSearchParams()
+  const [billing, setBilling] = useState<{
+    tier: string
+    isPro: boolean
+    currentPeriodEnd: string | null
+    cancelAtPeriodEnd: boolean
+    aiQueriesUsed: number
+    aiQueriesLimit: number | null
+    priceLabel: string | null
+  } | null>(null)
+  const [busy, setBusy] = useState(false)
+  const [msg, setMsg] = useState<string | null>(null)
+  const [successMsg, setSuccessMsg] = useState<string | null>(null)
+
+  useEffect(() => {
+    fetch(`${BILLING_API}/status`, { credentials: 'include' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => setBilling(data))
+      .catch(() => setBilling(null))
+  }, [])
+
+  useEffect(() => {
+    if (searchParams.get('checkout') !== 'success') return
+    setSuccessMsg('Welcome to Pro! Your subscription is active.')
+    const url = new URL(window.location.href)
+    url.searchParams.delete('checkout')
+    window.history.replaceState({}, '', url.pathname + url.search + url.hash)
+    const timer = window.setTimeout(() => setSuccessMsg(null), 8000)
+    return () => window.clearTimeout(timer)
+  }, [searchParams])
+
+  async function managePlan() {
+    setBusy(true)
+    setMsg(null)
+    try {
+      if (billing?.isPro) {
+        const r = await fetch(`${BILLING_API}/portal`, { method: 'POST', credentials: 'include' })
+        const data = await r.json()
+        if (!r.ok) throw new Error(data.error || `HTTP ${r.status}`)
+        if (data.url) window.location.href = data.url
+      } else {
+        window.location.href = '/platform/app/upgrade'
+      }
+    } catch (e: unknown) {
+      setMsg(e instanceof Error ? e.message : 'Could not open billing portal')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  const planName = billing?.isPro ? 'Pro Plan' : 'Free Plan'
+  const renewal = billing?.currentPeriodEnd
+    ? `renews ${new Date(billing.currentPeriodEnd).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}`
+    : billing?.isPro
+      ? 'active subscription'
+      : billing?.aiQueriesLimit != null
+        ? `${billing.aiQueriesUsed}/${billing.aiQueriesLimit} AI queries used this month`
+        : '10 AI queries/month included'
+
+  return (
+    <div style={{ padding:'16px 20px', borderRadius:12, background:'linear-gradient(135deg,rgba(27,79,255,0.05),rgba(13,159,232,0.05))', border:'1.5px solid rgba(27,79,255,0.15)', marginBottom:20 }}>
+      <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+        <div>
+          <div style={{ fontWeight:800, fontSize:14, color:'#0A1628' }}>{planName}</div>
+          <div style={{ fontSize:12, color:'#7D8FA9', marginTop:2 }}>
+            {billing?.priceLabel ? `${billing.priceLabel} · ${renewal}` : renewal}
+            {billing?.cancelAtPeriodEnd ? ' · cancels at period end' : ''}
+          </div>
+          {successMsg && (
+            <div style={{ fontSize:11, color:'#047857', marginTop:6, fontWeight:600 }}>{successMsg}</div>
+          )}
+          {msg && <div style={{ fontSize:11, color:'#B45309', marginTop:6 }}>{msg}</div>}
+        </div>
+        <button
+          onClick={() => void managePlan()}
+          disabled={busy}
+          style={{ padding:'6px 14px', borderRadius:8, border:'1.5px solid var(--accent)', background:'transparent', color:'var(--accent)', fontSize:12, fontWeight:700, cursor: busy ? 'wait' : 'pointer' }}
+        >
+          {busy ? 'Opening…' : billing?.isPro ? 'Manage Plan' : 'Upgrade'}
+        </button>
+      </div>
+    </div>
+  )
+}
 
 function DangerZone() {
   const [busy, setBusy] = useState<'export' | 'delete' | null>(null)
@@ -527,18 +615,7 @@ export default function SettingsPage() {
                 ))}
               </div>
 
-              {/* Plan */}
-              <div style={{ padding:'16px 20px', borderRadius:12, background:'linear-gradient(135deg,rgba(27,79,255,0.05),rgba(13,159,232,0.05))', border:'1.5px solid rgba(27,79,255,0.15)', marginBottom:20 }}>
-                <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
-                  <div>
-                    <div style={{ fontWeight:800, fontSize:14, color:'#0A1628' }}>Pro Plan</div>
-                    <div style={{ fontSize:12, color:'#7D8FA9', marginTop:2 }}>$29/month · renews May 14, 2026</div>
-                  </div>
-                  <button style={{ padding:'6px 14px', borderRadius:8, border:'1.5px solid var(--accent)', background:'transparent', color:'var(--accent)', fontSize:12, fontWeight:700, cursor:'pointer' }}>
-                    Manage Plan
-                  </button>
-                </div>
-              </div>
+              <BillingPlanCard />
 
               {/* Org context badge */}
               <OrgBadge />

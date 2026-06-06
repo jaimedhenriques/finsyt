@@ -3,6 +3,12 @@ import { clerkMiddleware, createRouteMatcher } from "@clerk/nextjs/server";
 import { OPEN_MODE } from "@/lib/open-mode";
 
 const isProtectedRoute = createRouteMatcher(["/app(.*)", "/excel-addin/auth(.*)"]);
+/** Stripe webhooks must stay public — Stripe signs requests, not Clerk. */
+const isPublicApiRoute = createRouteMatcher([
+  "/api/webhooks/stripe(.*)",
+  "/api/health(.*)",
+]);
+
 const isProtectedApiRoute = createRouteMatcher([
   "/api/company-discovery(.*)",
   "/api/coresignal(.*)",
@@ -25,6 +31,8 @@ const isProtectedApiRoute = createRouteMatcher([
   "/api/macro(.*)",
   "/api/transcripts(.*)",
   "/api/live-events(.*)",
+  "/api/billing/(.*)",
+  "/api/stripe/create-checkout(.*)",
 ]);
 const isAuthEntryRoute = createRouteMatcher([
   "/sign-in(.*)",
@@ -164,7 +172,7 @@ export default clerkMiddleware(async (auth, req) => {
   // server code resolves to a fixed demo principal (see lib/auth-server.ts).
   // Off by default; flip on with PLATFORM_OPEN_MODE=1 in the workspace only.
   if (!OPEN_MODE) {
-    if (isProtectedApiRoute(req)) {
+    if (isProtectedApiRoute(req) && !isPublicApiRoute(req)) {
       const { userId } = await auth();
       if (!userId) {
         return new NextResponse(

@@ -5,13 +5,24 @@ import * as schema from "./schema";
 
 const { Pool } = pg;
 
-if (!process.env.DATABASE_URL) {
+/** Resolve Postgres URL from env. Supports Vercel's POSTGRES_URL alias. */
+function resolveDatabaseUrl(): string {
+  const url =
+    process.env.DATABASE_URL?.trim() || process.env.POSTGRES_URL?.trim();
+  if (url) return url;
+
+  // Next.js imports API route modules during `next build` (page-data collection).
+  // No live database is required for that phase — allow the module graph to load.
+  if (process.env.NEXT_PHASE === "phase-production-build") {
+    return "postgres://build:build@127.0.0.1:5432/build";
+  }
+
   throw new Error(
     "DATABASE_URL must be set. Did you forget to provision a database?",
   );
 }
 
-export const pool = new Pool({ connectionString: process.env.DATABASE_URL });
+export const pool = new Pool({ connectionString: resolveDatabaseUrl() });
 export const db: NodePgDatabase<typeof schema> = drizzle(pool, { schema });
 
 export type Db = typeof db;
@@ -315,3 +326,4 @@ export * from "./blueprint-bootstrap";
 export * from "./deck-overrides-bootstrap";
 export * from "./live-highlights-bootstrap";
 export * from "./workspace-views-bootstrap";
+export * from "./billing-bootstrap";

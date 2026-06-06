@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { auth } from '@/lib/auth-server'
+import { requireProFeature } from '@/lib/billing'
 import { PROVIDERS, financeflowNews } from '@/lib/data-providers'
 
 const EODHD   = process.env.EODHD_API_KEY || process.env.eodhd_api || ''
@@ -24,6 +26,15 @@ function normalise(t: any, source: string) {
 }
 
 export async function GET(req: NextRequest) {
+  const { orgId } = await auth()
+  const pro = await requireProFeature(orgId, 'Insider transactions')
+  if (!pro.allowed) {
+    return NextResponse.json(
+      { error: pro.reason, upgradeUrl: '/platform/app/upgrade' },
+      { status: 402 },
+    )
+  }
+
   const symbol = req.nextUrl.searchParams.get('symbol')?.toUpperCase()
   const limit  = parseInt(req.nextUrl.searchParams.get('limit') || '30')
   const type   = req.nextUrl.searchParams.get('type') || ''   // buy | sell

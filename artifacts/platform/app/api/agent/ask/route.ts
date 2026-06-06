@@ -1,6 +1,7 @@
 import { NextRequest } from 'next/server'
 import { cookies, headers } from 'next/headers'
 import { auth } from '@/lib/auth-server'
+import { checkAiQueryEntitlement } from '@/lib/billing'
 import { resolveLocalOrgId } from '@/lib/org-resolver'
 import { buildConnectorAgentTools, invokeConnectorTool, type AgentTool as ConnectorAgentTool } from '@/lib/connectors/agent-tools'
 import { runAgent } from '@/lib/agent-core'
@@ -578,6 +579,21 @@ const OPENAI_TOOLS = TOOLS.map(t => ({
 
 // ── Route ────────────────────────────────────────────────────────────────────
 export async function POST(req: NextRequest) {
+  const { orgId } = await auth()
+  const entitlement = await checkAiQueryEntitlement(orgId, { increment: true })
+  if (!entitlement.allowed) {
+    return new Response(
+      JSON.stringify({
+        error: entitlement.reason ?? 'Upgrade required',
+        tier: entitlement.tier,
+        aiQueriesUsed: entitlement.aiQueriesUsed,
+        aiQueriesLimit: entitlement.aiQueriesLimit,
+        upgradeUrl: '/platform/app/upgrade',
+      }),
+      { status: 402, headers: { 'content-type': 'application/json' } },
+    )
+  }
+
   let body: { question?: string; symbols?: string[]; context?: Record<string, unknown> } = {}
   try { body = await req.json() } catch {}
   const question = (body.question || '').trim()

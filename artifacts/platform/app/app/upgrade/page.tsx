@@ -1,5 +1,6 @@
 'use client'
-import Link from 'next/link'
+import { useState } from 'react'
+import { useTier } from '@/lib/tier'
 
 const T = {
   bg: 'var(--bg-page)', surface: '#0F1929', border: 'rgba(255,255,255,0.06)',
@@ -81,7 +82,26 @@ const COMPARE = [
   { feature: 'Support',                   free: 'Community', pro: 'Priority (4h)', enterprise: 'Dedicated CSM' },
 ]
 
+function planCta(name: string, isPro: boolean, tier: string): { label: string; disabled: boolean } {
+  if (name === 'Free') {
+    return { label: tier === 'free' ? 'Current plan' : 'Included', disabled: true }
+  }
+  if (name === 'Pro') {
+    if (isPro) return { label: 'Current plan', disabled: true }
+    return { label: 'Upgrade to Pro — $29/mo', disabled: false }
+  }
+  return { label: 'Contact sales', disabled: false }
+}
+
 export default function UpgradePage() {
+  const { tier, isPro } = useTier()
+  const [busy, setBusy] = useState(false)
+
+  function startCheckout() {
+    setBusy(true)
+    window.location.href = '/platform/api/stripe/create-checkout?plan=pro'
+  }
+
   return (
     <div className="page-content" style={{ background: T.bg, minHeight: '100vh', color: T.text }}>
       <style>{`
@@ -105,7 +125,9 @@ export default function UpgradePage() {
 
       {/* Plans */}
       <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: 20, marginBottom: 80, maxWidth: 1100, margin: '0 auto 80px' }}>
-        {PLANS.map((plan, i) => (
+        {PLANS.map((plan) => {
+          const cta = planCta(plan.name, isPro, tier)
+          return (
           <div key={plan.name} style={{
             background: plan.highlight ? 'var(--accent)' : T.surface,
             border: `1px solid ${plan.highlight ? 'var(--accent)' : T.border}`,
@@ -127,19 +149,25 @@ export default function UpgradePage() {
             </div>
 
             <button
-              onClick={() => { if (!plan.disabled && plan.name !== 'Enterprise') { window.location.href = '/api/stripe/create-checkout?plan=pro' } else if (plan.name === 'Enterprise') { window.location.href = 'mailto:hello@finsyt.com' } }}
-              disabled={plan.disabled}
+              onClick={() => {
+                if (plan.name === 'Enterprise') {
+                  window.location.href = 'mailto:hello@finsyt.com'
+                } else if (plan.name === 'Pro' && !isPro) {
+                  void startCheckout()
+                }
+              }}
+              disabled={cta.disabled || (plan.name === 'Pro' && busy)}
               style={{
                 display: 'block', width: '100%', textAlign: 'center',
-                background: plan.highlight ? '#fff' : plan.disabled ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.1)',
-                color: plan.highlight ? 'var(--accent)' : plan.disabled ? T.textMuted : '#fff',
+                background: plan.highlight ? '#fff' : cta.disabled ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.1)',
+                color: plan.highlight ? 'var(--accent)' : cta.disabled ? T.textMuted : '#fff',
                 borderRadius: 9999, padding: '12px 24px',
                 fontFamily: T.sans, fontSize: 14, fontWeight: 700,
-                border: 'none', cursor: plan.disabled ? 'default' : 'pointer', marginBottom: 28,
+                border: 'none', cursor: cta.disabled ? 'default' : 'pointer', marginBottom: 28,
                 transition: 'opacity 0.15s',
                 letterSpacing: '-0.01em',
               }}
-            >{plan.cta}</button>
+            >{busy && plan.name === 'Pro' ? 'Redirecting…' : cta.label}</button>
 
             <div style={{ height: 1, background: plan.highlight ? 'rgba(255,255,255,0.15)' : T.border, marginBottom: 24 }} />
 
@@ -152,7 +180,8 @@ export default function UpgradePage() {
               ))}
             </ul>
           </div>
-        ))}
+          )
+        })}
       </div>
 
       {/* Comparison table */}
