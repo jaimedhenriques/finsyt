@@ -1,0 +1,43 @@
+kind = "web"
+previewPath = "/platform/"
+title = "Finsyt Platform"
+version = "1.0.0"
+id = "artifacts/platform"
+router = "path"
+
+[[integratedSkills]]
+name = "react-vite"
+version = "1.0.0"
+
+[[services]]
+name = "web"
+paths = [ "/platform/" ]
+localPort = 3000
+
+[services.development]
+run = "pnpm --filter @workspace/platform run dev"
+
+[services.production]
+
+[services.production.build]
+args = ["pnpm", "--filter", "@workspace/platform", "run", "build"]
+
+[services.production.build.env]
+NODE_ENV = "production"
+DB_RUNTIME_ROLE = "app_runtime"
+
+[services.production.run]
+args = ["pnpm", "--filter", "@workspace/platform", "exec", "next", "start", "-p", "3000"]
+
+[services.production.run.env]
+PORT = "3000"
+NODE_ENV = "production"
+BASE_PATH = "/platform/"
+DB_RUNTIME_ROLE = "app_runtime"
+
+[services.production.health.startup]
+path = "/platform/api/healthz"
+
+[services.env]
+PORT = "3000"
+BASE_PATH = "/platform/"

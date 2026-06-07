@@ -1,0 +1,159 @@
+{
+  "$schema": "https://developer.microsoft.com/json-schemas/office-js/custom-functions.schema.json",
+  "functions": [
+    {
+      "id": "QUOTE",
+      "name": "QUOTE",
+      "description": "Returns a single field for a stock quote (price, change, marketCap, pe, etc.)",
+      "helpUrl": "https://finsyt.com/platform/app/developer",
+      "result": { "type": "any", "dimensionality": "scalar" },
+      "parameters": [
+        { "name": "symbol", "description": "Ticker symbol", "type": "string", "dimensionality": "scalar" },
+        { "name": "field",  "description": "Field name (default: price)", "type": "string", "dimensionality": "scalar", "optional": true }
+      ]
+    },
+    {
+      "id": "METRIC",
+      "name": "METRIC",
+      "description": "Returns a fundamental metric value for the requested period.",
+      "helpUrl": "https://finsyt.com/platform/app/developer",
+      "result": { "type": "any", "dimensionality": "scalar" },
+      "parameters": [
+        { "name": "symbol", "description": "Ticker symbol", "type": "string", "dimensionality": "scalar" },
+        { "name": "metric", "description": "Metric mnemonic (e.g. revenue, netIncome)", "type": "string", "dimensionality": "scalar" },
+        { "name": "period", "description": "annual or quarterly (default: annual)", "type": "string", "dimensionality": "scalar", "optional": true },
+        { "name": "offset", "description": "0=most recent, -1=prior period, etc.", "type": "number", "dimensionality": "scalar", "optional": true }
+      ]
+    },
+    {
+      "id": "HISTORY",
+      "name": "HISTORY",
+      "description": "Returns OHLCV history as a 2-D range (date, open, high, low, close, volume).",
+      "helpUrl": "https://finsyt.com/platform/app/developer",
+      "result": { "type": "any", "dimensionality": "matrix" },
+      "parameters": [
+        { "name": "symbol", "description": "Ticker symbol", "type": "string", "dimensionality": "scalar" },
+        { "name": "from",   "description": "Start date YYYY-MM-DD", "type": "string", "dimensionality": "scalar" },
+        { "name": "to",     "description": "End date YYYY-MM-DD",   "type": "string", "dimensionality": "scalar" },
+        { "name": "timespan", "description": "minute|hour|day|week|month (default: day)", "type": "string", "dimensionality": "scalar", "optional": true }
+      ]
+    },
+    {
+      "id": "SEARCH",
+      "name": "SEARCH",
+      "description": "Search the global ticker universe (symbol, name, exchange).",
+      "helpUrl": "https://finsyt.com/platform/app/developer",
+      "result": { "type": "any", "dimensionality": "matrix" },
+      "parameters": [
+        { "name": "query", "description": "Company or ticker text", "type": "string", "dimensionality": "scalar" },
+        { "name": "limit", "description": "Max rows (default 10)",  "type": "number", "dimensionality": "scalar", "optional": true }
+      ]
+    },
+    {
+      "id": "FINANCIALS",
+      "name": "FINANCIALS",
+      "description": "Returns a single line item from a financial statement for a given period (scalar).",
+      "helpUrl": "https://finsyt.com/platform/app/developer",
+      "result": { "type": "any", "dimensionality": "scalar" },
+      "parameters": [
+        { "name": "symbol",    "description": "Ticker symbol", "type": "string", "dimensionality": "scalar" },
+        { "name": "statement", "description": "income | balance | cash", "type": "string", "dimensionality": "scalar" },
+        { "name": "line",      "description": "Line item (e.g. revenue, netIncome, totalAssets)", "type": "string", "dimensionality": "scalar" },
+        { "name": "period",    "description": "FY, FY-1, FY2024, Q-1, Q1-2025, 2025Q1, TTM, LTM (default FY)", "type": "string", "dimensionality": "scalar", "optional": true }
+      ]
+    },
+    {
+      "id": "ESTIMATE",
+      "name": "ESTIMATE",
+      "description": "Returns an analyst consensus estimate metric for a forward period (scalar).",
+      "helpUrl": "https://finsyt.com/platform/app/developer",
+      "result": { "type": "any", "dimensionality": "scalar" },
+      "parameters": [
+        { "name": "symbol", "description": "Ticker symbol", "type": "string", "dimensionality": "scalar" },
+        { "name": "metric", "description": "eps | revenue | ebitda | priceTarget | numAnalysts | rating", "type": "string", "dimensionality": "scalar" },
+        { "name": "period", "description": "next_q | next_y | current_q | current_y (default current_y)", "type": "string", "dimensionality": "scalar", "optional": true },
+        { "name": "type",   "description": "consensus | high | low | median (default consensus)", "type": "string", "dimensionality": "scalar", "optional": true }
+      ]
+    },
+    {
+      "id": "TRANSCRIPT",
+      "name": "TRANSCRIPT",
+      "description": "Returns earnings-call transcript text as a 2-D range.",
+      "helpUrl": "https://finsyt.com/platform/app/developer",
+      "result": { "type": "any", "dimensionality": "matrix" },
+      "parameters": [
+        { "name": "symbol",  "description": "Ticker symbol", "type": "string", "dimensionality": "scalar" },
+        { "name": "period",  "description": "YYYYQn (e.g. 2024Q1) or 'latest'", "type": "string", "dimensionality": "scalar" },
+        { "name": "section", "description": "summary | prepared | qa | full (default summary)", "type": "string", "dimensionality": "scalar", "optional": true }
+      ]
+    },
+    {
+      "id": "FILINGS",
+      "name": "FILINGS",
+      "description": "SEC filings list (Form, Filed, Description, URL).",
+      "helpUrl": "https://finsyt.com/platform/app/developer",
+      "result": { "type": "any", "dimensionality": "matrix" },
+      "parameters": [
+        { "name": "symbol", "description": "Ticker symbol", "type": "string", "dimensionality": "scalar" },
+        { "name": "type",   "description": "Form type filter (e.g. 10-K)", "type": "string", "dimensionality": "scalar", "optional": true },
+        { "name": "limit",  "description": "Max rows (default 10)", "type": "number", "dimensionality": "scalar", "optional": true }
+      ]
+    },
+    {
+      "id": "NEWS",
+      "name": "NEWS",
+      "description": "Latest news headlines (Date, Source, Title, URL).",
+      "helpUrl": "https://finsyt.com/platform/app/developer",
+      "result": { "type": "any", "dimensionality": "matrix" },
+      "parameters": [
+        { "name": "symbol", "description": "Ticker symbol (omit for general market)", "type": "string", "dimensionality": "scalar", "optional": true },
+        { "name": "limit",  "description": "Max rows (default 10)", "type": "number", "dimensionality": "scalar", "optional": true }
+      ]
+    },
+    {
+      "id": "MACRO",
+      "name": "MACRO",
+      "description": "Macro indicator series between two dates (Date, Value).",
+      "helpUrl": "https://finsyt.com/platform/app/developer",
+      "result": { "type": "any", "dimensionality": "matrix" },
+      "parameters": [
+        { "name": "series", "description": "Indicator id (CPI, INFLATION_RATE, GDP_GROWTH_RATE, UNEMPLOYMENT_RATE, INTEREST_RATE, YIELD_10Y, YIELD_2Y …)", "type": "string", "dimensionality": "scalar" },
+        { "name": "from",   "description": "Start date YYYY-MM-DD (optional)", "type": "string", "dimensionality": "scalar", "optional": true },
+        { "name": "to",     "description": "End date YYYY-MM-DD (optional)", "type": "string", "dimensionality": "scalar", "optional": true }
+      ]
+    },
+    {
+      "id": "MACRO_LATEST",
+      "name": "MACRO_LATEST",
+      "description": "Most recent value for a macro indicator (scalar).",
+      "helpUrl": "https://finsyt.com/platform/app/developer",
+      "result": { "type": "number", "dimensionality": "scalar" },
+      "parameters": [
+        { "name": "series",  "description": "Indicator id (CPI, YIELD_10Y, INTEREST_RATE, …)", "type": "string", "dimensionality": "scalar" },
+        { "name": "country", "description": "ISO country code (default US)", "type": "string", "dimensionality": "scalar", "optional": true }
+      ]
+    },
+    {
+      "id": "DIVIDEND",
+      "name": "DIVIDEND",
+      "description": "Returns a dividend metric for a symbol (yield, payout, nextExDate, amount, …).",
+      "helpUrl": "https://finsyt.com/platform/app/developer",
+      "result": { "type": "any", "dimensionality": "scalar" },
+      "parameters": [
+        { "name": "symbol", "description": "Ticker symbol", "type": "string", "dimensionality": "scalar" },
+        { "name": "field",  "description": "yield | payout | nextExDate | amount | frequency (default yield)", "type": "string", "dimensionality": "scalar", "optional": true }
+      ]
+    },
+    {
+      "id": "ASK",
+      "name": "ASK",
+      "description": "Ask the Finsyt research agent and return a synthesised answer string.",
+      "helpUrl": "https://finsyt.com/platform/app/developer",
+      "result": { "type": "string", "dimensionality": "scalar" },
+      "parameters": [
+        { "name": "question", "description": "Plain-English question", "type": "string", "dimensionality": "scalar" },
+        { "name": "symbol",   "description": "Optional ticker context for the question", "type": "string", "dimensionality": "scalar", "optional": true }
+      ]
+    }
+  ]
+}

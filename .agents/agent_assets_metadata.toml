@@ -1,0 +1,14 @@
+uploads = []
+outputs = []
+
+[[generated]]
+id = "W1pdaQVhbxWkG4T0TWkR7"
+uri = "file://artifacts/marketing/public/hero-bg.png"
+type = "image"
+title = "Abstract data mesh hero background"
+
+[[generated]]
+id = "djitKpDYAYBj5otKUqdE2"
+uri = "file://artifacts/marketing/public/login-bg.png"
+type = "image"
+title = "Ambient texture for login panel"

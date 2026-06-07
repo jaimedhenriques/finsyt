@@ -1,0 +1,5 @@
+Contact: mailto:security@finsyt.com
+Expires: 2027-04-20T00:00:00.000Z
+Preferred-Languages: en
+Canonical: https://finsyt.com/.well-known/security.txt
+Policy: https://finsyt.com/security

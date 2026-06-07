@@ -1,0 +1,79 @@
+Console Error
+
+A tree hydrated but some attributes of the server rendered HTML didn't match the client properties. This won't be patched up. This can happen if a SSR-ed Client Component used:
+
+- A server/client branch `if (typeof window !== 'undefined')`.
+- Variable input such as `Date.now()` or `Math.random()` which changes each time it's called.
+- Date formatting in a user's locale which doesn't match the server.
+- External changing data without sending a snapshot of it along with the HTML.
+- Invalid HTML tag nesting.
+
+It can also happen if the client has a browser extension installed which messes with the HTML before React loaded.
+
+See more info here: https://nextjs.org/docs/messages/react-hydration-error
+
+
+  ...
+    <link>
+    <RootLayout>
+      <ClerkProvider>
+        <ClientClerkProvider nonce="MDdiOTFkYj..." signInUrl="/platform/..." signUpUrl="/platform/..." ...>
+          ...
+            <ClerkProvider nonce="MDdiOTFkYj..." signInUrl="/platform/..." signUpUrl="/platform/..." ...>
+              <ClerkProviderBase nonce="MDdiOTFkYj..." signInUrl="/platform/..." signUpUrl="/platform/..." ...>
+                <ClerkContextProvider initialState={undefined} clerk={{clerkjs:null, ...}} clerkStatus="loading">
+                  <InitialStateProvider initialState={undefined}>
+                    <__experimental_CheckoutProvider value={undefined}>
+                      <RouterTelemetry>
+                      <ClerkScripts>
+                      <html lang="en" className="__variable..." style={{...}}>
+                        <head>
+                          <script
++                           nonce="MDdiOTFkYjUtZDFjNC00NjFkLTgzNDQtMmY1NzViZWI1OGY3"
+-                           nonce={null}
+                            dangerouslySetInnerHTML={{
++                             __html: "(function(){try{var t=localStorage.getItem('finsyt-theme');if(t&&['cream','gray..."
+-                             __html: ""
+                            }}
+-                           src="/__replco/static/devtools/injected.js"
+-                           onerror={"parent.postMessage({event:'error',payload:'script.onerror: Failed to load '+eve..."}
+                          >
+                        ...
+Call Stack
+18
+
+Show 1 ignore-listed frame(s)
+createConsoleError
+../../node_modules/.pnpm/next@15.5.15_@opentelemetry+api@1.9.0_react-dom@19.2.4_react@19.2.4__react@19.2.4/node_modules/next/dist/next-devtools/shared/console-error.js
+handleConsoleError
+../../node_modules/.pnpm/next@15.5.15_@opentelemetry+api@1.9.0_react-dom@19.2.4_react@19.2.4__react@19.2.4/node_modules/next/dist/next-devtools/userspace/app/errors/use-error-handler.js
+console.error
+../../node_modules/.pnpm/next@15.5.15_@opentelemetry+api@1.9.0_react-dom@19.2.4_react@19.2.4__react@19.2.4/node_modules/next/dist/next-devtools/userspace/app/errors/intercept-console-error.js
+eval
+../../node_modules/.pnpm/next@15.5.15_@opentelemetry+api@1.9.0_react-dom@19.2.4_react@19.2.4__react@19.2.4/node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js
+runWithFiberInDEV
+../../node_modules/.pnpm/next@15.5.15_@opentelemetry+api@1.9.0_react-dom@19.2.4_react@19.2.4__react@19.2.4/node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js
+emitPendingHydrationWarnings
+../../node_modules/.pnpm/next@15.5.15_@opentelemetry+api@1.9.0_react-dom@19.2.4_react@19.2.4__react@19.2.4/node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js
+completeWork
+../../node_modules/.pnpm/next@15.5.15_@opentelemetry+api@1.9.0_react-dom@19.2.4_react@19.2.4__react@19.2.4/node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js
+runWithFiberInDEV
+../../node_modules/.pnpm/next@15.5.15_@opentelemetry+api@1.9.0_react-dom@19.2.4_react@19.2.4__react@19.2.4/node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js
+completeUnitOfWork
+../../node_modules/.pnpm/next@15.5.15_@opentelemetry+api@1.9.0_react-dom@19.2.4_react@19.2.4__react@19.2.4/node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js
+performUnitOfWork
+../../node_modules/.pnpm/next@15.5.15_@opentelemetry+api@1.9.0_react-dom@19.2.4_react@19.2.4__react@19.2.4/node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js
+workLoopConcurrentByScheduler
+../../node_modules/.pnpm/next@15.5.15_@opentelemetry+api@1.9.0_react-dom@19.2.4_react@19.2.4__react@19.2.4/node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js
+renderRootConcurrent
+../../node_modules/.pnpm/next@15.5.15_@opentelemetry+api@1.9.0_react-dom@19.2.4_react@19.2.4__react@19.2.4/node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js
+performWorkOnRoot
+../../node_modules/.pnpm/next@15.5.15_@opentelemetry+api@1.9.0_react-dom@19.2.4_react@19.2.4__react@19.2.4/node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js
+performWorkOnRootViaSchedulerTask
+../../node_modules/.pnpm/next@15.5.15_@opentelemetry+api@1.9.0_react-dom@19.2.4_react@19.2.4__react@19.2.4/node_modules/next/dist/compiled/react-dom/cjs/react-dom-client.development.js
+MessagePort.performWorkUntilDeadline
+../../node_modules/.pnpm/next@15.5.15_@opentelemetry+api@1.9.0_react-dom@19.2.4_react@19.2.4__react@19.2.4/node_modules/next/dist/compiled/scheduler/cjs/scheduler.development.js
+script
+<anonymous>
+RootLayout
+about:/Server/webpack-internal:///(rsc)/app/layout.tsx (96:106)

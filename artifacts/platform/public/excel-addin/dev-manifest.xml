@@ -1,0 +1,137 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<OfficeApp
+  xmlns="http://schemas.microsoft.com/office/appforoffice/1.1"
+  xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+  xmlns:bt="http://schemas.microsoft.com/office/officeappbasictypes/1.0"
+  xmlns:ov="http://schemas.microsoft.com/office/taskpaneappversionoverrides"
+  xsi:type="TaskPaneApp">
+
+  <Id>e8d2f5c0-9a63-4d2e-bd8d-1f2a3b4c5dde</Id>
+  <Version>1.1.0.0</Version>
+  <ProviderName>Finsyt</ProviderName>
+  <DefaultLocale>en-US</DefaultLocale>
+  <DisplayName DefaultValue="Finsyt for Excel (Dev)" />
+  <Description DefaultValue="AI research copilot, one-click model templates (DCF, Comps, Sensitivity, WACC), and live =FINSYT.* worksheet functions." />
+  <IconUrl DefaultValue="https://193d0f67-54ab-40fd-a243-f63100500d39-00-1hzkzoeh4roar-hd4dze63.kirk.replit.dev/platform/excel-addin/icon-32.png" />
+  <HighResolutionIconUrl DefaultValue="https://193d0f67-54ab-40fd-a243-f63100500d39-00-1hzkzoeh4roar-hd4dze63.kirk.replit.dev/platform/excel-addin/icon-128.png" />
+  <SupportUrl DefaultValue="https://193d0f67-54ab-40fd-a243-f63100500d39-00-1hzkzoeh4roar-hd4dze63.kirk.replit.dev/platform/app/developer" />
+  <AppDomains>
+    <AppDomain>https://193d0f67-54ab-40fd-a243-f63100500d39-00-1hzkzoeh4roar-hd4dze63.kirk.replit.dev</AppDomain>
+    <AppDomain>https://www.finsyt.com</AppDomain>
+  </AppDomains>
+  <Hosts>
+    <Host Name="Workbook" />
+  </Hosts>
+  <Requirements>
+    <Sets DefaultMinVersion="1.1">
+      <Set Name="CustomFunctionsRuntime" MinVersion="1.4" />
+    </Sets>
+  </Requirements>
+  <DefaultSettings>
+    <SourceLocation DefaultValue="https://193d0f67-54ab-40fd-a243-f63100500d39-00-1hzkzoeh4roar-hd4dze63.kirk.replit.dev/platform/excel-addin/taskpane.html" />
+  </DefaultSettings>
+  <Permissions>ReadWriteDocument</Permissions>
+
+  <VersionOverrides xmlns="http://schemas.microsoft.com/office/taskpaneappversionoverrides" xsi:type="VersionOverridesV1_0">
+    <Hosts>
+      <Host xsi:type="Workbook">
+        <Runtimes>
+          <Runtime resid="Finsyt.Runtime" lifetime="long">
+            <Override type="javascript" resid="Finsyt.FunctionsJs" />
+          </Runtime>
+        </Runtimes>
+        <DesktopFormFactor>
+          <GetStarted>
+            <Title resid="Finsyt.Title" />
+            <Description resid="Finsyt.Desc" />
+            <LearnMoreUrl resid="Finsyt.Learn" />
+          </GetStarted>
+          <FunctionFile resid="Finsyt.FunctionsHtml" />
+          <ExtensionPoint xsi:type="CustomFunctions">
+            <Script>
+              <SourceLocation resid="Finsyt.FunctionsJs" />
+            </Script>
+            <Page>
+              <SourceLocation resid="Finsyt.FunctionsHtml" />
+            </Page>
+            <Metadata>
+              <SourceLocation resid="Finsyt.FunctionsJson" />
+            </Metadata>
+            <Namespace resid="Finsyt.Namespace" />
+          </ExtensionPoint>
+          <ExtensionPoint xsi:type="PrimaryCommandSurface">
+            <OfficeTab id="TabHome">
+              <Group id="Finsyt.Group">
+                <Label resid="Finsyt.GroupLabel" />
+                <Icon>
+                  <bt:Image size="16" resid="Finsyt.Icon16" />
+                  <bt:Image size="32" resid="Finsyt.Icon32" />
+                  <bt:Image size="80" resid="Finsyt.Icon80" />
+                </Icon>
+                <Control xsi:type="Button" id="Finsyt.OpenTaskpane">
+                  <Label resid="Finsyt.OpenLabel" />
+                  <Supertip>
+                    <Title resid="Finsyt.OpenLabel" />
+                    <Description resid="Finsyt.OpenDesc" />
+                  </Supertip>
+                  <Icon>
+                    <bt:Image size="16" resid="Finsyt.Icon16" />
+                    <bt:Image size="32" resid="Finsyt.Icon32" />
+                    <bt:Image size="80" resid="Finsyt.Icon80" />
+                  </Icon>
+                  <Action xsi:type="ShowTaskpane">
+                    <TaskpaneId>FinsytTaskpane</TaskpaneId>
+                    <SourceLocation resid="Finsyt.Taskpane" />
+                  </Action>
+                </Control>
+                <Control xsi:type="Button" id="Finsyt.OpenBuilder">
+                  <Label resid="Finsyt.BuilderLabel" />
+                  <Supertip>
+                    <Title resid="Finsyt.BuilderLabel" />
+                    <Description resid="Finsyt.BuilderDesc" />
+                  </Supertip>
+                  <Icon>
+                    <bt:Image size="16" resid="Finsyt.Icon16" />
+                    <bt:Image size="32" resid="Finsyt.Icon32" />
+                    <bt:Image size="80" resid="Finsyt.Icon80" />
+                  </Icon>
+                  <Action xsi:type="ShowTaskpane">
+                    <TaskpaneId>FinsytTaskpaneBuilder</TaskpaneId>
+                    <SourceLocation resid="Finsyt.TaskpaneBuilder" />
+                  </Action>
+                </Control>
+              </Group>
+            </OfficeTab>
+          </ExtensionPoint>
+        </DesktopFormFactor>
+      </Host>
+    </Hosts>
+    <Resources>
+      <bt:Images>
+        <bt:Image id="Finsyt.Icon16" DefaultValue="https://193d0f67-54ab-40fd-a243-f63100500d39-00-1hzkzoeh4roar-hd4dze63.kirk.replit.dev/platform/excel-addin/icon-32.png" />
+        <bt:Image id="Finsyt.Icon32" DefaultValue="https://193d0f67-54ab-40fd-a243-f63100500d39-00-1hzkzoeh4roar-hd4dze63.kirk.replit.dev/platform/excel-addin/icon-32.png" />
+        <bt:Image id="Finsyt.Icon80" DefaultValue="https://193d0f67-54ab-40fd-a243-f63100500d39-00-1hzkzoeh4roar-hd4dze63.kirk.replit.dev/platform/excel-addin/icon-128.png" />
+      </bt:Images>
+      <bt:Urls>
+        <bt:Url id="Finsyt.Taskpane" DefaultValue="https://193d0f67-54ab-40fd-a243-f63100500d39-00-1hzkzoeh4roar-hd4dze63.kirk.replit.dev/platform/excel-addin/taskpane.html" />
+        <bt:Url id="Finsyt.TaskpaneBuilder" DefaultValue="https://193d0f67-54ab-40fd-a243-f63100500d39-00-1hzkzoeh4roar-hd4dze63.kirk.replit.dev/platform/excel-addin/taskpane.html#builder" />
+        <bt:Url id="Finsyt.FunctionsHtml" DefaultValue="https://193d0f67-54ab-40fd-a243-f63100500d39-00-1hzkzoeh4roar-hd4dze63.kirk.replit.dev/platform/excel-addin/functions.html" />
+        <bt:Url id="Finsyt.FunctionsJs" DefaultValue="https://193d0f67-54ab-40fd-a243-f63100500d39-00-1hzkzoeh4roar-hd4dze63.kirk.replit.dev/platform/excel-addin/functions.js" />
+        <bt:Url id="Finsyt.FunctionsJson" DefaultValue="https://193d0f67-54ab-40fd-a243-f63100500d39-00-1hzkzoeh4roar-hd4dze63.kirk.replit.dev/platform/excel-addin/functions.json" />
+        <bt:Url id="Finsyt.Learn" DefaultValue="https://193d0f67-54ab-40fd-a243-f63100500d39-00-1hzkzoeh4roar-hd4dze63.kirk.replit.dev/platform/app/developer" />
+      </bt:Urls>
+      <bt:ShortStrings>
+        <bt:String id="Finsyt.Namespace" DefaultValue="FINSYT" />
+        <bt:String id="Finsyt.Title" DefaultValue="Finsyt for Excel" />
+        <bt:String id="Finsyt.GroupLabel" DefaultValue="Finsyt" />
+        <bt:String id="Finsyt.OpenLabel" DefaultValue="Open Finsyt" />
+        <bt:String id="Finsyt.BuilderLabel" DefaultValue="Builder" />
+      </bt:ShortStrings>
+      <bt:LongStrings>
+        <bt:String id="Finsyt.Desc" DefaultValue="AI research copilot + one-click models (DCF / Comps / Sensitivity / WACC) + live =FINSYT.* worksheet functions." />
+        <bt:String id="Finsyt.OpenDesc" DefaultValue="Open the Finsyt copilot pane to chat with the research agent, insert formulas, and run =FINSYT.* functions." />
+        <bt:String id="Finsyt.BuilderDesc" DefaultValue="Open the Builder tab and drop a DCF, Comps, Sensitivity, or WACC scaffold starting at your active cell." />
+      </bt:LongStrings>
+    </Resources>
+  </VersionOverrides>
+</OfficeApp>

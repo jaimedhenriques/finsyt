@@ -1,0 +1,1 @@
+- [Alt-data tiles reuse](alt-data-tiles.md) — shared Apify alt-data cards are bound to ONE focus ticker per page (not per-row) to avoid fanning out an Apify run per visible row.
