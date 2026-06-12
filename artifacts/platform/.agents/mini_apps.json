@@ -1,0 +1,27 @@
+{
+  "app_id": "69d90b6c3a377cf7e73f33e1",
+  "slug": "base44-agent-app-e73f33e1",
+  "pages": {
+    "Landing": {
+      "title": "Landing"
+    },
+    "Pricing": {
+      "title": "Pricing"
+    },
+    "Dashboard": {
+      "title": "Dashboard"
+    },
+    "DataExplorer": {
+      "title": "DataExplorer"
+    },
+    "Integrations": {
+      "title": "Integrations"
+    },
+    "Auth": {
+      "title": "Auth"
+    },
+    "Settings": {
+      "title": "Settings"
+    }
+  }
+}

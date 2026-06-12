@@ -1,0 +1,17 @@
+{
+  "name": "@workspace/tests",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test": "playwright test",
+    "test:signin": "playwright test platform/sign-in.spec.ts",
+    "test:install": "playwright install chromium",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "devDependencies": {
+    "@playwright/test": "^1.49.0",
+    "@types/node": "catalog:",
+    "typescript": "~5.9.2"
+  }
+}

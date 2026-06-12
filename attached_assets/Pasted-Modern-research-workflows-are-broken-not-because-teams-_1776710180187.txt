@@ -1,0 +1,54 @@
+Modern research workflows are broken — not because teams lack data, but because of the scattered nature of where that data lives.
+
+Today, we’re launching the next generation of Generative Search, designed to support research workflows end-to-end, from discovery through deliverable creation.
+
+The first generation of Generative Search introduced a sophisticated conversational search experience, trained on hundreds of millions of premium documents to deliver analyst-level responses. This next iteration builds on that foundation with a multi-agent research system — one that can reason across specialized data sources, automate repeatable workflows, and produce decision-ready outputs with transparent sourcing.
+
+Here’s a closer look at what the next generation of Generative Search makes possible.
+
+Deeper Discovery Across Deals, Companies, and Markets
+High-stakes decisions demand more than surface-level answers. They require a complete, connected view of the market, where qualitative insight and quantitative evidence reinforce each other.
+
+With the next generation of Generative Search, AlphaSense brings numbers and narrative together in a single research experience. Users can now analyze structured financial data — M&A transactions, funding rounds, equity metrics, and more — alongside premium qualitative sources like broker research, expert calls, filings, news, and internal documents.
+
+This unified approach enables teams to:
+
+Get a true 360 degree view of any company, deal, or market
+Screen opportunities using natural language instead of rigid filters
+Understand why the numbers are moving, not just that they are
+Instead of stitching together insights across tools, Generative Search delivers a complete, auditable picture — so users can spot signals earlier and move with confidence.
+
+Automate Strategic Workflows
+Research is rarely a one-off task. It’s a series of repeatable workflows — earnings prep, competitive tracking, market monitoring, diligence — that demand consistency, speed, and precision.
+
+Last fall we launched our library of proprietary, pre-built workflow agents, which streamlined some of your most common workflows to get you from question to answer more efficiently, without the need to build prompts.
+
+The next generation of Generative Search introduces fully customizable agents that turn these processes into reusable, automated workflows. Powered by our new multi-agent architecture, Generative Search can dynamically plan, reason, and execute multi-step research tasks based on your exact specifications with the click of a button, and automatically send updates, reports, and briefs right to your inbox.
+
+With workflow agents, teams can:
+
+Automate recurring research like earnings analysis, market scans, and competitive updates
+Build custom agents aligned to firm-specific methodologies and criteria
+Schedule insights to arrive before key meetings, launches, or reporting cycles
+This isn’t generic automation: It’s workflow intelligence designed to scale the way expert teams actually work.
+
+Deliver Executive-Ready Output in Minutes
+Insight only creates value when it can be shared, scrutinized, and acted on — often under tight timelines. Yet for many teams, the final step of turning research into usable outputs remains the most manual, fragmented, and time-consuming part of the process.
+
+The next generation of Generative Search closes that gap by enabling deliverable creation directly from research, so teams can move seamlessly from discovery to decision-ready output.
+
+Users can now generate slides and reports directly from their research. With this capability in Generative Search, teams can now:
+
+Instantly generate company profiles, competitor updates, monthly newsletters, earnings debriefs, and meeting prep materials, without manually formatting the data.
+Create consistent first-drafts so every analysis follows the same structure, rigor, and sourcing, whether it’s the first deal or the fiftieth.
+Audit and share insights with confidence, with sources fully cited and auditable.
+What once required hours of manual synthesis and formatting can now be created in minutes, giving teams more time to focus on shaping strategy, refining recommendations, and making the call.
+
+A New Foundation for How Research Teams Work
+Together, these capabilities transform Generative Search from a tool that answers questions into a system that powers decisions end-to-end. From deeper discovery across companies, deals, and markets to intelligent workflow automation and deliverable creation backed by trusted data, Generative Search now supports every step — from first signal to final output — in a single, unified experience.
+
+And this is just the beginning. In the coming months, we’ll continue expanding these capabilities with broader data coverage, deeper automation, and new integrations that let you build on AlphaSense outputs directly in tools like PowerPoint and Excel.
+
+When the stakes are high, you shouldn’t have to choose between speed and confidence. With AlphaSense, you get both.
+
+Learn more about what the next generation of Generative Search can do for your team by requesting a free trial or registering for our upcoming webinar.

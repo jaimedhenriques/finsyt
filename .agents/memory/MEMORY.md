@@ -1,0 +1,6 @@
+- [Alt-data tiles reuse](alt-data-tiles.md) — shared Apify alt-data cards are bound to ONE focus ticker per page (not per-row) to avoid fanning out an Apify run per visible row.
+- [e2e cold-compile flakiness](e2e-cold-compile-flakiness.md) — platform Playwright flakes (ERR_ABORTED) on heavy Next dev routes; fix = gotoWithRetry + prewarmHeavyRoutes + low retries, all three.
+- [e2e validation parallelism](e2e-validation-parallelism.md) — validation runs e2e concurrently with build/lint/typecheck/test, starving the dev server; smoke flakes are environmental — fix with `retries: 1` + nav retry, never weaken specs.
+- [E2E smoke name matching](e2e-smoke-name-matching.md) — tests/platform specs match by accessible name/visible copy; any UI rename must update the spec regex or it times out looking like a product bug.
+- [Quote provider waterfall & dead-key handling](quote-provider-waterfall.md) — /api/quote degrades across providers; never add a rejected-key circuit-breaker (breaks credential-health recovery detection).
+- [agent-tool-result-payload shape locked](agent-tool-result-payload-shape.md) — extra per-result fields (e.g. citeIndex) go on the SSE frame wrapper, NOT in buildAgentToolResultPayload (exact-keyset test).
