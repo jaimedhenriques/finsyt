@@ -1,0 +1,15 @@
+# Finsyt
+
+> Finsyt is an institutional investor intelligence platform that combines AI-powered research agents, financial data aggregation, and workflow automation for analysts, portfolio managers, and investment teams.
+
+Finsyt is designed for institutional investors — hedge funds, asset managers, private equity firms, and investment banks — who need faster, deeper, and more reliable investment research. The platform provides company analysis, peer comparisons, valuation models, document intelligence, and a conversational AI agent trained on financial workflows.
+
+## Key Pages
+
+- [Home](https://finsyt.com/): Overview of the Finsyt platform and its value proposition for institutional investors.
+- [Product](https://finsyt.com/product): Detailed breakdown of platform capabilities — research workspaces, AI agent, financial data integrations, and document analysis.
+- [Solutions](https://finsyt.com/solutions): How Finsyt serves different institutional investor personas and use cases (fundamental equity, credit, PE/VC diligence, macro).
+- [Pricing](https://finsyt.com/pricing): Subscription tiers and enterprise pricing for teams and organizations.
+- [About](https://finsyt.com/about): Company background, mission, and team.
+- [Security](https://finsyt.com/security): Security posture, data handling, compliance, and infrastructure details.
+- [Request Access](https://finsyt.com/request-access): Sign-up form to join the waitlist or request a demo.
