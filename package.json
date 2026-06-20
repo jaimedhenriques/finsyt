@@ -1,0 +1,23 @@
+{
+  "name": "workspace",
+  "version": "0.0.0",
+  "license": "MIT",
+  "scripts": {
+    "preinstall": "sh -c 'rm -f package-lock.json yarn.lock; case \"$npm_config_user_agent\" in pnpm/*) ;; *) echo \"Use pnpm instead\" >&2; exit 1 ;; esac'",
+    "build": "pnpm run typecheck && pnpm run test && pnpm run validate:excel-manifest && pnpm run build:artifacts",
+    "validate:excel-manifest": "pnpm --filter @workspace/scripts run validate:excel-manifest",
+    "build:artifacts": "pnpm --filter @workspace/scripts run build:artifacts",
+    "typecheck:libs": "tsc --build",
+    "typecheck": "pnpm run typecheck:libs && pnpm -r --filter \"./artifacts/**\" --filter \"./scripts\" --if-present run typecheck",
+    "test": "pnpm -r --filter \"./scripts\" --if-present run test && pnpm --filter @workspace/platform run test:ci",
+    "lint": "pnpm -r --filter \"./artifacts/**\" --if-present run lint"
+  },
+  "private": true,
+  "devDependencies": {
+    "prettier": "^3.8.1",
+    "typescript": "~5.9.2"
+  },
+  "dependencies": {
+    "@replit/connectors-sdk": "^0.4.0"
+  }
+}

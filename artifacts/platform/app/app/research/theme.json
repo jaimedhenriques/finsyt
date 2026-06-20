@@ -1,0 +1,46 @@
+{
+  "theme": {
+    "--font-family": "'Inter', system-ui, -apple-system, sans-serif",
+    "--border-radius": "12px",
+    "--border-radius-sm": "8px",
+    "--border-radius-lg": "16px"
+  },
+  "dark": {
+    "--bg-primary": "#060e1e",
+    "--bg-secondary": "#0a1525",
+    "--bg-tertiary": "#0d1b32",
+    "--bg-input": "#0a1525",
+    "--border-color": "rgba(27,79,255,0.12)",
+    "--border-color-focus": "rgba(27,79,255,0.4)",
+    "--text-primary": "#ffffff",
+    "--text-secondary": "rgba(255,255,255,0.5)",
+    "--text-tertiary": "rgba(255,255,255,0.25)",
+    "--accent-primary": "#1B4FFF",
+    "--accent-primary-hover": "#2563eb",
+    "--accent-secondary": "#06b6d4",
+    "--user-message-bg": "#1B4FFF",
+    "--user-message-text": "#ffffff",
+    "--assistant-message-bg": "#0d1b32",
+    "--assistant-message-text": "#ffffff",
+    "--tool-bg": "#060e1e",
+    "--tool-border": "rgba(27,79,255,0.15)",
+    "--tool-text": "rgba(255,255,255,0.7)",
+    "--input-bg": "#0a1525",
+    "--input-text": "#ffffff",
+    "--input-placeholder": "rgba(255,255,255,0.25)",
+    "--send-button-bg": "#1B4FFF",
+    "--send-button-hover": "#2563eb",
+    "--send-button-text": "#ffffff",
+    "--scrollbar-thumb": "rgba(27,79,255,0.2)",
+    "--scrollbar-track": "transparent",
+    "--code-bg": "#030712",
+    "--code-border": "rgba(27,79,255,0.1)",
+    "--code-text": "#93c5fd"
+  },
+  "light": {
+    "--bg-primary": "#f8fafc",
+    "--bg-secondary": "#ffffff",
+    "--text-primary": "#0f172a",
+    "--accent-primary": "#1B4FFF"
+  }
+}

@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://finsyt.com/</loc><changefreq>weekly</changefreq><priority>1.0</priority></url>
+  <url><loc>https://finsyt.com/product</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://finsyt.com/solutions</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://finsyt.com/pricing</loc><changefreq>monthly</changefreq><priority>0.8</priority></url>
+  <url><loc>https://finsyt.com/about</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://finsyt.com/security</loc><changefreq>monthly</changefreq><priority>0.7</priority></url>
+  <url><loc>https://finsyt.com/request-access</loc><changefreq>monthly</changefreq><priority>0.6</priority></url>
+  <url><loc>https://finsyt.com/privacy</loc><changefreq>yearly</changefreq><priority>0.4</priority></url>
+  <url><loc>https://finsyt.com/terms</loc><changefreq>yearly</changefreq><priority>0.4</priority></url>
+</urlset>
