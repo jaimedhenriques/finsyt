@@ -71,7 +71,7 @@ The API server validates its config via Zod (`artifacts/api-server/src/lib/confi
 |----------|----------|-------------|
 | `DATABASE_URL` | Yes | PostgreSQL connection string |
 | `PORT` | Yes | API server port |
-| `CORS_ALLOWED_ORIGINS` | No | Comma-separated allowed origins |
+| `CORS_ALLOWED_ORIGINS` | Production | Comma-separated allowed origins |
 | `CSRF_SECRET` | Production | CSRF protection secret (min 32 chars) |
 | `DB_RUNTIME_ROLE` | No | PostgreSQL runtime role |
 | `TRUSTED_PROXY_IPS` | No | Comma-separated trusted proxy IPs |
