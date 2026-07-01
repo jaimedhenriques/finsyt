@@ -1,0 +1,9 @@
+.agents/.env
+node_modules/
+finsyt-platform/public/data/ciq_dictionary.json
+incoming_files/
+
+# Next.js build output (transient, must not be tracked)
+.next/
+# Dev-only build output: see distDir override in next.config.ts.
+.next-dev/

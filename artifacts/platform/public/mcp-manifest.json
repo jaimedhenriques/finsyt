@@ -1,0 +1,91 @@
+{
+  "$schema": "https://platform.finsyt.com/api/mcp?discovery=1",
+  "schema_version": "v1",
+  "mcpVersion": "2024-11-05",
+  "name": "Finsyt",
+  "nameForModel": "finsyt_finance",
+  "description": "Institutional financial intelligence — real-time quotes, fundamentals, analyst estimates, DCF valuation, earnings transcripts, SEC filings, insider trades, M&A deal flow, macro indicators, peer comp tables, and stock screener.",
+  "descriptionForModel": "Use Finsyt tools to retrieve financial data for institutional research. Always attribute the 'source' field returned by each tool. For valuation work use get_dcf. For comp tables use get_peer_comps. For consensus and sentiment use get_estimates + get_earnings_transcript.",
+  "version": "2.0.0",
+  "logo_url": "https://platform.finsyt.com/opengraph.jpg",
+  "contact_email": "support@finsyt.com",
+  "legal_info_url": "https://finsyt.com/legal",
+  "endpoint": "https://platform.finsyt.com/api/mcp",
+  "transport": "http",
+  "auth": {
+    "type": "bearer",
+    "instructions": "Generate an API key in the Finsyt platform under Settings → API Keys, then pass it as the Authorization header: 'Authorization: Bearer <key>'.",
+    "generateKeyUrl": "https://platform.finsyt.com/app/settings/api-keys"
+  },
+  "tools": [
+    {
+      "name": "get_stock_quote",
+      "description": "Real-time stock quote, price, change, market cap, P/E, 52-week range, sector, and industry.",
+      "category": "Quotes & Market Data"
+    },
+    {
+      "name": "get_financials",
+      "description": "Income statement, balance sheet, or cash flow for a company.",
+      "category": "Fundamentals"
+    },
+    {
+      "name": "get_estimates",
+      "description": "Analyst consensus EPS estimates, price targets, buy/sell/hold ratings, earnings surprises, and upgrade/downgrade history.",
+      "category": "Fundamentals"
+    },
+    {
+      "name": "get_dcf",
+      "description": "Discounted cash flow (DCF) valuation anchored to a ticker's reported FCF, with optional 5×5 sensitivity grid.",
+      "category": "Fundamentals"
+    },
+    {
+      "name": "get_earnings_transcript",
+      "description": "List available earnings call transcripts or retrieve the full text for a specific quarter.",
+      "category": "Research"
+    },
+    {
+      "name": "get_news",
+      "description": "Recent financial news headlines and summaries, company-specific or market-wide.",
+      "category": "Research"
+    },
+    {
+      "name": "get_filings",
+      "description": "SEC filings (10-K, 10-Q, 8-K, DEF 14A) with direct document links.",
+      "category": "Research"
+    },
+    {
+      "name": "get_insider_trades",
+      "description": "Recent insider trading disclosures (Form 4) — name, title, shares, price, value, buy/sell filter.",
+      "category": "Corporate Activity"
+    },
+    {
+      "name": "get_deals",
+      "description": "M&A deal flow: latest announced/pending/completed deals, or deals involving a specific company.",
+      "category": "Corporate Activity"
+    },
+    {
+      "name": "get_peer_comps",
+      "description": "Compare a list of tickers on key metrics: market cap, P/E, revenue growth, gross margin, net margin.",
+      "category": "Peer Benchmarking"
+    },
+    {
+      "name": "get_macro_data",
+      "description": "Macroeconomic indicator series from FRED: Fed rate, CPI, GDP growth, unemployment, yield curve, VIX.",
+      "category": "Macro"
+    },
+    {
+      "name": "search_companies",
+      "description": "Search for companies by name or partial ticker.",
+      "category": "Discovery"
+    },
+    {
+      "name": "screen_stocks",
+      "description": "Screen stocks by sector, market cap range, and exchange.",
+      "category": "Discovery"
+    }
+  ],
+  "copilotForExcel": {
+    "manifestUrl": "https://platform.finsyt.com/api/excel-addin/manifest",
+    "note": "For Copilot for Excel, use the Excel Add-in manifest URL above or search for 'Finsyt' in the Microsoft AppSource catalog."
+  }
+}

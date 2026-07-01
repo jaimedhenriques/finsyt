@@ -1,0 +1,22 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git add:*)",
+      "Bash(git commit -m '*')",
+      "Bash(git push:*)",
+      "Bash(vercel --prod --yes)",
+      "Bash(vercel --prod)",
+      "Bash(vercel env:*)",
+      "Bash(bash:*)",
+      "Bash(curl:*)",
+      "Bash(jq:*)",
+      "Bash(pkill:*)",
+      "Skill(autoloop-prepare)",
+      "Skill(autoloop-prepare:*)",
+      "Skill(autoloop-feedback)",
+      "Skill(autoloop-feedback:*)",
+      "Skill(autoloop-deploy)",
+      "Skill(autoloop-deploy:*)"
+    ]
+  }
+}

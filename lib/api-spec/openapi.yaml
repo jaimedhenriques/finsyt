@@ -1,0 +1,198 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: API specification
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: connectors
+    description: |
+      Unified Connector Hub. Each workspace can wire up curated catalog
+      connectors, custom REST endpoints, or custom MCP servers, and then
+      invoke any of their operations through this single namespace using a
+      Finsyt API key. Slugs resolve to either a connector definition the
+      workspace has connected, or directly to a connection UUID.
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      description: Returns server health status
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+  /v1/connectors/{slug}/{operation}:
+    parameters:
+      - $ref: "#/components/parameters/ConnectorSlug"
+      - $ref: "#/components/parameters/ConnectorOperation"
+    get:
+      operationId: connectorInvokeGet
+      tags: [connectors]
+      summary: Invoke a connector operation (GET)
+      description: |
+        Executes the named operation on the connection identified by
+        `slug`. Query string params are forwarded to the upstream call
+        according to the operation's `paramSchema`. Use this for
+        idempotent reads — the executor caches GETs per the
+        operation's `cacheTtlSeconds`.
+      security:
+        - apiKeyHeader: []
+        - bearerAuth: []
+      responses:
+        "200":
+          description: Operation invoked successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConnectorInvokeResult"
+        "400":
+          description: Invalid params or unsafe URL
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConnectorErrorResponse"
+        "401":
+          description: Missing or invalid API key
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConnectorErrorResponse"
+        "404":
+          description: Slug or operation not found in this workspace
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConnectorErrorResponse"
+        "409":
+          description: Slug ambiguous (multiple active connections share it)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConnectorErrorResponse"
+        "423":
+          description: Connection is disabled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConnectorErrorResponse"
+    post:
+      operationId: connectorInvokePost
+      tags: [connectors]
+      summary: Invoke a connector operation (POST)
+      description: |
+        Same as GET but accepts a JSON body of params. Use for write
+        operations or when params are too large/structured for a query
+        string. Body params merge over query params.
+      security:
+        - apiKeyHeader: []
+        - bearerAuth: []
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/ConnectorInvokeBody"
+      responses:
+        "200":
+          description: Operation invoked successfully
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConnectorInvokeResult"
+        "400":
+          description: Invalid params or unsafe URL
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConnectorErrorResponse"
+        "401":
+          description: Missing or invalid API key
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConnectorErrorResponse"
+        "404":
+          description: Slug or operation not found in this workspace
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConnectorErrorResponse"
+        "409":
+          description: Slug ambiguous (multiple active connections share it)
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConnectorErrorResponse"
+        "423":
+          description: Connection is disabled
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/ConnectorErrorResponse"
+components:
+  securitySchemes:
+    apiKeyHeader:
+      type: apiKey
+      in: header
+      name: X-API-Key
+      description: Workspace API key
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: Workspace API key as bearer token
+  parameters:
+    ConnectorSlug:
+      name: slug
+      in: path
+      required: true
+      schema: { type: string }
+      description: |
+        Either the connector_definitions.slug for a connection this
+        workspace has activated, or a literal connection UUID.
+    ConnectorOperation:
+      name: operation
+      in: path
+      required: true
+      schema: { type: string }
+      description: The connection_operations.name to execute.
+  schemas:
+    HealthStatus:
+      type: object
+      properties:
+        status:
+          type: string
+      required:
+        - status
+    ConnectorInvokeBody:
+      type: object
+      additionalProperties: true
+      description: Free-form params forwarded to the upstream call.
+    ConnectorInvokeResult:
+      type: object
+      required: [ok, status, latencyMs]
+      properties:
+        ok:           { type: boolean }
+        status:       { type: integer, description: Upstream HTTP status code }
+        data:         { description: Upstream JSON body (any shape) }
+        fromCache:    { type: boolean }
+        latencyMs:    { type: integer }
+        rateLimitRemaining: { type: integer, nullable: true }
+        rateLimitLimit:     { type: integer, nullable: true }
+        rateLimitReset:     { type: string,  nullable: true, format: date-time }
+    ConnectorErrorResponse:
+      type: object
+      required: [error]
+      properties:
+        error:  { type: string }
+        status: { type: integer, nullable: true }
+

@@ -1,0 +1,165 @@
+modules = ["nodejs-24", "python-3.11", "postgresql-16"]
+
+[deployment]
+router = "application"
+deploymentTarget = "autoscale"
+
+[deployment.postBuild]
+args = ["pnpm", "store", "prune"]
+env = { "CI" = "true" }
+
+[workflows]
+runButton = "Project"
+
+[[workflows.workflow]]
+name = "Project"
+mode = "parallel"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "e2e-signin"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "typecheck"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "build"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "lint"
+
+[[workflows.workflow.tasks]]
+task = "workflow.run"
+args = "test"
+
+[[workflows.workflow]]
+name = "e2e-signin"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "pnpm --filter @workspace/tests run test"
+
+[workflows.workflow.metadata]
+isValidation = true
+
+[[workflows.workflow]]
+name = "typecheck"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "pnpm run typecheck"
+
+[workflows.workflow.metadata]
+isValidation = true
+
+[[workflows.workflow]]
+name = "build"
+author = "agent"
+
+[workflows.workflow.metadata]
+isValidation = true
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "pnpm run build"
+
+[[workflows.workflow]]
+name = "lint"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "pnpm run lint"
+
+[workflows.workflow.metadata]
+isValidation = true
+
+[[workflows.workflow]]
+name = "test"
+author = "agent"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "pnpm run test"
+
+[workflows.workflow.metadata]
+isValidation = true
+
+[agent]
+stack = "PNPM_WORKSPACE"
+expertMode = true
+integrations = ["github:1.0.0"]
+
+[postMerge]
+path = "scripts/post-merge.sh"
+timeoutMs = 90000
+
+[nix]
+channel = "stable-25_05"
+
+[userenv]
+
+[userenv.shared]
+FMP_API_KEY = "7WzuKRveo0Mlso6AYzyJZIUs5yzpKRMb"
+PLATFORM_OPEN_MODE = "1"
+DROPPED_PROVIDERS = "massive,databento"
+
+[userenv.development]
+
+[userenv.production]
+CSRF_SECRET = "39040e1643fc4848444fd12f1df594d6ce2f9512fa547c385d1445f5c484a7aa"
+INTERNAL_AUTH_SECRET = "5b3f33bcbd0c6da828715f895283e56955c93c8ded3d734a5f759671f8e705bd"
+CORS_ALLOWED_ORIGINS = "https://finsyt.replit.app"
+DB_RUNTIME_ROLE = "app_runtime"
+PLATFORM_PRODUCTION_DEMO = "1"
+ALLOW_DEMO_IDENTITY = "1"
+
+[[ports]]
+localPort = 3000
+externalPort = 3000
+
+[[ports]]
+localPort = 3099
+externalPort = 5173
+
+[[ports]]
+localPort = 8080
+externalPort = 8080
+
+[[ports]]
+localPort = 8081
+externalPort = 8081
+
+[[ports]]
+localPort = 8082
+externalPort = 3001
+
+[[ports]]
+localPort = 8083
+externalPort = 5000
+
+[[ports]]
+localPort = 8084
+externalPort = 3003
+
+[[ports]]
+localPort = 8090
+externalPort = 6800
+
+[[ports]]
+localPort = 22813
+externalPort = 80
+
+[[ports]]
+localPort = 22814
+externalPort = 3002
+
+[[ports]]
+localPort = 22815
+externalPort = 4200
